@@ -17,8 +17,10 @@ import { div } from "framer-motion/client";
 
 export const Admin = () => {
     return (
-        <div className="">
-            <Navbar />
+        <div className="lalalalalalalla">
+            <Navbar 
+            estilos="bg-white"
+            />
         </div>
     )
 }
