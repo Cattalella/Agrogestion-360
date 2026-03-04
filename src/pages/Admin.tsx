@@ -15,7 +15,7 @@ import insumos from "../assets/imgs/icon_insumo.webp";
 import inventario from "../assets/imgs/icon_inventario.webp";
 import { div } from "framer-motion/client";
 
-export const hero = () => {
+export const Admin = () => {
     return (
         <div className="">
             <Navbar />

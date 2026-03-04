@@ -227,8 +227,8 @@ const Footer = () => {
             rounded-[2rem] mt-[2.5rem] w-full max-w-[80rem] 
             gap-[2.5rem] mx-auto p-7">
 
-            <p className="">
-                -- Sembrando Técnología, Cosechando Resultados -- sdhfhsdf
+            <p className="flex justify-end bg-amber-200 w-full max-w-[80rem]">
+                -- Sembrando Técnología, Cosechando Resultados --
             </p>
         </footer>
     )
