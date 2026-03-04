@@ -1,0 +1,38 @@
+
+@font-face {
+    font-family: 'agro';
+    src: url('/src/assets/fonts/agro.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'texto';
+    src: url('/src/assets/fonts/texto.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'yusei';
+    src: url('/src/assets/fonts/yusei.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+:root {
+    /* variables para color */
+    --color-amarilloBorde: #ffaa00;
+    --color-verdeBorde: #00ff00;
+    --color-azulDueño: #000f21;
+    --color-graficaDueño: #0077ff;
+    --color-rosado: #aa00cc;
+    --color-violeta: #3200a8;
+    --color-verdeInfo: #a6ffb0;
+    --color-amarilloInfo: #dfffae;
+
+    /* variables para fuentes */
+    --fuente-agro: 'agro', sans-serif;
+    --fuente-general: 'texto', sans-serif;
+    --fuente-info: 'yusei', sans-serif;
+}
