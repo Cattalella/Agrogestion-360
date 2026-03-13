@@ -19,7 +19,7 @@ export const Entrar = () => {
             <div className='flex flex-col items-center gap-4'>
                 <Botones 
                     texto='INICIAR SESIÓN'
-                    onClick={() => navigate("/login")} // <--- Te manda a la ruta /login
+                    onClick={() => navigate("/star")} // <--- Te manda a la ruta /login
                     estilo='rounded-[10rem] rounded-br-0 
                     rounded-tr-[20rem] border-r-[0.5rem] 
                     border-[var(--color-verdeBorde)] w-[12rem] 

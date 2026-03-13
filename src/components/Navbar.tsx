@@ -55,6 +55,7 @@ export const Navbar = ({ estilos, texto }: NavProps) => {
 
                 <Botones 
                 texto="INICIAR SESION" 
+                onClick={() => navigate("/star")}
                 estilo=""
                 />
             </div>

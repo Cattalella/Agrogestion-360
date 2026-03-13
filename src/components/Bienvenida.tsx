@@ -4,8 +4,7 @@ import { motion } from 'framer-motion';
 
 const saludo = "BIENVENIDOS";
 const logo = "AGROGESTIÓN";
-const lema = "GESTIÓN INTEGRAL DE TU FINCA EN UN SOLO LUGAR";
-
+let lema = "GESTIÓN INTEGRAL DE TU FINCA EN UN SOLO LUGAR";
 
 export const Bienvenida = () => {
     return (
