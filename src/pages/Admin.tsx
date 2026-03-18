@@ -19,14 +19,13 @@ import inventario from '../assets/imgs/icon_inventario.webp'
 import alimentos from '../assets/imgs/icon_alimento.webp'
 import herramientas from '../assets/imgs/icon_herramienta.webp'
 import sanidad from '../assets/imgs/icon_sanidad.webp'
-import admin2 from '../assets/imgs/admin.jpg'
-import plantas from '../assets/imgs/PLANTAS.webp'
-import { input } from "framer-motion/client";
+import admin2 from '../assets/imgs/aguila.webp'
+import { input, section } from "framer-motion/client";
 
 // --- COMPONENTE REUTILIZABLE (MOLDE) ---
 export const CardRegistro = ({ titulo, icono, datos }: any) => {
     return (
-        <article className="flex border-1 rounded-[1.5rem] bg-white p-4 w-[15rem] min-h-[8rem] gap-4 justify-center shadow-sm">
+        <article className="flex border-1 rounded-[1.5rem] bg-white p-4 w-[17rem] min-h-[8rem] gap-4 justify-center shadow-sm">
             <div className="shrink-0">
                 <img className="w-[2.5rem]" src={icono} alt={titulo} />
             </div>
@@ -52,35 +51,30 @@ export const CardRegistro = ({ titulo, icono, datos }: any) => {
 // --- ENCABEZADO (Solo visual) ---
 export const Encabezado = () => {
     return ( 
-        <div className="bg-white">
-            <div className="w-full h-auto relative flex flex-col px-24 pt-32 overflow-hidden">
-                <div 
-                    className="absolute inset-0 z-0 bg-cover bg-no-repeat blur-[3px] scale-110"
-                    style={{ backgroundImage: `url(${admin2})` }}
-                />
-                <div className="absolute inset-0 z-10 bg-gradient-to-b from-transparent via-white/100 to-white" />
+        <div className="relative w-full overflow-hidden bg-white flex justify-end">
+            
+            {/* 2. LA IMAGEN COMPLETA */}
+            {/* Al no ponerle 'absolute', esta imagen es la que manda en el TAMAÑO del contenedor. */}
+            {/* Si quieres que el ave se vea más grande, solo sube el 'w-[1200px]' o lo que necesites */}
+            <img 
+                src={admin2} 
+                alt="Fondo Águila" 
+                className=" w-full h-auto block object-contain max-w-[60rem]" 
+            />
 
-                <div className="relative z-20 flex justify-between items-start w-full">
-                    <div>
-                        <h1 className="text-[85px] font-[texto] font-extrabold leading-[1] text-black tracking-[2px] uppercase">
-                            BIENVENIDO<br /> ESTE ES EL<br /> PANEL PRINCIPAL
-                        </h1>
-                        <Imgs url={plantas} alt="Materas" estilos="!w-[30rem] h-auto mt-[5rem]" />
-                    </div>
+            {/* 3. EL TEXTO ENCIMA */}
+            {/* 'absolute' con 'inset-0' para que cubra toda la imagen y podamos posicionar el texto */}
+            <div className="absolute inset-0 z-20 flex flex-col justify-center p-10">
+                
+                <h1 className="text-[5rem] font-black leading-[1] text-black uppercase">
+                    BIENVENIDO<br /> 
+                    ESTE ES EL<br /> 
+                    PANEL PRINCIPAL
+                </h1>
 
-                    <div className="border-l-[5px] border-black pl-10 py-4 mt-8">
-                        <ul className="space-y-4 text-[22px] font-bold text-gray-900/80">
-                            <li>- Lidera con respeto</li>
-                            <li>- Orden hoy, éxito mañana</li>
-                            <li>- Registro al día, mente clara</li>
-                            <li>- Claridad en las tareas</li>
-                            <li>- Paciencia = Resultado</li>
-                            <li>- Escucha sugerencias</li>
-                            <li>- Tu calma guía el trabajo</li>
-                        </ul>
-                    </div>
-                </div>
+                {/* Si quieres que el texto suba o baje, cambia 'justify-center' por 'justify-start' o 'pt-20' */}
             </div>
+
         </div>
     );
 }
@@ -88,8 +82,8 @@ export const Encabezado = () => {
 // --- HERO (Contenedor de tarjetas) ---    
 export const Hero = ({ ganado, cerdos, vacunas, ventas }: any) => {
     return (
-        <section className="flex flex-col gap-8 mt-20 border p-10 max-w-[80rem] rounded-[2rem]">
-            <div className="">
+        <section className="flex flex-col gap-8 mt-20 border mx-auto p-10 max-w-[80rem] rounded-[2rem]">
+            <div className="text-center font-[texto] text-[var(--color-gray)]">
             <p>GANADERÍA Y PORCICULTURA</p>
             </div>
 
@@ -101,6 +95,26 @@ export const Hero = ({ ganado, cerdos, vacunas, ventas }: any) => {
             </div>
         </section>
     );
+}
+
+// -- Hero 2 --
+export const Hero2 = () => {
+    return (
+        <section className="flex font-[texto] max-w-[80rem] mx-auto mt-15">
+
+            <div className=""> {/* Izquierda */}
+            <article className="flex border rounded-[3rem] p-4 pl-9 pr-9 gap-5"> 
+                <img className="w-13 self-center object-contain" src={sack} alt="Bolsa de dinero" />
+                <div className="">
+                    <p className="font-medium text-amber-950 text-[1.4rem] leading-6">REGISTAR <br /> PAGOS </p>
+                    <p className="mt-2 text-[var(--color-gray)] leading-5">Pagos a <br /> trabajadores </p>
+                </div>
+            </article>
+            
+            </div>
+
+        </section>
+    )
 }
 
 // --- COMPONENTE PRINCIPAL ---
@@ -138,6 +152,7 @@ export const Admin = () => {
                 vacunas={vacunas} 
                 ventas={ventas} 
             />
+            <Hero2 />
         </div>
     )
 }
