@@ -1,0 +1,22 @@
+@import 'tailwindcss';
+@import "./assets/styles/Variables.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+html, body, #root {
+    height: 100%;
+    width: 100%;
+}
+
+/* Ocultar barra de scroll en Chrome, Safari y Opera */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+/* Ocultar barra de scroll para IE, Edge y Firefox */
+.no-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}

@@ -1,0 +1,181 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- MÓDULO 1: SEGURIDAD Y GESTIÓN DE PERSONAL ---
+
+model Rol {
+  id_rol     Int       @id @default(autoincrement())
+  nombre_rol String    @unique @db.VarChar(50) // Dueño, Administrador
+  personas   Persona[]
+}
+
+model CatalogoDoc {
+  id_tipo_doc Int       @id @default(autoincrement())
+  nombre_tipo String    @db.VarChar(50) // CC, CE, NIT
+  personas    Persona[]
+}
+
+model EstadoPers {
+  id_estado Int       @id @default(autoincrement())
+  nombre    String    @db.VarChar(50) // Activo, Inactivo
+  personas  Persona[]
+}
+
+model Persona {
+  id_persona      Int       @id @default(autoincrement())
+  id_rol          Int
+  id_tipo_doc     Int
+  id_estado       Int
+  nombre_completo String    @db.VarChar(150)
+  num_documento   String    @unique @db.VarChar(20)
+  email           String    @unique @db.VarChar(100)
+  telefono        String?   @db.VarChar(20)
+  nombre_usuario  String?   @unique @db.VarChar(50)
+  contrasena_hash String?   @db.VarChar(255)
+  creado_en       DateTime  @default(now())
+
+  rol         Rol         @relation(fields: [id_rol], references: [id_rol])
+  tipo_doc    CatalogoDoc @relation(fields: [id_tipo_doc], references: [id_tipo_doc])
+  estado      EstadoPers  @relation(fields: [id_estado], references: [id_estado])
+  
+  tokens      RecuperacionClave[]
+  vacunaciones RegVacuna[]
+  solicitudes  Solicitud[] @relation("solicitante")
+  aprobaciones Solicitud[] @relation("aprobador")
+  auditorias   Auditoria[]
+}
+
+model RecuperacionClave {
+  id_token         Int      @id @default(autoincrement())
+  id_persona       Int
+  token_hash       String   @unique @db.VarChar(255)
+  fecha_expiracion DateTime
+  usado            Boolean  @default(false)
+
+  persona Persona @relation(fields: [id_persona], references: [id_persona])
+}
+
+// --- MÓDULO 2: GANADERÍA Y SANIDAD ---
+
+model Especie {
+  id_especie Int      @id @default(autoincrement())
+  nombre     String   @db.VarChar(50) // Bovino, Porcino
+  animales   Animal[]
+}
+
+model EstadoAni {
+  id_estado_ani Int      @id @default(autoincrement())
+  nombre        String   @db.VarChar(50) // Activo, Vendido, Difunto
+  animales      Animal[]
+}
+
+model Ubicacion {
+  id_ubicacion Int      @id @default(autoincrement())
+  nombre_ubi   String   @db.VarChar(50) // Potrero 1, Establo A
+  animales     Animal[]
+}
+
+model Animal {
+  id_animal       Int      @id @default(autoincrement())
+  num_ica_chapeta String?  @unique @db.VarChar(50)
+  codigo_local    String   @unique @db.VarChar(20) // El "Apodo"
+  id_especie      Int
+  id_estado_ani   Int
+  id_ubicacion    Int
+  sexo            String   @db.Char(1)
+  raza            String   @db.VarChar(50)
+  fecha_nacimiento DateTime
+  peso_actual     Decimal  @db.Decimal(10, 2)
+  origen          String   @db.VarChar(50)
+  foto_url        String?  @db.VarChar(255)
+
+  especie    Especie    @relation(fields: [id_especie], references: [id_especie])
+  estado     EstadoAni  @relation(fields: [id_estado_ani], references: [id_estado_ani])
+  ubicacion  Ubicacion  @relation(fields: [id_ubicacion], references: [id_ubicacion])
+  
+  vacunas    RegVacuna[]
+  pesajes    HistorialPeso[]
+}
+
+model HistorialPeso {
+  id_peso       Int      @id @default(autoincrement())
+  id_animal     Int
+  peso          Decimal  @db.Decimal(10, 2)
+  fecha_pesaje  DateTime @default(now())
+
+  animal Animal @relation(fields: [id_animal], references: [id_animal])
+}
+
+model CatVacunas {
+  id_vacuna     Int      @id @default(autoincrement())
+  nombre_vacuna String   @db.VarChar(100)
+  registros     RegVacuna[]
+}
+
+model RegVacuna {
+  id_reg_vac     Int      @id @default(autoincrement())
+  id_animal      Int
+  id_vacuna      Int
+  id_responsable Int
+  fecha_aplicacion DateTime @default(now())
+
+  animal      Animal     @relation(fields: [id_animal], references: [id_animal])
+  vacuna      CatVacunas @relation(fields: [id_vacuna], references: [id_vacuna])
+  responsable Persona    @relation(fields: [id_responsable], references: [id_persona])
+}
+
+// --- MÓDULO 3: INVENTARIO Y LOGÍSTICA ---
+
+model CatInsumos {
+  id_insumo     Int      @id @default(autoincrement())
+  nombre_insumo String   @db.VarChar(100)
+  unidad_medida String   @db.VarChar(20) // Kg, Lts, Bultos
+  
+  lotes         LoteInv[]
+  solicitudes   Solicitud[]
+}
+
+model Solicitud {
+  id_solicitud  Int      @id @default(autoincrement())
+  id_insumo     Int
+  id_admin      Int
+  id_dueno      Int
+  estado_sol    String   @db.VarChar(20) // Pendiente, Aprobada, Rechazada
+
+  insumo     CatInsumos @relation(fields: [id_insumo], references: [id_insumo])
+  solicitante Persona    @relation("solicitante", fields: [id_admin], references: [id_persona])
+  aprobador   Persona    @relation("aprobador", fields: [id_dueno], references: [id_persona])
+}
+
+model LoteInv {
+  id_lote       Int      @id @default(autoincrement())
+  id_insumo     Int
+  cant_actual   Decimal  @db.Decimal(10, 2)
+  fecha_venc    DateTime?
+
+  insumo CatInsumos @relation(fields: [id_insumo], references: [id_insumo])
+}
+
+// --- MÓDULO 4: AUDITORÍA Y TRAZABILIDAD ---
+
+model Auditoria {
+  id_auditoria   Int      @id @default(autoincrement())
+  id_usuario     Int
+  fecha_hora     DateTime @default(now())
+  accion         String   @db.VarChar(50) // INSERT, UPDATE, DELETE
+  tabla_afectada String   @db.VarChar(50)
+  valor_anterior String?  @db.Text
+
+  usuario Persona @relation(fields: [id_usuario], references: [id_persona])
+}
