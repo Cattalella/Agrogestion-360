@@ -16,33 +16,53 @@ export const Login = () => {
         setError(null);
 
         try {
-            // Sincronizado con tu controlador de NestJS
-            const respuesta = await axios.post('http://localhost:3000/auth/login', {
+            // INTENTO DE CONEXIÓN REAL CON EL BACKEND
+            const respuesta = await axios.post('http://127.0.0.1:3000/auth/login', {
                 email: email,
-                contrasena: clave // Usamos 'contrasena' tal cual lo probamos en Postman
+                contrasena: clave 
             });
 
-            // Guardamos el token para futuras peticiones
             localStorage.setItem('token', respuesta.data.access_token);
-            
-            // Guardamos el nombre para que aparezca en Boss.tsx
             localStorage.setItem('nombreUsuario', respuesta.data.user.nombre);
             
             console.log("Login exitoso para:", respuesta.data.user.nombre);
-            
-            // Redirección a la pantalla solicitada
             navigate('/boss', { replace: true }); 
 
         } catch (err: any) {
-            // Manejo de errores específico
+
+            // ==========================================================
+            //       LA OVEJA NEGRA: BYPASS SI EL SERVER NO ESTÁ
+            // ==========================================================
+            
+            if (err.code === "ERR_NETWORK") {
+                
+                console.warn("⚠️ MODO EMERGENCIA: Servidor no detectado.");
+                console.log("Accediendo con credenciales quemadas para diseño...");
+
+                // Si ella escribe estos datos específicos, entra aunque no haya server
+                if (email === 'boss@agro.com' && clave === 'clave123') {
+                    
+                    localStorage.setItem('token', 'token-falso-desarrollo');
+                    localStorage.setItem('nombreUsuario', 'Invitada (Modo Diseño)');
+                    
+                    navigate('/boss', { replace: true });
+                    return; // Fin de la oveja negra
+                } else {
+                    setError("MODO OFFLINE: USA LAS CLAVES DE DISEÑO");
+                    return;
+                }
+            }
+
+            // ==========================================================
+
+            // MANEJO DE ERRORES NORMAL (CUANDO EL SERVER SÍ RESPONDE)
             if (err.response?.status === 401) {
                 setError("CREDENCIALES INCORRECTAS");
-            } else if (err.code === "ERR_NETWORK") {
-                setError("SERVIDOR FUERA DE LÍNEA");
             } else {
                 const mensajeError = err.response?.data?.message || "Error inesperado";
                 setError(Array.isArray(mensajeError) ? mensajeError[0] : mensajeError);
             }
+
         } finally {
             setCargando(false);
         }
@@ -64,7 +84,6 @@ export const Login = () => {
                 }} 
                 className='flex flex-col items-center gap-8 w-full px-8'
             >
-                {/* MENSAJE DE ERROR VISUAL - Con tu estilo pulse */}
                 <div className="h-4 flex items-center justify-center">
                     {error && (
                         <span className="text-red-500 text-[0.7rem] uppercase tracking-widest animate-pulse">
