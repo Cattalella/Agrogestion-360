@@ -1,14 +1,35 @@
-import { useState, useEffect, act } from "react";
-import { Plus } from "lucide-react";
+import { useState, useEffect } from "react";
 
 // Importaciones de utilidades de persistencia
 import { guardarFotos, obtenerFotos } from "../utils/storage";
+import { TablaHistorial } from "../components/TablaHistorial";
+
+import { useTrabajoRealizado } from "../hooks/useTrabajoRealizado";
+import { FormularioTrabajoRealizado } from "../components/FormularioPagoRealizado";
+
+// los hooks
+import { useGanado } from "../hooks/useGanado";
+import { useCerdos } from "../hooks/useCerdos";
+import { useVacunas } from "../hooks/useVacunas";
+import { useVentas } from "../hooks/useVentas";
+
+import { FormularioGanado } from "../components/FormularioGanado";
+import { FormularioCerdo } from "../components/FormularioCerdo";
+import { FormularioVacuna } from "../components/FormularioVacuna";
+import { FormularioVenta } from "../components/FormularioVenta";
+
+import { type DatosCard } from "../types/admin";
 
 // Importaciones de componentes
 import { Modal } from "../components/Modal";
 import { ModalGenerico } from "../components/ModalGenerico";
 import { Carrusel, type FotoEvidencia } from "../components/Carrusel";
+
+import { CardRegistro } from "./CardRegistro";
 import { Encabezado } from "../components/Encabezado";
+
+import { FormularioPago } from "../components/FormularioPagos";
+import { useRegistrarPagos } from "../hooks/useRegistrarPagos";
 
 // Importaciones de iconos
 import vaca from '../assets/imgs/icon_vaca.webp'
@@ -29,282 +50,6 @@ import luna from '../assets/imgs/icon_luna.webp'
 import corral from '../assets/imgs/icon_corral.webp'
 import alimentos from '../assets/imgs/icon_alimento.webp'
 import sanidad from '../assets/imgs/icon_sanidad.webp'
-
-// --- INTERFACES ---
-interface FormularioGanadoProps {
-    sugerenciaId: string;
-    categoriaSeleccionada: string;
-    setCategoria: (categoria: string) => void;
-    onGuardar: (datos: any, cerrar: boolean) => void;
-}
-
-interface DatosCard {
-    tipo1: string;
-    cantidad1: string | number;
-    tipo2: string;
-    cantidad2: string | number;
-    tipo3?: string;
-    cantidad3?: string | number;
-    tipo4?: string;
-    cantidad4?: string | number;
-}
-
-interface CardRegistroProps {
-    estilo?: string;
-    titulo: string;
-    icono: string;
-    datos: DatosCard;
-    onClick?: () => void;
-}
-
-// --- COMPONENTE INTERNO: FORMULARIO ---
-const FormularioGanado = ({ sugerenciaId, categoriaSeleccionada, setCategoria, onGuardar }: FormularioGanadoProps) => {
-    const mostrarMadre = ["TE", "NO"].includes(categoriaSeleccionada);
-
-    return (
-        <form className="grid grid-cols-2 gap-4 animate-in fade-in duration-500">
-            <div className="flex flex-col gap-3">
-                <input type="text" placeholder="ID OFICIAL (ICA) - OPCIONAL" className="border-1 border-purple-200 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-purple-300 transition-all" />
-                
-                <div className="relative">
-                    <input 
-                        type="text" 
-                        placeholder={`ID LOCAL (EJ: ${sugerenciaId})`} 
-                        className="w-full border-1 border-purple-200 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-purple-300 transition-all font-bold text-purple-700 placeholder:font-normal" 
-                    />
-                    <span className="absolute right-4 top-2 text-[8px] text-purple-300 uppercase font-black">Sugerido</span>
-                </div>
-
-                {mostrarMadre && (
-                    <input 
-                        type="text" 
-                        placeholder="ID DE LA MADRE (TRAZABILIDAD)" 
-                        className="border-2 border-emerald-200 bg-emerald-50 rounded-full px-6 py-2 text-[12px] focus:outline-none animate-in slide-in-from-left-2" 
-                    />
-                )}
-
-                <input type="text" placeholder="PESO INICIAL (KG)" className="border-1 border-purple-200 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-purple-300 transition-all" />
-                <input type="text" placeholder="INGRESO (DD/MM/AA)" className="border-1 border-purple-200 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-purple-300 transition-all" />
-            </div>
-
-            <div className="flex flex-col gap-3">
-                <select 
-                    value={categoriaSeleccionada}
-                    onChange={(e) => setCategoria(e.target.value)}
-                    className="border-1 border-purple-200 rounded-full px-6 py-2 text-[12px] bg-white text-gray-600 font-bold focus:outline-none cursor-pointer"
-                >
-                    <option value="VA">VACA (ADULTA)</option>
-                    <option value="TO">TORO (ADULTO)</option>
-                    <option value="TE">TERNERO/A (BEBÉ)</option>
-                    <option value="NO">NOVILLO/A (JOVEN)</option>
-                </select>
-
-                <input type="text" placeholder="ESTABLO / LOTE" className="border-1 border-purple-200 rounded-full px-6 py-2 text-[12px] focus:outline-none" />
-                <input type="text" placeholder="ESTADO DE SALUD" className="border-1 border-purple-200 rounded-full px-6 py-2 text-[12px] focus:outline-none" />
-                
-                <div className="border-1 border-purple-200 rounded-[1.5rem] p-3 flex flex-col items-center justify-center text-gray-400 gap-1 cursor-pointer hover:bg-purple-50 transition-colors">
-                    <p className="text-[9px] uppercase font-bold tracking-wider">Subir Fotografía</p>
-                    <div className="w-8 h-8 border-1 border-dashed border-purple-300 rounded-lg flex items-center justify-center">
-                        <Plus size={16} className="text-purple-300" />
-                    </div>
-                </div>
-            </div>
-
-            <div className="col-span-2 flex justify-between mt-4">
-                <button 
-                    onClick={() => onGuardar({}, false)}
-                    type="button" 
-                    className="bg-purple-400 text-white px-6 py-2 rounded-full font-black text-[10px] uppercase italic shadow-md active:scale-95 transition-all"
-                >
-                    Guardar y Seguir
-                </button>
-                <button 
-                    onClick={() => onGuardar({}, true)}
-                    type="button" 
-                    className="bg-blue-600 text-white px-6 py-2 rounded-full font-black text-[10px] uppercase shadow-md active:scale-95 transition-all"
-                >
-                    Guardar y Salir
-                </button>
-            </div>
-        </form>
-    );
-};
-
-// --- COMPONENTE INTERNO: FORMULARIO PORCICULTURA ---
-const FormularioCerdos = ({ sugerenciaId, categoriaSeleccionada, setCategoria, onGuardar }: FormularioGanadoProps) => {
-    return (
-        <form className="grid grid-cols-2 gap-4 animate-in fade-in zoom-in duration-300 p-4">
-            <div className="flex flex-col gap-3">
-                <input type="text" placeholder="ID OFICIAL (ICA)" className="border-1 border-emerald-300 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-emerald-400 transition-all" />
-                
-                <div className="relative">
-                    <input 
-                        type="text" 
-                        placeholder={`ID LOCAL (EJ: ${sugerenciaId})`} 
-                        className="w-full border-1 border-emerald-300 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-emerald-400 transition-all font-bold text-emerald-700 placeholder:font-normal" 
-                    />
-                    <span className="absolute right-4 top-2 text-[8px] text-emerald-400 uppercase font-black">Sugerido</span>
-                </div>
-
-                <input type="text" placeholder="PESO INICIAL (KG)" className="border-1 border-emerald-300 rounded-full px-6 py-2 text-[12px] focus:outline-none" />
-                <input type="text" placeholder="INGRESO (DD/MM/AA)" className="border-1 border-emerald-300 rounded-full px-6 py-2 text-[12px] focus:outline-none" />
-                <input type="text" placeholder="NACIMIENTO (DD/MM/AA)" className="border-1 border-emerald-300 rounded-full px-6 py-2 text-[12px] focus:outline-none" />
-            </div>
-
-            <div className="flex flex-col gap-3">
-                <select 
-                    value={categoriaSeleccionada}
-                    onChange={(e) => setCategoria(e.target.value)}
-                    className="border-1 border-emerald-300 rounded-full px-6 py-2 text-[12px] bg-white text-gray-600 font-bold focus:outline-none cursor-pointer appearance-none"
-                >
-                    <option value="HEMBRA">HEMBRA</option>
-                    <option value="MACHO">MACHO</option>
-                    <option value="BEBE">BEBÉ / LECHÓN</option>
-                </select>
-
-                <input type="text" placeholder="ESTABLO" className="border-1 border-emerald-300 rounded-full px-6 py-2 text-[12px] focus:outline-none" />
-                <input type="text" placeholder="ESTADO" className="border-1 border-emerald-300 rounded-full px-6 py-2 text-[12px] focus:outline-none" />
-                
-                <div className="border-1 border-emerald-300 rounded-[2rem] p-4 flex flex-col items-center justify-center text-gray-400 gap-1 cursor-pointer hover:bg-emerald-50 transition-colors h-full">
-                    <p className="text-[10px] uppercase font-bold tracking-wider">Subir Fotografía</p>
-                    <Plus size={24} className="text-emerald-300" />
-                </div>
-            </div>
-
-            <div className="col-span-2 flex justify-between mt-6 gap-4">
-                <button 
-                    onClick={() => onGuardar({}, false)}
-                    type="button" 
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1 py-3 rounded-l-full rounded-r-lg font-black text-[11px] uppercase italic shadow-md active:scale-95 transition-all"
-                >
-                    Guardar y Seguir
-                </button>
-                <button 
-                    onClick={() => onGuardar({}, true)}
-                    type="button" 
-                    className="bg-teal-600 hover:bg-teal-700 text-white flex-1 py-3 rounded-r-full rounded-l-lg font-black text-[11px] uppercase shadow-md active:scale-95 transition-all"
-                >
-                    Guardar y Salir
-                </button>
-            </div>
-        </form>
-    );
-};
-
-// --- COMPONENTE: FORMULARIO VACUNAS ---
-const FormularioVacunas = ({ onGuardar }: { onGuardar: (datos: any, cerrar: boolean) => void }) => {
-    return (
-        <form className="grid grid-cols-2 gap-4 animate-in fade-in zoom-in duration-300 p-4">
-            <div className="flex flex-col gap-3">
-                <input name="tipoVacuna" type="text" placeholder="TIPO DE VACUNA" className="border-1 border-cyan-300 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-cyan-400" />
-                <input name="dosis" type="text" placeholder="DOSIS APLICADA" className="border-1 border-cyan-300 rounded-full px-6 py-2 text-[12px] focus:outline-none" />
-                
-                <select name="tipoAnimal" className="border-1 border-cyan-300 rounded-full px-6 py-2 text-[12px] bg-white text-gray-500 appearance-none">
-                    <option value="">TIPO DE ANIMAL</option>
-                    <option value="BOVINO">BOVINO</option>
-                    <option value="PORCINO">PORCINO</option>
-                </select>
-
-                <input name="animalId" type="text" placeholder="ID LOCAL DE ANIMAL" className="border-1 border-cyan-300 rounded-full px-6 py-2 text-[12px] focus:outline-none font-bold text-cyan-700" />
-            </div>
-
-            <div className="flex flex-col gap-3">
-                <input name="fechaAplicacion" type="text" placeholder="FECHA DE APLICACIÓN (DD/MM/AA)" className="border-1 border-cyan-300 rounded-full px-6 py-2 text-[12px] focus:outline-none" />
-                
-                <select name="viaAplicacion" className="border-1 border-cyan-300 rounded-full px-6 py-2 text-[12px] bg-white text-gray-500">
-                    <option value="">VÍA DE APLICACIÓN</option>
-                    <option value="INTRAMUSCULAR">INTRAMUSCULAR</option>
-                    <option value="SUBCUTANEA">SUBCUTÁNEA</option>
-                    <option value="ORAL">ORAL</option>
-                </select>
-
-                <input name="proximoRefuerzo" type="text" placeholder="PRÓXIMO REFUERZO (DD/MM/AA)" className="border-1 border-cyan-300 rounded-full px-6 py-2 text-[12px] focus:outline-none" />
-                
-                <select name="lote" className="border-1 border-cyan-300 rounded-full px-6 py-2 text-[12px] bg-white text-gray-500">
-                    <option value="">LOTE DE MEDICAMENTO</option>
-                    <option value="L-001">L-001</option>
-                    <option value="L-002">L-002</option>
-                </select>
-            </div>
-
-            <div className="col-span-2 flex justify-between mt-6 gap-4">
-                <button 
-                    type="button"
-                    onClick={() => onGuardar({}, false)}
-                    className="bg-cyan-600 hover:bg-cyan-700 text-white flex-1 py-3 rounded-l-full rounded-r-lg font-black text-[11px] uppercase italic shadow-md active:scale-95 transition-all"
-                >
-                    Guardar y Seguir
-                </button>
-                <button 
-                    type="button"
-                    onClick={() => onGuardar({}, true)}
-                    className="bg-emerald-500 hover:bg-emerald-600 text-white flex-1 py-3 rounded-r-full rounded-l-lg font-black text-[11px] uppercase shadow-md active:scale-95 transition-all"
-                >
-                    Guardar y Salir
-                </button>
-            </div>
-        </form>
-    );
-};
-
-// --- COMPONENTE: FORMULARIO VENTAS ---
-const FormularioVentas = ({ onGuardar }: { onGuardar: (datos: any, cerrar: boolean) => void }) => {
-    return (
-        <form className="grid grid-cols-2 gap-4 animate-in fade-in zoom-in duration-300 p-4">
-            <div className="flex flex-col gap-3">
-                <input name="idAnimal" type="text" placeholder="ID ANIMAL" className="border-1 border-orange-300 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-orange-400 font-bold text-orange-800" />
-                <input name="pesoAnimal" type="text" placeholder="PESO DEL ANIMAL KG" className="border-1 border-orange-300 rounded-full px-6 py-2 text-[12px] focus:outline-none" />
-                <input name="pesoKiloUnidad" type="text" placeholder="PESO POR KILO/UNIDAD" className="border-1 border-orange-300 rounded-full px-6 py-2 text-[12px] focus:outline-none" />
-            </div>
-
-            <div className="flex flex-col gap-3">
-                <input name="vendedor" type="text" placeholder="VENDEDOR" className="border-1 border-orange-300 rounded-full px-6 py-2 text-[12px] focus:outline-none" />
-                <input name="fechaVenta" type="text" placeholder="FECHA DE VENTA" className="border-1 border-orange-300 rounded-full px-6 py-2 text-[12px] focus:outline-none" />
-                <input name="precioVenta" type="text" placeholder="PRECIO DE VENTA" className="border-1 border-orange-300 rounded-full px-6 py-2 text-[12px] focus:outline-none font-bold text-emerald-600" />
-            </div>
-
-            <div className="col-span-2 flex justify-between mt-6 gap-4">
-                <button 
-                    type="button"
-                    onClick={() => onGuardar({}, false)}
-                    className="bg-emerald-700 hover:bg-emerald-800 text-white flex-1 py-3 rounded-l-full rounded-r-lg font-black text-[11px] uppercase italic shadow-md active:scale-95 transition-all"
-                >
-                    Guardar y Seguir
-                </button>
-                <button 
-                    type="button"
-                    onClick={() => onGuardar({}, true)}
-                    className="bg-[#A0522D] hover:bg-[#8B4513] text-white flex-1 py-3 rounded-r-full rounded-l-lg font-black text-[11px] uppercase shadow-md active:scale-95 transition-all"
-                >
-                    Guardar y Salir
-                </button>
-            </div>
-        </form>
-    );
-};
-
-// --- COMPONENTE REUTILIZABLE: CARD ---
-export const CardRegistro = ({ estilo, titulo, icono, datos, onClick }: CardRegistroProps) => {
-    return (
-        <article 
-            onClick={onClick}
-            className={`flex border-1 border-[var(--color-gray)] rounded-[1.5rem] bg-white p-4 w-[15rem] min-h-[8rem] gap-8 justify-center ${estilo} ${onClick ? 'cursor-pointer' : ''}`}
-        >
-            <div className="shrink-0">
-                <img className="w-[2.5rem]" src={icono} alt={titulo} />
-            </div>
-            <div>
-                <h1 className="mb-2 text-[12px] uppercase leading-tight">{titulo}</h1>
-                <div className="flex flex-col gap-1">
-                    <p className="text-[11px] font-semibold text-gray-500 uppercase"> - {datos.cantidad1} {datos.tipo1}</p>
-                    <p className="text-[11px] font-semibold text-gray-500 uppercase"> - {datos.cantidad2} {datos.tipo2}</p>
-                    {datos.tipo3 && <p className="text-[11px] font-semibold text-gray-500 uppercase"> - {datos.cantidad3} {datos.tipo3}</p>}
-                    {datos.tipo4 && <p className="text-[11px] font-semibold text-gray-500 uppercase"> - {datos.cantidad4} {datos.tipo4}</p>}
-                </div>
-            </div>
-        </article>
-    );
-}
 
 // --- HERO 1: GANADERÍA ---
 export const Hero = ({ ganado, cerdos, vacunas, ventas, onRegGanadoClick, onRegCerdosClick, onRegVacunasClick, onRegVentasClick }: any) => {
@@ -337,12 +82,12 @@ export const Hero = ({ ganado, cerdos, vacunas, ventas, onRegGanadoClick, onRegC
 }
 
 // --- HERO 2: SECCIÓN INTERMEDIA ---
-export const Hero2 = ({ pagos, trabajo, trabajadores, compras }: any) => {
+export const Hero2 = ({ pagos, trabajo, trabajadores, compras, onRegPagosClick, onRegTrabajoClick, onRegTrabajadoresClick, onRegComprasClick }: any) => {
     const cardsHero2 = [
-        { titulo: "REGISTRAR PAGOS", icono: sack, datos: pagos },
-        { titulo: "TRABAJO REALIZADO", icono: martillo, datos: trabajo },
-        { titulo: "NUEVO TRABAJADOR", icono: trabajador, datos: trabajadores },
-        { titulo: "REGISTRAR COMPRA", icono: compra, datos: compras },
+        { titulo: "REGISTRAR PAGOS", icono: sack, datos: pagos, accion: onRegPagosClick },
+        { titulo: "TRABAJO REALIZADO", icono: martillo, datos: trabajo, accion: onRegTrabajoClick },
+        { titulo: "NUEVO TRABAJADOR", icono: trabajador, datos: trabajadores, accion: onRegTrabajadoresClick },
+        { titulo: "REGISTRAR COMPRA", icono: compra, datos: compras, accion: onRegComprasClick },
     ];
 
     return (
@@ -355,6 +100,7 @@ export const Hero2 = ({ pagos, trabajo, trabajadores, compras }: any) => {
                         titulo={card.titulo}
                         icono={card.icono}
                         datos={card.datos}
+                        onClick={card.accion}
                     />
                 ))}
             </div>
@@ -432,86 +178,81 @@ export const Hero3 = ({ fotos, rol, onSubirClick, onBorrarTodo, onBorrarUnaFoto 
 
 // --- COMPONENTE PRINCIPAL ---
 export const Admin = () => {
-    // Estados de datos de las cards
-    const [ganado] = useState<DatosCard>({ tipo1: "VACAS", cantidad1: 0, tipo2: "TOROS", cantidad2: 0, tipo3: "NOVILLOS", cantidad3: 0, tipo4: "TERNEROS", cantidad4: 0 });
-    const [cerdos] = useState<DatosCard>({ tipo1: "VERRACOS", cantidad1: 0, tipo2: "CERDAS DE CRÍA", cantidad2: 0, tipo3: "LECHONES", cantidad3: 200, tipo4: "CERDOS DE CEBA", cantidad4: 0 });
-    const [vacunas] = useState<DatosCard>({ tipo1: "GANADOS VACUNADOS", cantidad1: 0, tipo2: "CERDOS VACUNADOS", cantidad2: 0 });
-    const [ventas] = useState<DatosCard>({ tipo1: "GANADOS VENDIDOS", cantidad1: 0, tipo2: "CERDOS VENDIDOS", cantidad2: 0 });
-    const [pagos] = useState<DatosCard>({ tipo1: "NÓMINA TOTAL", cantidad1: "$ 12M", tipo2: "PENDIENTES", cantidad2: 0 });
-    const [trabajo] = useState<DatosCard>({ tipo1: "HORAS TOTALES", cantidad1: 0, tipo2: "TAREAS COMPLETAS", cantidad2: 0 });
-    const [trabajadores] = useState<DatosCard>({ tipo1: "ACTIVOS", cantidad1: 0, tipo2: "POR CONTRATAR", cantidad2: 0 });
-    const [compras] = useState<DatosCard>({ tipo1: "INSUMOS MES", cantidad1: 0, tipo2: "MAQUINARIA", cantidad2: 0 });
+    // 1. Datos estáticos de las Cards
+    const [ganadoStats] = useState<DatosCard>({ tipo1: "VACAS", cantidad1: 0, tipo2: "TOROS", cantidad2: 0, tipo3: "NOVILLOS", cantidad3: 0, tipo4: "TERNEROS", cantidad4: 0 });
+    const [cerdosStats] = useState<DatosCard>({ tipo1: "VERRACOS", cantidad1: 0, tipo2: "CERDAS DE CRÍA", cantidad2: 0, tipo3: "LECHONES", cantidad3: 200, tipo4: "CERDOS DE CEBA", cantidad4: 0 });
+    const [vacunasStats] = useState<DatosCard>({ tipo1: "GANADOS VACUNADOS", cantidad1: 0, tipo2: "CERDOS VACUNADOS", cantidad2: 0 });
+    const [ventasStats] = useState<DatosCard>({ tipo1: "GANADOS VENDIDOS", cantidad1: 0, tipo2: "CERDOS VENDIDOS", cantidad2: 0 });
+    
+    const [pagosStats] = useState<DatosCard>({ tipo1: "NÓMINA TOTAL", cantidad1: "$ 12M", tipo2: "PENDIENTES", cantidad2: 0 });
+    const [trabajoStats] = useState<DatosCard>({ tipo1: "HORAS TOTALES", cantidad1: 0, tipo2: "TAREAS COMPLETAS", cantidad2: 0 });
+    const [trabajadoresStats] = useState<DatosCard>({ tipo1: "ACTIVOS", cantidad1: 0, tipo2: "POR CONTRATAR", cantidad2: 0 });
+    const [comprasStats] = useState<DatosCard>({ tipo1: "INSUMOS MES", cantidad1: 0, tipo2: "MAQUINARIA", cantidad2: 0 });
 
-    // Control de Modales para Cerdos
-    const [isCerdosModalOpen, setIsCerdosModalOpen] = useState(false);
-    const [vistaCerdos, setVistaCerdos] = useState<'lista' | 'formulario'>('lista');
-    const [categoriaCerdo, setCategoriaCerdo] = useState("HEMBRA");
-    const [listaCerdos] = useState([
-        { id: 1, local: "C-01", oficial: "ICA-P01", sexo: "HEMBRA", estado: "Sano" },
-    ]);
+    // 2. Hooks Personalizados
+    const { 
+        listaGanado, 
+        isModalOpen: isGanadoOpen, 
+        vista: vistaGanado, 
+        sugerenciaId, 
+        categoriaSeleccionada,
+        abrirModal: abrirGanado, 
+        cerrarModal: cerrarGanado, 
+        cambiarVista: setVistaGanado, 
+        setCategoriaSeleccionada: setCatGanado, 
+        guardarAnimal: guardarGanado 
+    } = useGanado([{ id: 1, oficial: "ICA-001", local: "VA-01", sexo: "HEMBRA", estado: "Sano" }]);
 
-        // Control de Modales para Vacunas
-    const [isVacunasModalOpen, setIsVacunasModalOpen] = useState(false);
-    const [vistaVacunas, setVistaVacunas] = useState<'lista' | 'formulario'>('lista');
-    const [listaVacunas] = useState([
-        { id: 1, animal: "VA-01", vacuna: "Aftosa", fecha: "10/04/26", refuerzo: "10/10/26" },
-]);
+    const { 
+        listaPagos, 
+        isModalOpen: isPagosOpen, 
+        vista: vistaPagos, 
+        guardarPago, 
+        cerrarModal: cerrarPagos, 
+        setVista: setVistaPagos,
+        abrirModal: abrirPagos
+    } = useRegistrarPagos();
 
-    // Control de Modales para Ventas
-    const [isVentasModalOpen, setIsVentasModalOpen] = useState(false);
-    const [vistaVentas, setVistaVentas] = useState<'lista' | 'formulario'>('lista');
-    const [listaVentas] = useState([
-    { id: 1, animal: "VA-05", cliente: "Feria Ganadera", fecha: "08/04/26", monto: "$ 4.500.000" },
-]);
+    const {
+        listaTrabajos,
+        isModalOpen: isTrabajoOpen,
+        vista: vistaTrabajo,
+        abrirModal: abrirTrabajo,
+        cerrarModal: cerrarTrabajo,
+        setVista: setVistaTrabajo,
+        guardarTrabajo,
+    } = useTrabajoRealizado();
 
-    // Control de Modales
-    const [isGanadoModalOpen, setIsGanadoModalOpen] = useState(false);
-    const [vistaGanado, setVistaGanado] = useState<'lista' | 'formulario'>('lista');
-    const [modalConfig, setModalConfig] = useState({ abierto: false, mensaje: "", accion: () => {} });
+    const { 
+        listaCerdos, isModalOpen: isCerdosOpen, vista: vistaCerdos, categoriaCerdo,
+        abrirModal: abrirCerdos, cerrarModal: cerrarCerdos, cambiarVista: setVistaCerdos, setCategoriaCerdo, guardarCerdo 
+    } = useCerdos([{ id: 1, local: "C-01", oficial: "ICA-P01", sexo: "HEMBRA", estado: "Sano" }]);
 
-    // Lógica de Negocio: Ganado e IDs
-    const [categoriaSeleccionada, setCategoriaSeleccionada] = useState("VA");
-    const [sugerenciaId, setSugerenciaId] = useState("");
-    const [listaGanado] = useState([
-        { id: 1, oficial: "ICA-001", local: "VA-01", sexo: "HEMBRA", estado: "Sano" },
-        { id: 2, oficial: "ICA-002", local: "TO-01", sexo: "MACHO", estado: "Sano" },
-        { id: 3, oficial: "ICA-003", local: "TE-01", sexo: "HEMBRA", estado: "Sano" },
-    ]);
+    const { 
+        listaVacunas, isModalOpen: isVacunasOpen, vista: vistaVacunas,
+        abrirModal: abrirVacunas, cerrarModal: cerrarVacunas, cambiarVista: setVistaVacunas, guardarVacuna 
+    } = useVacunas([{ id: 1, animal: "VA-01", vacuna: "Aftosa", fecha: "10/04/26", refuerzo: "10/10/26" }]);
 
-    useEffect(() => {
-        const registrosMismoTipo = listaGanado.filter(a => a.local.startsWith(categoriaSeleccionada));
-        const ultimoNumero = registrosMismoTipo.reduce((max, curr) => {
-            const partes = curr.local.split('-');
-            const num = partes.length > 1 ? parseInt(partes[1]) : 0;
-            return !isNaN(num) && num > max ? num : max;
-        }, 0);
+    const { 
+        listaVentas, isModalOpen: isVentasOpen, vista: vistaVentas,
+        abrirModal: abrirVentas, cerrarModal: cerrarVentas, cambiarVista: setVistaVentas, guardarVenta 
+    } = useVentas([{ id: 1, animal: "VA-05", cliente: "Feria Ganadera", fecha: "08/04/26", monto: "$ 4.500.000" }]);
 
-        setSugerenciaId(`${categoriaSeleccionada}-${String(ultimoNumero + 1).padStart(2, '0')}`);
-    }, [categoriaSeleccionada, listaGanado]);
-
-    // Lógica de Fotos
+    // 3. Lógica de Fotos y Modales
     const [listasFotos, setListasFotos] = useState<FotoEvidencia[]>(obtenerFotos());
-
-    const cerrarModalGanado = () => {
-        setIsGanadoModalOpen(false);
-        setVistaGanado('lista');
-    };
+    const [modalConfig, setModalConfig] = useState({ abierto: false, mensaje: "", accion: () => {} });
 
     const manejarSubida = (nuevaFoto: FotoEvidencia) => {
         const nuevas = [nuevaFoto, ...listasFotos];
         setListasFotos(nuevas);
         guardarFotos(nuevas);
-    }
+    };
 
     const abrirModalBorrarTodo = () => {
         setModalConfig({
             abierto: true,
             mensaje: "Vas a eliminar todas las fotos de evidencia. Esta acción no se puede deshacer.",
-            accion: () => {
-                setListasFotos([]);
-                guardarFotos([]);
-                setModalConfig(prev => ({ ...prev, abierto: false }));
-            }
+            accion: () => { setListasFotos([]); guardarFotos([]); setModalConfig(prev => ({ ...prev, abierto: false })); }
         });
     };
 
@@ -521,45 +262,23 @@ export const Admin = () => {
             mensaje: "Vas a eliminar esta foto de evidencia permanentemente.",
             accion: () => { 
                 const filtradas = listasFotos.filter(f => f.id !== id);
-                setListasFotos(filtradas); 
-                guardarFotos(filtradas); 
+                setListasFotos(filtradas); guardarFotos(filtradas); 
                 setModalConfig(prev => ({ ...prev, abierto: false })); 
             }
         });
-    };
-
-    const handleGuardarGanado = (datos: any, cerrar: boolean) => {
-        // Aquí iría la lógica para enviar al backend
-        console.log("Guardando animal...", datos);
-        if(cerrar) {
-            cerrarModalGanado();
-        } else {
-            // Limpiar formulario o resetear sugerencia si es necesario
-            setVistaGanado('lista'); 
-        }
     };
 
     return (
         <div className="flex flex-col min-h-screen pb-20 font-[texto] justify-center">
             
             {/* Modal Principal de Ganado */}
-            <ModalGenerico 
-                titulo={vistaGanado === 'lista' ? "CONTROL DE INVENTARIO" : "REGISTRO DE GANADO"}
-                isOpen={isGanadoModalOpen}
-                onClose={cerrarModalGanado}
-                width="max-w-2xl"
-            >
+            <ModalGenerico titulo={vistaGanado === 'lista' ? "CONTROL DE INVENTARIO" : "REGISTRO DE GANADO"} isOpen={isGanadoOpen} onClose={cerrarGanado} width="max-w-2xl">
                 {vistaGanado === 'lista' ? (
                     <div className="flex flex-col gap-6">
                         <div className="overflow-hidden rounded-xl border border-gray-100 shadow-sm">
                             <table className="w-full text-left text-[11px] uppercase tracking-wider">
                                 <thead className="bg-gray-50 text-gray-400">
-                                    <tr>
-                                        <th className="p-3">ID LOCAL</th>
-                                        <th className="p-3">OFICIAL</th>
-                                        <th className="p-3">SEXO</th>
-                                        <th className="p-3">ESTADO</th>
-                                    </tr>
+                                    <tr><th className="p-3">ID LOCAL</th><th className="p-3">OFICIAL</th><th className="p-3">SEXO</th><th className="p-3">ESTADO</th></tr>
                                 </thead>
                                 <tbody className="text-gray-600">
                                     {listaGanado.map((animal) => (
@@ -573,40 +292,21 @@ export const Admin = () => {
                                 </tbody>
                             </table>
                         </div>
-                        <button 
-                            onClick={() => setVistaGanado('formulario')}
-                            className="bg-emerald-600 text-white py-3 rounded-full font-bold uppercase tracking-widest text-[10px] shadow-lg hover:bg-emerald-700 active:scale-95 transition-all"
-                        >
-                            + Añadir Nuevo Animal
-                        </button>
+                        <button onClick={() => setVistaGanado('formulario')} className="bg-emerald-600 text-white py-3 rounded-full font-bold uppercase tracking-widest text-[10px] shadow-lg hover:bg-emerald-700 active:scale-95 transition-all">+ Añadir Nuevo Animal</button>
                     </div>
                 ) : (
-                    <FormularioGanado 
-                        sugerenciaId={sugerenciaId}
-                        categoriaSeleccionada={categoriaSeleccionada}
-                        setCategoria={setCategoriaSeleccionada}
-                        onGuardar={handleGuardarGanado}
-                    />                 
+                    <FormularioGanado listaGanado={listaGanado} sugerenciaId={sugerenciaId} categoriaSeleccionada={categoriaSeleccionada} setCategoria={setCatGanado} onGuardar={(animal: any) => guardarGanado(animal, true)} />                  
                 )}
             </ModalGenerico>
 
             {/* Modal de Porcicultura */}
-            <ModalGenerico 
-                titulo={vistaCerdos === 'lista' ? "INVENTARIO PORCINO" : "REGISTRAR CERDOS"}
-                isOpen={isCerdosModalOpen}
-                onClose={() => { setIsCerdosModalOpen(false); setVistaCerdos('lista'); }}
-                width="max-w-2xl"
-            >
+            <ModalGenerico titulo={vistaCerdos === 'lista' ? "INVENTARIO PORCINO" : "REGISTRAR CERDOS"} isOpen={isCerdosOpen} onClose={cerrarCerdos} width="max-w-2xl">
                 {vistaCerdos === 'lista' ? (
                     <div className="flex flex-col gap-6 p-4">
                         <div className="overflow-hidden rounded-xl border border-emerald-100 shadow-sm">
                             <table className="w-full text-left text-[11px] uppercase">
                                 <thead className="bg-emerald-50 text-emerald-700">
-                                    <tr>
-                                        <th className="p-3">ID LOCAL</th>
-                                        <th className="p-3">SEXO</th>
-                                        <th className="p-3">ESTADO</th>
-                                    </tr>
+                                    <tr><th className="p-3">ID LOCAL</th><th className="p-3">SEXO</th><th className="p-3">ESTADO</th></tr>
                                 </thead>
                                 <tbody>
                                     {listaCerdos.map((cerdo) => (
@@ -619,103 +319,141 @@ export const Admin = () => {
                                 </tbody>
                             </table>
                         </div>
-                        <button 
-                            onClick={() => setVistaCerdos('formulario')}
-                            className="bg-emerald-600 text-white py-3 rounded-full font-bold uppercase text-[10px] shadow-lg hover:shadow-emerald-200 transition-all"
-                        >
-                            + Registrar Nuevo Cerdo
-                        </button>
+                        <button onClick={() => setVistaCerdos('formulario')} className="bg-emerald-600 text-white py-3 rounded-full font-bold uppercase text-[10px] shadow-lg hover:shadow-emerald-200 transition-all">+ Registrar Nuevo Cerdo</button>
                     </div>
                 ) : (
-                    <FormularioCerdos 
-                        sugerenciaId="C-02"
-                        categoriaSeleccionada={categoriaCerdo}
-                        setCategoria={setCategoriaCerdo}
-                        onGuardar={() => { setIsCerdosModalOpen(false); setVistaCerdos('lista'); }}
+                    <FormularioCerdo sugerenciaId="C-02" categoriaSeleccionada={categoriaCerdo} setCategoria={setCategoriaCerdo} onGuardar={guardarCerdo} />
+                )}
+            </ModalGenerico>
+
+            {/* Modal de Vacunas */}
+            <ModalGenerico titulo={vistaVacunas === 'lista' ? "HISTORIAL DE VACUNACIÓN" : "REGISTRAR VACUNAS"} isOpen={isVacunasOpen} onClose={cerrarVacunas} width="max-w-2xl">
+                {vistaVacunas === 'lista' ? (
+                    <div className="flex flex-col gap-6 p-4">
+                        <div className="overflow-hidden rounded-xl border border-cyan-100 shadow-sm">
+                            <table className="w-full text-left text-[11px] uppercase">
+                                <thead className="bg-cyan-50 text-cyan-700">
+                                    <tr><th className="p-3">ANIMAL</th><th className="p-3">VACUNA</th><th className="p-3">FECHA</th><th className="p-3">REFUERZO</th></tr>
+                                </thead>
+                                <tbody className="text-gray-600">
+                                    {listaVacunas.map((v) => (
+                                        <tr key={v.id} className="border-t border-cyan-50">
+                                            <td className="p-3 font-bold">{v.animal}</td>
+                                            <td className="p-3">{v.vacuna}</td>
+                                            <td className="p-3">{v.fecha}</td>
+                                            <td className="p-3 font-semibold text-orange-500">{v.refuerzo}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <button onClick={() => setVistaVacunas('formulario')} className="bg-cyan-600 text-white py-3 rounded-full font-bold uppercase text-[10px] shadow-lg hover:shadow-cyan-200 transition-all">+ Registrar Nueva Aplicación</button>
+                    </div>
+                ) : (
+                    <FormularioVacuna onGuardar={guardarVacuna} />
+                )}
+            </ModalGenerico>
+
+            {/* Modal de Ventas */}
+            <ModalGenerico titulo={vistaVentas === 'lista' ? "HISTORIAL DE VENTAS" : "REGISTRAR VENTAS"} isOpen={isVentasOpen} onClose={cerrarVentas} width="max-w-2xl">
+                {vistaVentas === 'lista' ? (
+                    <div className="flex flex-col gap-6 p-4">
+                        <div className="overflow-hidden rounded-xl border border-orange-100 shadow-sm">
+                            <table className="w-full text-left text-[11px] uppercase">
+                                <thead className="bg-orange-50 text-orange-700">
+                                    <tr><th className="p-3">ID ANIMAL</th><th className="p-3">CLIENTE/VEND.</th><th className="p-3">FECHA</th><th className="p-3">MONTO TOTAL</th></tr>
+                                </thead>
+                                <tbody className="text-gray-600">
+                                    {listaVentas.map((v) => (
+                                        <tr key={v.id} className="border-t border-orange-50 hover:bg-orange-50/30 transition-colors">
+                                            <td className="p-3 font-bold">{v.animal}</td>
+                                            <td className="p-3">{v.cliente}</td>
+                                            <td className="p-3">{v.fecha}</td>
+                                            <td className="p-3 font-bold text-emerald-600">{v.monto}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <button onClick={() => setVistaVentas('formulario')} className="bg-orange-600 text-white py-3 rounded-full font-bold uppercase text-[10px] shadow-lg hover:bg-orange-700 transition-all">+ Generar Nueva Venta</button>
+                    </div>
+                ) : (
+                    <FormularioVenta onGuardar={guardarVenta} />
+                )}
+            </ModalGenerico>
+
+            {/* Modal de Pagos */}
+            <ModalGenerico 
+                isOpen={isPagosOpen} 
+                onClose={cerrarPagos}
+                titulo={vistaPagos === 'lista' ? "HISTORIAL DE PAGOS" : "REGISTRO DE PAGO"}
+            >
+                {vistaPagos === 'lista' ? (
+                    <TablaHistorial 
+                        datos={listaPagos} 
+                        onNuevo={() => setVistaPagos('formulario')} 
+                    />
+                ) : (
+                    <FormularioPago 
+                        onGuardar={guardarPago} 
+                        onCancelar={() => setVistaPagos('lista')} 
                     />
                 )}
             </ModalGenerico>
 
-            {/* Modal de Vacunas: Historial + Registro */}
-            <ModalGenerico 
-                titulo={vistaVacunas === 'lista' ? "HISTORIAL DE VACUNACIÓN" : "REGISTRAR VACUNAS"}
-                isOpen={isVacunasModalOpen}
-                onClose={() => { setIsVacunasModalOpen(false); setVistaVacunas('lista'); }}
-                width="max-w-2xl"
-                >
-                {vistaVacunas === 'lista' ? (
-                <div className="flex flex-col gap-6 p-4">
-                    <div className="overflow-hidden rounded-xl border border-cyan-100 shadow-sm">
-                        <table className="w-full text-left text-[11px] uppercase">
-                            <thead className="bg-cyan-50 text-cyan-700">
-                                <tr>
-                                    <th className="p-3">ANIMAL</th>
-                                    <th className="p-3">VACUNA</th>
-                                    <th className="p-3">FECHA</th>
-                                    <th className="p-3">REFUERZO</th>
-                                </tr>
-                            </thead>
-                            <tbody className="text-gray-600">
-                                {listaVacunas.map((v) => (
-                                <tr key={v.id} className="border-t border-cyan-50">
-                                    <td className="p-3 font-bold">{v.animal}</td>
-                                    <td className="p-3">{v.vacuna}</td>
-                                    <td className="p-3">{v.fecha}</td>
-                                    <td className="p-3 font-semibold text-orange-500">{v.refuerzo}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            <button 
-                onClick={() => setVistaVacunas('formulario')}
-                className="bg-cyan-600 text-white py-3 rounded-full font-bold uppercase text-[10px] shadow-lg hover:shadow-cyan-200 transition-all"
+            {/* Modal de Trabajo Realizado */}
+            <ModalGenerico
+                isOpen={isTrabajoOpen}
+                onClose={cerrarTrabajo}
+                titulo={vistaTrabajo === 'lista' ? "HISTORIAL DE TRABAJOS" : "REGISTRAR TRABAJO"}
             >
-                + Registrar Nueva Aplicación
-            </button>
-        </div>
-    ) : (
-        <FormularioVacunas 
-            onGuardar={() => { 
-                // Aquí conectarás con Prisma/Express después
-                setIsVacunasModalOpen(false); 
-                setVistaVacunas('lista'); 
-            }} 
-        />
-    )}
+                {vistaTrabajo === 'lista' ? (
+                    <div className="flex flex-col gap-4">
+                        <div className="overflow-hidden rounded-xl border border-gray-100">
+                            <table className="w-full text-left text-[11px] uppercase">
+                                <thead className="bg-gray-50">
+                                    <tr><th className="p-3">FECHA</th><th className="p-3">TRABAJADOR</th><th className="p-3">LABOR</th></tr>
+                                </thead>
+                                <tbody>
+                                    {listaTrabajos.map((t: any) => (
+                                        <tr key={t.id} className="border-t">
+                                            <td className="p-3">{t.fecha}</td>
+                                            <td className="p-3">{t.trabajador}</td>
+                                            <td className="p-3">{t.labor}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <button onClick={() => setVistaTrabajo('formulario')} className="bg-emerald-600 text-white py-2 rounded-full text-[10px] font-bold uppercase">Nuevo Registro</button>
+                    </div>
+                ) : (
+                    <FormularioTrabajoRealizado 
+                        onGuardar={guardarTrabajo} 
+                        onCancelar={() => setVistaTrabajo('lista')} 
+                    />
+                )}
             </ModalGenerico>
 
-            {/* Modal de Confirmación para eliminar */}
-            <Modal
-                abierto={modalConfig.abierto}
-                mensaje={modalConfig.mensaje}
-                onConfirmar={modalConfig.accion}
-                onCancelar={() => setModalConfig(prev => ({ ...prev, abierto: false }))}
-            />
+            {/* Modal de Confirmación */}
+            <Modal abierto={modalConfig.abierto} mensaje={modalConfig.mensaje} onConfirmar={modalConfig.accion} onCancelar={() => setModalConfig(prev => ({ ...prev, abierto: false }))} />
 
             <Encabezado id="admin" titulos="PANEL PRINCIPAL">
-                <img src={admin2} alt="Fondo Águila" className="w-full h-full object-cover object-center" />
+                <img src={admin2} alt="Fondo" className="w-full h-full object-cover object-center" />
             </Encabezado>
 
             <Hero 
-                ganado={ganado} 
-                cerdos={cerdos} 
-                vacunas={vacunas} 
-                ventas={ventas} 
-                onRegGanadoClick={() => setIsGanadoModalOpen(true)}
-                onRegCerdosClick={() => setIsCerdosModalOpen(true)}
-                onRegVacunasClick={() => setIsVacunasModalOpen(true)}
+                ganado={ganadoStats} cerdos={cerdosStats} vacunas={vacunasStats} ventas={ventasStats} 
+                onRegGanadoClick={abrirGanado} onRegCerdosClick={abrirCerdos} onRegVacunasClick={abrirVacunas} onRegVentasClick={abrirVentas} 
             />
             
-            <Hero2 pagos={pagos} trabajo={trabajo} trabajadores={trabajadores} compras={compras} />
-            
-            <Hero3 
-                fotos={listasFotos} 
-                rol="admin" 
-                onSubirClick={manejarSubida} 
-                onBorrarTodo={abrirModalBorrarTodo} 
-                onBorrarUnaFoto={abrirModalBorrarUna} 
+            <Hero2 
+                pagos={pagosStats} trabajo={trabajoStats} trabajadores={trabajadoresStats} compras={comprasStats} 
+                onRegPagosClick={abrirPagos}
+                onRegTrabajoClick={abrirTrabajo}
             />
+            
+            <Hero3 fotos={listasFotos} rol="admin" onSubirClick={manejarSubida} onBorrarTodo={abrirModalBorrarTodo} onBorrarUnaFoto={abrirModalBorrarUna} />
         </div>
     );
 };

@@ -4,6 +4,8 @@ import { Plus, Camera } from "lucide-react";
 interface FormularioGanadoProps {
     listaGanado: any[]; // Para filtrar las madres disponibles
     sugerenciaId: string;
+    categoriaSeleccionada: string;
+    setCategoria: (valor: string) => void;
     onGuardar: (datos: any, salir: boolean) => void;
 }
 

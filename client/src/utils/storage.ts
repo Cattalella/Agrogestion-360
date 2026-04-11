@@ -1,12 +1,10 @@
-import { type FotoEvidencia } from "../components/Carrusel";
+// src/utils/storage.ts
 
-const KEY = "evidencias_agrogestion";
-
-export const guardarFotos = (fotos: FotoEvidencia[]) => {
-    localStorage.setItem(KEY, JSON.stringify(fotos));
+export const guardarFotos = (fotos: any[]) => {
+  localStorage.setItem('fotos_evidencia', JSON.stringify(fotos));
 };
 
-export const obtenerFotos = (): FotoEvidencia[] => {
-    const fotos = localStorage.getItem(KEY);
-    return fotos ? JSON.parse(fotos) : [];
-}
+export const obtenerFotos = (): any[] => {
+  const fotos = localStorage.getItem('fotos_evidencia');
+  return fotos ? JSON.parse(fotos) : [];
+};

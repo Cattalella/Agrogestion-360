@@ -4,11 +4,21 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Esto obliga a los selectores de fecha a mostrarse en mayúsculas */
+input[type="date"]::-webkit-datetime-edit {
+    text-transform: uppercase;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+    /* Opcional: si quieres que el icono combine con tu diseño gris */
+    filter: invert(0.5); 
+}
 
 html, body, #root {
     height: 100%;
     width: 100%;
 }
+
 
 /* Ocultar barra de scroll en Chrome, Safari y Opera */
 .no-scrollbar::-webkit-scrollbar {
