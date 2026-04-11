@@ -7,7 +7,7 @@ async function bootstrap() {
 
   // Configuramos CORS una sola vez y correctamente
   app.enableCors({
-    origin: 'http://localhost:5173', // Tu URL de Vite/React
+    origin: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true, // Corregido: 'credentials' en minúscula
   });
