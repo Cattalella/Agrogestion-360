@@ -1,5 +1,3 @@
-// hooks/useGanado.ts
-
 import { useState, useEffect } from 'react';
 
 interface Animal {
@@ -41,7 +39,6 @@ export const useGanado = (listaInicial: Animal[]) => {
 
     const cambiarVista = (nuevaVista: 'lista' | 'formulario') => setVista(nuevaVista);
 
-    // CAMBIO AQUÍ: Nombre genérico para que Admin.tsx lo renombre como quiera
     const guardarAnimal = (nuevoAnimal: any, cerrar: boolean) => {
         console.log("Enviando a base de datos...", nuevoAnimal);
         if (cerrar) {
@@ -54,13 +51,13 @@ export const useGanado = (listaInicial: Animal[]) => {
     return {
         listaGanado,
         categoriaSeleccionada,
-        setCategoriaSeleccionada, // Asegúrate de que Admin use este nombre exacto
+        setCategoriaSeleccionada,
         sugerenciaId,
         isModalOpen,
         vista,
         abrirModal,
         cerrarModal,
         cambiarVista,
-        guardarAnimal // <--- IMPORTANTE
+        guardarAnimal
     };
 };

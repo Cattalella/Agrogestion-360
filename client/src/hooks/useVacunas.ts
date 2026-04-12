@@ -1,23 +1,22 @@
 import { useState } from 'react';
 
-// Definimos la estructura de la aplicación de vacuna
-interface RegistroVacuna {
+interface Vacuna {
     id: number;
-    animal: string;   // ID Local del animal (VA-01, C-01, etc)
-    vacuna: string;   // Nombre de la vacuna
-    fecha: string;    // Fecha de aplicación
-    refuerzo: string; // Fecha programada de refuerzo
+    animal: string;
+    vacuna: string;
+    fecha: string;
+    refuerzo: string;
 }
 
-export const useVacunas = (listaInicial: RegistroVacuna[]) => {
-    // 1. Estados de Datos
-    const [listaVacunas, setListaVacunas] = useState<RegistroVacuna[]>(listaInicial);
-
-    // 2. Estados de UI (Modales y Vistas)
+export const useVacunas = (listaInicial: Vacuna[]) => {
+    const [listaVacunas, setListaVacunas] = useState<Vacuna[]>(listaInicial);
+    const [sugerenciaId, setSugerenciaId] = useState<string>(() => {
+        const nextId = listaInicial.length + 1;
+        return `VAC-${nextId}`;
+    });
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [vista, setVista] = useState<'lista' | 'formulario'>('lista');
 
-    // 3. Handlers de Interfaz
     const abrirModal = () => setIsModalOpen(true);
     
     const cerrarModal = () => {
@@ -27,17 +26,15 @@ export const useVacunas = (listaInicial: RegistroVacuna[]) => {
 
     const cambiarVista = (nuevaVista: 'lista' | 'formulario') => setVista(nuevaVista);
 
-    // 4. Lógica de Negocio: Registro
-    const guardarVacuna = (nuevaAplicacion: any) => {
-        // En el futuro: await prisma.vacuna.create({ data: nuevaAplicacion })
-        console.log("Registrando aplicación de vacuna...", nuevaAplicacion);
-        
-        // Simulación: Volver a la lista tras guardar
+    const guardarVacuna = (datos: any) => {
+        console.log("Guardando vacuna...", datos);
+        setIsModalOpen(false);
         setVista('lista');
     };
 
     return {
         listaVacunas,
+        sugerenciaId,
         isModalOpen,
         vista,
         abrirModal,

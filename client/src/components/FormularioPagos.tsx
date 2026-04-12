@@ -1,100 +1,109 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { type Pago, type EstadoPago } from "../hooks/useRegistrarPagos";
 
 interface Props {
-    onGuardar: (pago: any) => void;
+    pagoAEditar: Pago | null;
+    onGuardar: (datos: Omit<Pago, 'id' | 'contabilizado' | 'anulado'>, cerrar: boolean) => void;
     onCancelar: () => void;
 }
 
-export const FormularioPago = ({ onGuardar, onCancelar }: Props) => {
-    const [formData, setFormData] = useState({
-        trabajadorId: "",
-        tipoTrabajo: "",
-        fechaPago: "",
+export const FormularioPagos = ({ pagoAEditar, onGuardar, onCancelar }: Props) => {
+    const [form, setForm] = useState<Omit<Pago, 'id' | 'contabilizado' | 'anulado'>>({
+        id_trabajador: "",
+        tipo_trabajo: "",
+        fecha_pago: "",
+        monto_total: 0,
         concepto: "",
-        totalPagado: ""
+        estado: "No pagado",
     });
 
-    const manejarSubmit = (e: React.FormEvent, cerrar: boolean) => {
+    useEffect(() => {
+        if (pagoAEditar) {
+            setForm({
+                id_trabajador: pagoAEditar.id_trabajador,
+                tipo_trabajo: pagoAEditar.tipo_trabajo,
+                fecha_pago: pagoAEditar.fecha_pago,
+                monto_total: pagoAEditar.monto_total,
+                concepto: pagoAEditar.concepto,
+                estado: pagoAEditar.estado,
+            });
+        }
+    }, [pagoAEditar]);
+
+    const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onGuardar(formData);
-        if (cerrar) onCancelar();
+        onGuardar(form, true);
     };
 
     return (
-        <form className="flex flex-col items-center gap-6 p-8">
-            
-            {/* Cabecera con Icono y Título */}
-            <div className="flex flex-col items-center gap-2 mb-4">
-                <div className="w-16 h-16 text-blue-500 border-2 border-blue-500 rounded-full flex items-center justify-center italic font-serif text-3xl">
-                    i
-                </div>
-                <h2 className="text-3xl font-bold text-gray-500 tracking-tight">
-                    REGISTRAR PAGOS
-                </h2>
-            </div>
-
-            {/* Cuerpo del Formulario - Inputs Centrados */}
-            <div className="w-full max-w-sm flex flex-col gap-3">
-                <input 
-                    type="text" 
-                    placeholder="ID DEL TRABAJADOR" 
-                    className="border rounded-full p-3 text-center outline-none focus:ring-2 focus:ring-emerald-500/20"
-                    style={{ borderColor: 'var(--color-gray)' }}
-                    onChange={(e) => setFormData({...formData, trabajadorId: e.target.value})}
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input
+                    className="border p-2 rounded"
+                    type="text"
+                    placeholder="ID Trabajador"
+                    value={form.id_trabajador}
+                    onChange={(e) => setForm({ ...form, id_trabajador: e.target.value })}
+                    required
                 />
-                
-                <input 
-                    type="text" 
-                    placeholder="TRABAJO REALIZADO" 
-                    className="border rounded-full p-3 text-center outline-none focus:ring-2 focus:ring-emerald-500/20"
-                    style={{ borderColor: 'var(--color-gray)' }}
-                    onChange={(e) => setFormData({...formData, tipoTrabajo: e.target.value})}
+                <input
+                    className="border p-2 rounded"
+                    type="text"
+                    placeholder="Tipo de Trabajo"
+                    value={form.tipo_trabajo}
+                    onChange={(e) => setForm({ ...form, tipo_trabajo: e.target.value })}
+                    required
                 />
-
-                <input 
-                    type="date" 
-                    placeholder="FECHA DE PAGO" 
-                    className="border rounded-full cursor-text p-3 text-center text-[var(--color-gray)] outline-none focus:ring-2 focus:ring-emerald-500/20"
-                    style={{ borderColor: 'var(--color-gray)' }}
-                    onChange={(e) => setFormData({...formData, fechaPago: e.target.value})}
+                <input
+                    className="border p-2 rounded"
+                    type="date"
+                    value={form.fecha_pago}
+                    onChange={(e) => setForm({ ...form, fecha_pago: e.target.value })}
+                    required
                 />
-
-                <input 
-                    type="text" 
-                    placeholder="CONCEPTO DEL PAGO" 
-                    className="border rounded-full p-3 text-center outline-none focus:ring-2 focus:ring-emerald-500/20"
-                    style={{ borderColor: 'var(--color-gray)' }}
-                    onChange={(e) => setFormData({...formData, concepto: e.target.value})}
-                />
-
-                <input 
-                    type="number" 
-                    placeholder="TOTAL PAGADO" 
-                    className="border rounded-full p-3 text-center outline-none focus:ring-2 focus:ring-emerald-500/20"
-                    style={{ borderColor: 'var(--color-gray)' }}
-                    onChange={(e) => setFormData({...formData, totalPagado: e.target.value})}
+                <input
+                    className="border p-2 rounded"
+                    type="number"
+                    placeholder="Monto Total"
+                    value={form.monto_total}
+                    onChange={(e) => setForm({ ...form, monto_total: Number(e.target.value) })}
+                    required
                 />
             </div>
 
-            {/* Botones de Acción */}
-            <div className="w-full max-w-sm flex flex-col gap-3 mt-4">
-                <button 
+            <select
+                className="border p-2 rounded"
+                value={form.estado}
+                onChange={(e) => setForm({ ...form, estado: e.target.value as EstadoPago })}
+            >
+                <option value="No pagado">No pagado</option>
+                <option value="Pendiente de firma">Pendiente de firma</option>
+                <option value="Pagado con firma">Pagado con firma</option>
+            </select>
+
+            <textarea
+                className="border p-2 rounded"
+                placeholder="Concepto"
+                value={form.concepto}
+                onChange={(e) => setForm({ ...form, concepto: e.target.value })}
+                required
+            />
+
+            <div className="flex justify-end gap-2 mt-4">
+                <button
                     type="button"
-                    onClick={(e) => manejarSubmit(e, false)}
-                    className="bg-[#4ba300] text-white p-3 rounded-full font-bold shadow-md uppercase transition-all active:scale-95"
+                    onClick={onCancelar}
+                    className="bg-gray-500 text-white px-4 py-2 rounded"
                 >
-                    GUARDAR Y SEGUIR
+                    Cancelar
                 </button>
-                
-                <button 
-                    type="button"
-                    onClick={(e) => manejarSubmit(e, true)}
-                    className="bg-[#0028a3] text-white p-3 rounded-full font-bold shadow-md uppercase transition-all active:scale-95"
+                <button
+                    type="submit"
+                    className="bg-blue-600 text-white px-4 py-2 rounded"
                 >
-                    GUARDAR Y SALIR
+                    {pagoAEditar ? "Actualizar Pago" : "Registrar Pago"}
                 </button>
             </div>
-
         </form>
     );
 };
