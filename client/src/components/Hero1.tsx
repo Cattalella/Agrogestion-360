@@ -15,10 +15,11 @@ interface Hero1Props {
         tipo1: string;
         cantidad1: number;
     };
+    gastosPorSector?: any[];
 }
 
-export const Hero1 = ({ ganancias, inversion }: Hero1Props) => {
-    const datosGastosSector = [
+export const Hero1 = ({ ganancias, inversion, gastosPorSector }: Hero1Props) => {
+    const datosGastosSector = gastosPorSector || [
         { name: "PORCICULTURA", valor: 2, color: "#10b981", detalle: "Ene: 1M | Feb: 1M" },
         { name: "GANADERÍA", valor: 2, color: "#8b5cf6", detalle: "Ene: 1M | Feb: 1M" },
         { name: "INSUMOS", valor: 2, color: "#f43f5e", detalle: "Ene: 1M | Feb: 1M" },

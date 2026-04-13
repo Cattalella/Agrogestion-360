@@ -64,14 +64,15 @@ export const Hero2 = ({
     onRegTrabajadoresClick, 
     onRegComprasClick, 
     onRegFormatoPagoClick,
-    onRegSolicitudClick 
+    onRegSolicitudClick,
+    onRegConsumoClick
 }: any) => {
     const cards = [
         { titulo: "REGISTRAR PAGOS",   icono: sack,      datos: pagos,        accion: onRegPagosClick },
         { titulo: "TRABAJO REALIZADO", icono: martillo,  datos: trabajo,      accion: onRegTrabajoClick },
         { titulo: "NUEVO TRABAJADOR",  icono: trabajador,datos: trabajadores, accion: onRegTrabajadoresClick },
         { titulo: "REGISTRAR COMPRA",  icono: compra,    datos: compras,      accion: onRegComprasClick },
-        { titulo: "SOLICITUDES",       icono: docuemento,datos: null,         accion: onRegSolicitudClick },
+        // Card SOLICITUDES ELIMINADA
     ];
 
     return (
@@ -107,8 +108,11 @@ export const Hero2 = ({
             {/* Panel derecho — Solicitudes e Insumos */}
             <div className="flex flex-col gap-5 w-fit h-full">
 
-                {/* Solicitud 1 */}
-                <div className="grid grid-cols-2 rounded-[1.5rem] pl-5 pr-5 p-3 shadow-[0_4px_8px_rgba(0,0,0,0.2)] flex-1 content-center">
+                {/* Solicitud 1 - AHORA CLICKEABLE */}
+                <div 
+                    onClick={onRegSolicitudClick}
+                    className="grid grid-cols-2 rounded-[1.5rem] pl-5 pr-5 p-3 shadow-[0_4px_8px_rgba(0,0,0,0.2)] flex-1 content-center cursor-pointer hover:shadow-[0_8px_16px_rgba(0,0,0,0.3)] hover:scale-[1.02] transition-all duration-300"
+                >
                     <div className="col-span-2 flex flex-col items-center justify-center gap-2 border-b-[var(--color-gray)] border-b border-dashed pb-2 mb-2">
                         <img className="w-8" src={docuemento} alt="doc" />
                         <p className="text-emerald-900 text-[0.8rem]">-- ENVIAR SOLICITUD --</p>
@@ -124,7 +128,10 @@ export const Hero2 = ({
                 </div>
 
                 {/* Consumos e Insumos */}
-                <div className="grid grid-cols-1 rounded-[1.5rem] pl-5 pr-5 p-3 gap-4 shadow-[0_4px_8px_rgba(0,0,0,0.2)] flex-1 content-center">
+                <div 
+                    onClick={onRegConsumoClick}
+                    className="grid grid-cols-1 rounded-[1.5rem] pl-5 pr-5 p-3 gap-4 shadow-[0_4px_8px_rgba(0,0,0,0.2)] flex-1 content-center cursor-pointer hover:shadow-[0_8px_16px_rgba(0,0,0,0.3)] hover:scale-[1.02] transition-all duration-300"
+                >
                     <div className="col-span-1 flex flex-col items-center justify-center gap-2 border-b-[var(--color-gray)] border-b border-dashed pb-2 mb-2">
                         <img className="w-8" src={insumo} alt="insumo" />
                         <p className="text-emerald-900 text-[0.8rem]">-- REGISTRO DE CONSUMOS E INSUMOS --</p>
@@ -139,11 +146,11 @@ export const Hero2 = ({
                     </div>
                 </div>
 
-                {/* Solicitud 2 */}
+                {/* Solicitud 2 - VER INVENTARIO (Desnudo) */}
                 <div className="grid grid-cols-2 rounded-[1.5rem] pl-5 pr-5 p-3 gap-4 shadow-[0_4px_8px_rgba(0,0,0,0.2)] flex-1 content-center">
                     <div className="col-span-2 flex flex-col items-center justify-center gap-2 border-b-[var(--color-gray)] border-b border-dashed pb-2 mb-2">
                         <img className="w-8" src={docuemento} alt="doc" />
-                        <p className="text-emerald-900 text-[0.8rem]">-- ENVIAR SOLICITUD --</p>
+                        <p className="text-emerald-900 text-[0.8rem]">-- VER INVENTARIO --</p>
                     </div>
                     <div className="flex flex-col gap-3 pl-5 pr-5 p-2">
                         <div className="flex items-center gap-2"><img className="w-5" src={alimentos} alt="alimentos" /><p className="text-[0.7rem]">ALIMENTOS</p></div>

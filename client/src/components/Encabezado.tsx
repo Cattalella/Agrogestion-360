@@ -164,6 +164,8 @@ const BannerRecordatorio = ({
 // ============================================================
 const ModalPerfil = ({ onClose }: { onClose: () => void }) => {
     const modalRef = useRef<HTMLDivElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [fotoPerfil, setFotoPerfil] = useState<string | null>(() => localStorage.getItem("foto_perfil"));
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -178,13 +180,43 @@ const ModalPerfil = ({ onClose }: { onClose: () => void }) => {
         };
     }, [onClose]);
 
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const base64String = reader.result as string;
+                localStorage.setItem("foto_perfil", base64String);
+                setFotoPerfil(base64String);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
     return (
         <div ref={modalRef} className="absolute top-14 right-0 w-64 backdrop-blur-xl bg-white/90 p-6 rounded-2xl shadow-2xl border border-white/50 z-50 flex flex-col gap-4 text-black animate-in fade-in zoom-in duration-200">
             <div className="flex flex-col items-center gap-2">
-                <div className="w-16 h-16 bg-gray-300 rounded-full flex items-center justify-center cursor-pointer hover:bg-gray-400 transition-colors">
-                    <span className="text-[10px] text-center font-bold">FOTO</span>
+                <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    accept="image/*" 
+                    onChange={handleFileChange}
+                />
+                <div 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-16 h-16 bg-gray-300 rounded-full flex items-center justify-center cursor-pointer hover:bg-gray-400 transition-colors overflow-hidden border-2 border-white shadow-sm"
+                >
+                    {fotoPerfil ? (
+                        <img src={fotoPerfil} alt="Perfil" className="w-full h-full object-cover" />
+                    ) : (
+                        <span className="text-[10px] text-center font-bold">FOTO</span>
+                    )}
                 </div>
-                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter cursor-pointer underline">
+                <p 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter cursor-pointer hover:text-green-600 transition-colors"
+                >
                     [ clic para cambiar ]
                 </p>
             </div>
@@ -198,7 +230,7 @@ const ModalPerfil = ({ onClose }: { onClose: () => void }) => {
             </div>
 
             <div className="flex flex-col gap-2 mt-2">
-                <button className="bg-black text-white py-2 rounded-lg text-[10px] uppercase hover:bg-gray-800 transition-colors">Guardar cambios</button>
+                <button className="bg-black text-white py-2 rounded-lg text-[10px] uppercase hover:bg-green-700 transition-colors">Guardar cambios</button>
                 <button onClick={onClose} className="border border-black py-2 rounded-lg text-[10px] uppercase hover:bg-gray-100 transition-colors">Cancelar</button>
             </div>
 

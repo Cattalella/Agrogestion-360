@@ -1,16 +1,13 @@
-// 1. Importas el tipo de los datos que ya tienes definido
 import { type DatosCard } from "../types/admin";
 
-// 2. Defines la interface de las Props del componente
 interface CardRegistroProps {
-    estilo?: string;      // Opcional
-    titulo: string;      // Obligatorio
-    icono: string;       // La ruta de la imagen
-    datos: DatosCard;    // Aquí reusamos la interface que ya existe
-    onClick?: () => void; // Función opcional para el click
+    estilo?: string;
+    titulo: string;
+    icono: string;
+    datos: DatosCard | null;
+    onClick?: () => void;
 }
 
-// 3. Aplicas la interface al componente
 export const CardRegistro = ({ estilo, titulo, icono, datos, onClick }: CardRegistroProps) => {
     return (
         <article 
@@ -23,15 +20,13 @@ export const CardRegistro = ({ estilo, titulo, icono, datos, onClick }: CardRegi
             <div>
                 <h1 className="mb-2 text-[12px] uppercase leading-tight font-bold">{titulo}</h1>
                 <div className="flex flex-col gap-1">
-                    <p className="text-[11px] font-semibold text-gray-500 uppercase"> - {datos.cantidad1} {datos.tipo1}</p>
-                    <p className="text-[11px] font-semibold text-gray-500 uppercase"> - {datos.cantidad2} {datos.tipo2}</p>
-                    
-                    {/* Renderizado condicional limpio */}
-                    {datos.tipo3 && (
-                        <p className="text-[11px] font-semibold text-gray-500 uppercase"> - {datos.cantidad3} {datos.tipo3}</p>
+                    <p className="text-[11px] font-semibold text-gray-500 uppercase"> - {datos?.cantidad1 ?? 0} {datos?.tipo1 ?? ''}</p>
+                    <p className="text-[11px] font-semibold text-gray-500 uppercase"> - {datos?.cantidad2 ?? 0} {datos?.tipo2 ?? ''}</p>
+                    {datos?.tipo3 && (
+                        <p className="text-[11px] font-semibold text-gray-500 uppercase"> - {datos.cantidad3 ?? 0} {datos.tipo3}</p>
                     )}
-                    {datos.tipo4 && (
-                        <p className="text-[11px] font-semibold text-gray-500 uppercase"> - {datos.cantidad4} {datos.tipo4}</p>
+                    {datos?.tipo4 && (
+                        <p className="text-[11px] font-semibold text-gray-500 uppercase"> - {datos.cantidad4 ?? 0} {datos.tipo4}</p>
                     )}
                 </div>
             </div>

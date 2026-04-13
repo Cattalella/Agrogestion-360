@@ -4,9 +4,10 @@ import filtrar from "../assets/imgs/icon_filtrar.webp";
 
 interface BarraFiltrosProps {
     onFiltrar?: (filtro: string) => void;
+    filtrosDisponibles?: string[];
 }
 
-export const BarraFiltros = ({ onFiltrar }: BarraFiltrosProps) => {
+export const BarraFiltros = ({ onFiltrar, filtrosDisponibles = ["ESTE MES", "SEIS MESES", "UN AÑO ATRÁS"] }: BarraFiltrosProps) => {
     const [mostrar, setMostrar] = useState(false);
 
     const handleFiltro = (filtro: string) => {
@@ -29,24 +30,15 @@ export const BarraFiltros = ({ onFiltrar }: BarraFiltrosProps) => {
             {mostrar && (
                 <div className="flex flex-col bg-white shadow-[0_3px_15px_rgba(0,0,0,0.2)] p-4 rounded-lg gap-2 absolute right-0 top-full mt-4 z-30">
                     <ul className="flex flex-col tracking-wider gap-3 cursor-pointer">
-                        <li 
-                            onClick={() => handleFiltro("ESTE MES")}
-                            className="hover:bg-emerald-50 p-1 rounded text-sm"
-                        > 
-                            📅 ESTE MES 
-                        </li>
-                        <li 
-                            onClick={() => handleFiltro("SEIS MESES")}
-                            className="hover:bg-emerald-50 p-1 rounded text-sm"
-                        > 
-                            📊 SEIS MESES 
-                        </li>
-                        <li 
-                            onClick={() => handleFiltro("UN AÑO ATRÁS")}
-                            className="hover:bg-emerald-50 p-1 rounded text-sm"
-                        > 
-                            📈 UN AÑO ATRÁS 
-                        </li>
+                        {filtrosDisponibles.map((filtroTexto, index) => (
+                            <li 
+                                key={index}
+                                onClick={() => handleFiltro(filtroTexto)}
+                                className="hover:bg-emerald-50 p-1 rounded text-sm"
+                            > 
+                                {index === 0 ? "📅" : index === 1 ? "📊" : "📈"} {filtroTexto}
+                            </li>
+                        ))}
                         <li 
                             onClick={() => handleFiltro("RESETEAR")}
                             className="cursor-pointer hover:bg-red-50 p-1 rounded text-sm text-red-600"

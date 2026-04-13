@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 // Utilidades
-import { guardarFotos, obtenerFotos } from "../utils/storage";
+import { useFotosStorage } from "../utils/storage";
 
 // Hooks pecuarios
 import { useGanado } from "../hooks/useGanado";
@@ -18,13 +18,13 @@ import { useTrabajoRealizado } from "../hooks/useTrabajoRealizado";
 import { useNuevoTrabajador } from "../hooks/useNuevoTrabajador";
 import { useRegistrarCompra } from "../hooks/useRegistrarCompra";
 
-// ── NUEVO HOOK SOLICITUD COMPRA ──
 import { useSolicitudCompra } from "../hooks/useSolicitudCompra";
+import { useConsumoInsumos } from "../hooks/useConsumoInsumos";
 
 // Componentes de layout
 import { Encabezado } from "../components/Encabezado";
 import { Modal } from "../components/Modal";
-import { Carrusel, type FotoEvidencia } from "../components/Carrusel";
+import { type FotoEvidencia } from "../components/Carrusel";
 
 // Heroes
 import { Hero, Hero2, Hero3 } from "../components/Heroes";
@@ -74,17 +74,17 @@ export const Admin = () => {
     const compras = useRegistrarCompra();
     const generarPDF = useGenerarPagoPDF();
     
-    // ── NUEVO HOOK SOLICITUD COMPRA ──
-    const solicitudCompra = useSolicitudCompra();
+    // ── NUEVO HOOK SOLICITUD COMPRA Y CONSUMOS ──
+    const solicitudCompra = useSolicitudCompra([]);
+    const consumoInsumos = useConsumoInsumos([]);
 
     // ── FOTOS Y EVIDENCIAS ──
-    const [listasFotos, setListasFotos] = useState<FotoEvidencia[]>(obtenerFotos());
+    const [listasFotos, setListasFotos] = useFotosStorage();
     const [modalConfig, setModalConfig] = useState({ abierto: false, mensaje: "", accion: () => {} });
 
     const manejarSubida = (nuevaFoto: FotoEvidencia) => {
         const nuevas = [nuevaFoto, ...listasFotos];
         setListasFotos(nuevas);
-        guardarFotos(nuevas);
     };
 
     const abrirModalBorrarTodo = () => {
@@ -93,20 +93,18 @@ export const Admin = () => {
             mensaje: "Vas a eliminar todas las fotos de evidencia. Esta acción no se puede deshacer.",
             accion: () => {
                 setListasFotos([]);
-                guardarFotos([]);
                 setModalConfig(prev => ({ ...prev, abierto: false }));
             }
         });
     };
 
     const abrirModalBorrarUna = (id: number) => {
-        setModalConfig({
+        setModalConfig({   
             abierto: true,
             mensaje: "Vas a eliminar esta foto de evidencia permanentemente.",
             accion: () => {
                 const filtradas = listasFotos.filter(f => f.id !== id);
                 setListasFotos(filtradas);
-                guardarFotos(filtradas);
                 setModalConfig(prev => ({ ...prev, abierto: false }));
             }
         });
@@ -127,6 +125,7 @@ export const Admin = () => {
                 compras={compras}
                 generarPDF={generarPDF}
                 solicitudCompra={solicitudCompra}
+                consumoInsumos={consumoInsumos}
             />
 
             {/* Modal de confirmación (borrar fotos) */}
@@ -166,6 +165,7 @@ export const Admin = () => {
                 onRegComprasClick={compras.abrirModal}
                 onRegFormatoPagoClick={generarPDF.abrirModal}
                 onRegSolicitudClick={solicitudCompra.abrirModal}
+                onRegConsumoClick={consumoInsumos.abrirModal}
             />
 
             {/* Hero 3 — Evidencias */}
