@@ -4,8 +4,7 @@ import type {
     TipoSolicitud, 
     CategoriaInsumo, 
     EspecieDestino, 
-    UnidadMedida, 
-    ActividadAsociada 
+    UnidadMedida 
 } from "../hooks/useSolicitudCompra";
 import type { Trabajador } from "../hooks/useNuevoTrabajador";
 
@@ -42,8 +41,6 @@ export const FormularioSolicitudCompra = ({
         especieDestino: "" as EspecieDestino | "",
         proveedor: "",
         categoriaAlimento: "",
-        actividadAsociada: "" as ActividadAsociada | "",
-        responsableId: "",
     });
 
     useEffect(() => {
@@ -61,8 +58,6 @@ export const FormularioSolicitudCompra = ({
                 especieDestino: solicitudAEditar.especieDestino || "",
                 proveedor: solicitudAEditar.proveedor || "",
                 categoriaAlimento: solicitudAEditar.categoriaAlimento || "",
-                actividadAsociada: solicitudAEditar.actividadAsociada || "",
-                responsableId: solicitudAEditar.responsableId || "",
             });
         }
     }, [solicitudAEditar]);
@@ -99,17 +94,6 @@ export const FormularioSolicitudCompra = ({
             }
         }
         
-        if (form.tipo === 'consumo') {
-            if (!form.actividadAsociada) {
-                alert("Debes seleccionar una actividad asociada.");
-                return;
-            }
-            if (!form.responsableId) {
-                alert("Debes seleccionar un responsable.");
-                return;
-            }
-        }
-        
         onGuardar(form, usuarioActual);
     };
 
@@ -136,10 +120,6 @@ export const FormularioSolicitudCompra = ({
                 <label className="flex items-center gap-2 cursor-pointer">
                     <input type="radio" name="tipo" checked={tipoActual === 'alimento'} onChange={() => setTipoSeleccionado('alimento')} disabled={!!solicitudAEditar} />
                     <span className={tipoActual === 'alimento' ? "font-bold text-blue-600" : "text-gray-600"}>🍖 Alimento</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="tipo" checked={tipoActual === 'consumo'} onChange={() => setTipoSeleccionado('consumo')} disabled={!!solicitudAEditar} />
-                    <span className={tipoActual === 'consumo' ? "font-bold text-orange-600" : "text-gray-600"}>📉 Consumo</span>
                 </label>
             </div>
 
@@ -196,27 +176,6 @@ export const FormularioSolicitudCompra = ({
                         <input type="text" placeholder="Proveedor" className="border rounded-lg p-2 text-sm" value={form.proveedor} onChange={(e) => setForm({ ...form, proveedor: e.target.value })} />
                         <input type="text" placeholder="Categoría" className="border rounded-lg p-2 text-sm" value={form.categoriaAlimento} onChange={(e) => setForm({ ...form, categoriaAlimento: e.target.value })} />
                         <input type="date" placeholder="Fecha de vencimiento" className="border rounded-lg p-2 text-sm" value={form.fechaVencimiento} onChange={(e) => setForm({ ...form, fechaVencimiento: e.target.value })} />
-                    </div>
-                </div>
-            )}
-
-            {tipoActual === 'consumo' && (
-                <div className="bg-orange-50 rounded-xl p-4 border border-orange-200 space-y-4">
-                    <p className="text-xs font-bold text-orange-600 uppercase">Datos del Consumo</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <select className="border rounded-lg p-2 text-sm bg-white" value={form.actividadAsociada} onChange={(e) => setForm({ ...form, actividadAsociada: e.target.value as ActividadAsociada })} required>
-                            <option value="">Actividad asociada *</option>
-                            <option value="siembra">Siembra</option>
-                            <option value="mantenimiento">Mantenimiento</option>
-                            <option value="alimentacion">Alimentación</option>
-                            <option value="vacunacion">Vacunación</option>
-                        </select>
-                        <select className="border rounded-lg p-2 text-sm bg-white" value={form.responsableId} onChange={(e) => setForm({ ...form, responsableId: e.target.value })} required>
-                            <option value="">Responsable *</option>
-                            {trabajadoresActivos.map(t => (
-                                <option key={t.id} value={t.id_trabajador}>{t.nombre_completo} - {t.tipo_trabajo}</option>
-                            ))}
-                        </select>
                     </div>
                 </div>
             )}

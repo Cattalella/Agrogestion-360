@@ -18,8 +18,8 @@ import { useTrabajoRealizado } from "../hooks/useTrabajoRealizado";
 import { useNuevoTrabajador } from "../hooks/useNuevoTrabajador";
 import { useRegistrarCompra } from "../hooks/useRegistrarCompra";
 
-// ── NUEVO HOOK SOLICITUD COMPRA ──
 import { useSolicitudCompra } from "../hooks/useSolicitudCompra";
+import { useConsumoInsumos } from "../hooks/useConsumoInsumos";
 
 // Componentes de layout
 import { Encabezado } from "../components/Encabezado";
@@ -74,8 +74,9 @@ export const Admin = () => {
     const compras = useRegistrarCompra();
     const generarPDF = useGenerarPagoPDF();
     
-    // ── NUEVO HOOK SOLICITUD COMPRA ──
-    const solicitudCompra = useSolicitudCompra();
+    // ── NUEVO HOOK SOLICITUD COMPRA Y CONSUMOS ──
+    const solicitudCompra = useSolicitudCompra([]);
+    const consumoInsumos = useConsumoInsumos([]);
 
     // ── FOTOS Y EVIDENCIAS ──
     const [listasFotos, setListasFotos] = useState<FotoEvidencia[]>(obtenerFotos());
@@ -100,7 +101,7 @@ export const Admin = () => {
     };
 
     const abrirModalBorrarUna = (id: number) => {
-        setModalConfig({
+        setModalConfig({   
             abierto: true,
             mensaje: "Vas a eliminar esta foto de evidencia permanentemente.",
             accion: () => {
@@ -127,6 +128,7 @@ export const Admin = () => {
                 compras={compras}
                 generarPDF={generarPDF}
                 solicitudCompra={solicitudCompra}
+                consumoInsumos={consumoInsumos}
             />
 
             {/* Modal de confirmación (borrar fotos) */}
@@ -166,6 +168,7 @@ export const Admin = () => {
                 onRegComprasClick={compras.abrirModal}
                 onRegFormatoPagoClick={generarPDF.abrirModal}
                 onRegSolicitudClick={solicitudCompra.abrirModal}
+                onRegConsumoClick={consumoInsumos.abrirModal}
             />
 
             {/* Hero 3 — Evidencias */}
