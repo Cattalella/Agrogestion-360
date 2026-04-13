@@ -18,6 +18,9 @@ import { useTrabajoRealizado } from "../hooks/useTrabajoRealizado";
 import { useNuevoTrabajador } from "../hooks/useNuevoTrabajador";
 import { useRegistrarCompra } from "../hooks/useRegistrarCompra";
 
+// ── NUEVO HOOK SOLICITUD COMPRA ──
+import { useSolicitudCompra } from "../hooks/useSolicitudCompra";
+
 // Componentes de layout
 import { Encabezado } from "../components/Encabezado";
 import { Modal } from "../components/Modal";
@@ -54,13 +57,25 @@ export const Admin = () => {
     const ventas   = useVentas([{ id: 1, animal: "VA-05", cliente: "Feria Ganadera", fecha: "08/04/26", monto: "$ 4.500.000" }]);
 
     // ── HOOKS DE PERSONAL ──
-    const pagos        = useRegistrarPagos();
-    const trabajo      = useTrabajoRealizado();
+    const pagos = useRegistrarPagos([{ 
+        id: 1, 
+        id_trabajador: "TR-01", 
+        tipo_trabajo: "Mantenimiento",
+        fecha_pago: "2026-04-10",
+        monto_total: 500000,
+        concepto: "Pago semanal",
+        estado: "No pagado",
+        contabilizado: false,
+        anulado: false 
+    }]);
+
+    const trabajo = useTrabajoRealizado();
     const trabajadores = useNuevoTrabajador();
-    const compras      = useRegistrarCompra();
-
+    const compras = useRegistrarCompra();
     const generarPDF = useGenerarPagoPDF();
-
+    
+    // ── NUEVO HOOK SOLICITUD COMPRA ──
+    const solicitudCompra = useSolicitudCompra();
 
     // ── FOTOS Y EVIDENCIAS ──
     const [listasFotos, setListasFotos] = useState<FotoEvidencia[]>(obtenerFotos());
@@ -111,6 +126,7 @@ export const Admin = () => {
                 trabajadores={trabajadores}
                 compras={compras}
                 generarPDF={generarPDF}
+                solicitudCompra={solicitudCompra}
             />
 
             {/* Modal de confirmación (borrar fotos) */}
@@ -149,6 +165,7 @@ export const Admin = () => {
                 onRegTrabajadoresClick={trabajadores.abrirModal}
                 onRegComprasClick={compras.abrirModal}
                 onRegFormatoPagoClick={generarPDF.abrirModal}
+                onRegSolicitudClick={solicitudCompra.abrirModal}
             />
 
             {/* Hero 3 — Evidencias */}

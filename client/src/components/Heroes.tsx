@@ -25,13 +25,12 @@ import sanidad from '../assets/imgs/icon_sanidad.webp';
 // ─────────────────────────────────────────
 // HERO 1 — GANADERÍA Y PORCICULTURA
 // ─────────────────────────────────────────
-export const Hero = ({ ganado, cerdos, vacunas, ventas, onRegGanadoClick, onRegCerdosClick, onRegVacunasClick, onRegVentasClick, onRegFormatoPagoClick }: any) => {
+export const Hero = ({ ganado, cerdos, vacunas, ventas, onRegGanadoClick, onRegCerdosClick, onRegVacunasClick, onRegVentasClick }: any) => {
     const cards = [
         { titulo: "REGISTRAR GANADO",  icono: vaca,   datos: ganado,  accion: onRegGanadoClick },
         { titulo: "REGISTRAR CERDOS",  icono: cerdo,  datos: cerdos,  accion: onRegCerdosClick },
         { titulo: "REGISTRAR VACUNAS", icono: vacuna, datos: vacunas, accion: onRegVacunasClick },
         { titulo: "REGISTRAR VENTAS",  icono: venta,  datos: ventas,  accion: onRegVentasClick },
-        
     ];
 
     return (
@@ -58,12 +57,21 @@ export const Hero = ({ ganado, cerdos, vacunas, ventas, onRegGanadoClick, onRegC
 // ─────────────────────────────────────────
 // HERO 2 — ADMINISTRACIÓN Y LOGÍSTICA
 // ─────────────────────────────────────────
-export const Hero2 = ({ pagos, trabajo, trabajadores, compras, onRegPagosClick, onRegTrabajoClick, onRegTrabajadoresClick, onRegComprasClick, onRegFormatoPagoClick }: any) => {
+export const Hero2 = ({ 
+    pagos, trabajo, trabajadores, compras, 
+    onRegPagosClick, 
+    onRegTrabajoClick, 
+    onRegTrabajadoresClick, 
+    onRegComprasClick, 
+    onRegFormatoPagoClick,
+    onRegSolicitudClick 
+}: any) => {
     const cards = [
         { titulo: "REGISTRAR PAGOS",   icono: sack,      datos: pagos,        accion: onRegPagosClick },
         { titulo: "TRABAJO REALIZADO", icono: martillo,  datos: trabajo,      accion: onRegTrabajoClick },
         { titulo: "NUEVO TRABAJADOR",  icono: trabajador,datos: trabajadores, accion: onRegTrabajadoresClick },
         { titulo: "REGISTRAR COMPRA",  icono: compra,    datos: compras,      accion: onRegComprasClick },
+        { titulo: "SOLICITUDES",       icono: docuemento,datos: null,         accion: onRegSolicitudClick },
     ];
 
     return (

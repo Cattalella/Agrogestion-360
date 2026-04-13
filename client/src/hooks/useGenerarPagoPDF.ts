@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import jsPDF from 'jspdf';
 import type { Pago } from './useRegistrarPagos';
 import type { Trabajador } from './useNuevoTrabajador';
 import type { TrabajoRealizado } from './useTrabajoRealizado';
@@ -21,16 +22,16 @@ export interface FormatoPago {
         montoLetras: string;
     };
     estadoFirma: 'pendiente' | 'firmado' | 'escaneado';
-    firmaDigital?: string;        // Base64 o URL de la firma digital
-    evidenciaEscaneo?: string;    // URL o Base64 del PDF/Imagen escaneado
+    firmaDigital?: string;
+    evidenciaEscaneo?: string;
     fechaFirma?: string;
-    fechaRegistroPago?: string;    // Cuando se confirma el pago (solo después de firmar)
+    fechaRegistroPago?: string;
 }
 
 type Vista = 'lista' | 'formulario' | 'vistaPrevia';
 
 // ─────────────────────────────────────────
-// UTILIDAD: Convertir número a letras (CORREGIDA)
+// UTILIDAD: Convertir número a letras
 // ─────────────────────────────────────────
 const numeroALetras = (numero: number): string => {
     if (numero === 0) return 'CERO';
@@ -49,12 +50,10 @@ const numeroALetras = (numero: number): string => {
         60: 'SESENTA', 70: 'SETENTA', 80: 'OCHENTA', 90: 'NOVENTA'
     };
     
-    // Números especiales (1-29)
     if (numero <= 29) {
         return especiales[numero] || `${unidades[numero]}`;
     }
     
-    // Decenas (30-99)
     if (numero < 100) {
         const decena = Math.floor(numero / 10) * 10;
         const unidad = numero % 10;
@@ -62,7 +61,6 @@ const numeroALetras = (numero: number): string => {
         return `${decenas[decena]} Y ${unidades[unidad]}`;
     }
     
-    // Centenas (100-999)
     if (numero < 1000) {
         const centena = Math.floor(numero / 100);
         const resto = numero % 100;
@@ -79,32 +77,21 @@ const numeroALetras = (numero: number): string => {
         else if (centena === 9) centenaStr = 'NOVECIENTOS';
         
         if (resto === 0) return centenaStr;
-        if (resto < 100) return `${centenaStr} ${numeroALetras(resto)}`;
         return `${centenaStr} ${numeroALetras(resto)}`;
     }
     
-    // Miles (1000-999999)
     if (numero < 1000000) {
         const miles = Math.floor(numero / 1000);
         const resto = numero % 1000;
-        
-        let milesStr = '';
-        if (miles === 1) milesStr = 'MIL';
-        else milesStr = `${numeroALetras(miles)} MIL`;
-        
+        const milesStr = miles === 1 ? 'MIL' : `${numeroALetras(miles)} MIL`;
         if (resto === 0) return milesStr;
         return `${milesStr} ${numeroALetras(resto)}`;
     }
     
-    // Millones
     if (numero < 1000000000) {
         const millones = Math.floor(numero / 1000000);
         const resto = numero % 1000000;
-        
-        let millonesStr = '';
-        if (millones === 1) millonesStr = 'UN MILLÓN';
-        else millonesStr = `${numeroALetras(millones)} MILLONES`;
-        
+        const millonesStr = millones === 1 ? 'UN MILLÓN' : `${numeroALetras(millones)} MILLONES`;
         if (resto === 0) return millonesStr;
         return `${millonesStr} ${numeroALetras(resto)}`;
     }
@@ -123,7 +110,6 @@ export const useGenerarPagoPDF = () => {
     const [formatoSeleccionado, setFormatoSeleccionado] = useState<FormatoPago | null>(null);
     const [generandoPDF, setGenerandoPDF] = useState(false);
 
-    // ── Abrir / Cerrar ──
     const abrirModal = () => {
         setVista('lista');
         setIsModalOpen(true);
@@ -139,7 +125,6 @@ export const useGenerarPagoPDF = () => {
         setVista(nuevaVista);
     };
 
-    // ── Generar formato de pago (PDF) ──
     const generarFormatoPago = async (
         pago: Pago,
         trabajador: Trabajador,
@@ -150,7 +135,6 @@ export const useGenerarPagoPDF = () => {
         setGenerandoPDF(true);
         
         try {
-            // Filtrar trabajos del trabajador en el período
             const actividades = trabajosRealizados
                 .filter(t => t.id_trabajador === trabajador.id_trabajador)
                 .map(t => `${t.tipo_actividad} (${t.duracion_trabajo})`);
@@ -172,23 +156,106 @@ export const useGenerarPagoPDF = () => {
                 estadoFirma: 'pendiente'
             };
             
-            // Aquí iría la generación del PDF con una librería (jsPDF, react-pdf, etc.)
-            // Por ahora simulamos
-            console.log("Generando PDF...", nuevoFormato);
+            // 📄 GENERAR PDF CON jsPDF
+            const doc = new jsPDF();
+            let y = 20;
+            
+            // Título
+            doc.setFontSize(16);
+            doc.setFont("helvetica", "bold");
+            doc.text("FORMATO DE PAGO", 20, y);
+            y += 10;
+            
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "normal");
+            doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 20, y);
+            y += 15;
+            
+            // Línea separadora
+            doc.line(20, y, 190, y);
+            y += 10;
+            
+            // DATOS DEL TRABAJADOR
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            doc.text("DATOS DEL TRABAJADOR", 20, y);
+            y += 8;
+            
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "normal");
+            doc.text(`Nombre: ${trabajador.nombre_completo}`, 20, y);
+            y += 6;
+            doc.text(`ID Trabajador: ${trabajador.id_trabajador}`, 20, y);
+            y += 6;
+            doc.text(`Tipo de trabajo: ${trabajador.tipo_trabajo}`, 20, y);
+            y += 6;
+            doc.text(`Período: ${periodo}`, 20, y);
+            y += 15;
+            
+            // ACTIVIDADES REALIZADAS
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            doc.text("ACTIVIDADES REALIZADAS", 20, y);
+            y += 8;
+            
+            doc.setFontSize(9);
+            doc.setFont("helvetica", "normal");
+            actividades.forEach((act, idx) => {
+                if (y > 270) {
+                    doc.addPage();
+                    y = 20;
+                }
+                doc.text(`• ${act}`, 25, y);
+                y += 5;
+            });
+            y += 10;
+            
+            // MONTO A PAGAR
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            doc.text("MONTO A PAGAR", 20, y);
+            y += 8;
+            
+            doc.setFontSize(11);
+            doc.text(`Monto total: $${pago.monto_total.toLocaleString()}`, 20, y);
+            y += 7;
+            doc.setFontSize(9);
+            doc.text(`En letras: ${numeroALetras(pago.monto_total)}`, 20, y);
+            y += 20;
+            
+            // FIRMA
+            doc.line(60, y, 150, y);
+            y += 5;
+            doc.setFontSize(9);
+            doc.text("Firma del trabajador", 80, y);
+            y += 15;
+            
+            // Nota
+            doc.setFontSize(8);
+            doc.setTextColor(150);
+            doc.text("El pago en efectivo solo se registrará después de firmar este formato.", 20, y);
+            
+            // Guardar PDF
+            doc.save(`formato_pago_${nuevoFormato.id}.pdf`);
+            
+            console.log("PDF generado correctamente", nuevoFormato);
             
             setFormatosPago(prev => [nuevoFormato, ...prev]);
             return nuevoFormato;
             
+        } catch (error) {
+            console.error("Error al generar PDF:", error);
+            alert("❌ Error al generar el PDF. Por favor intenta de nuevo.");
+            throw error;
         } finally {
             setGenerandoPDF(false);
         }
     };
 
-    // ── Registrar firma (digital o escaneo) ──
     const registrarFirma = (
         idFormato: string, 
         tipo: 'digital' | 'escaneo',
-        firmaData: string  // Base64 de firma o URL de escaneo
+        firmaData: string
     ) => {
         setFormatosPago(prev =>
             prev.map(f => {
@@ -210,7 +277,6 @@ export const useGenerarPagoPDF = () => {
         );
     };
 
-    // ── Confirmar pago (solo si está firmado o escaneado) RN.8.1.4 ──
     const confirmarPagoConFirma = (idFormato: string, pagoId: number, onConfirmarPago?: () => void) => {
         const formato = formatosPago.find(f => f.id === idFormato);
         
@@ -224,7 +290,6 @@ export const useGenerarPagoPDF = () => {
             return false;
         }
         
-        // Actualizar el formato con fecha de registro de pago
         setFormatosPago(prev =>
             prev.map(f =>
                 f.id === idFormato
@@ -233,7 +298,6 @@ export const useGenerarPagoPDF = () => {
             )
         );
         
-        // Llamar al callback para actualizar el estado del pago en useRegistrarPagos
         if (onConfirmarPago) {
             onConfirmarPago();
         }
@@ -242,7 +306,6 @@ export const useGenerarPagoPDF = () => {
         return true;
     };
 
-    // ── Obtener historial de pagos firmados ──
     const historialPagosFirmados = formatosPago.filter(
         f => f.estadoFirma !== 'pendiente'
     );
