@@ -15,7 +15,7 @@ import toro from "../assets/imgs/TORO_IMG.webp";
 const MOCK_GASTOS_SECTOR = [
     { name: "PORCICULTURA", valor: 2, color: "#10b981", detalle: "Ene: 1M | Feb: 1M" },
     { name: "GANADERÍA", valor: 2, color: "#8b5cf6", detalle: "Ene: 1M | Feb: 1M" },
-    { name: "tt", valor: 2, color: "#f43f5e", detalle: "Ene: 1M | Feb: 1M" },
+    { name: "INVENTARIO", valor: 2, color: "#f43f5e", detalle: "Ene: 1M | Feb: 1M" },
 ];
 
 const MOCK_FILTROS = ["ESTE MES", "SEIS MESES", "UN AÑO ATRÁS"];
