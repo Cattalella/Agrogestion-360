@@ -56,12 +56,11 @@ const TooltipRecordatorio = ({
     }, [isOpen, onClose]);
 
     const handleGuardar = () => {
-        // ✅ Solo la fecha es obligatoria, el propósito es opcional
-        if (!fecha) {
-            alert("Por favor selecciona una fecha");
+        if (!fecha || !proposito) {
+            alert("Por favor completa todos los campos");
             return;
         }
-        onGuardar({ fecha, proposito: proposito || "Sin motivo" }); // Si no hay motivo, poner "Sin motivo"
+        onGuardar({ fecha, proposito });
         setFecha("");
         setProposito("");
         onClose();
@@ -75,13 +74,13 @@ const TooltipRecordatorio = ({
             className="absolute top-full right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 z-[200] overflow-hidden animate-in fade-in zoom-in duration-200"
         >
             <div className="bg-green-700 p-3 text-white">
-                <h3 className="text-sm font-bold text-center">NUEVO RECORDATORIO</h3>
+                <h3 className="text-sm font-bold text-center">📅 NUEVO RECORDATORIO</h3>
             </div>
             
             <div className="p-4 space-y-3">
                 <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">
-                        FECHA DEL RECORDATORIO *
+                        FECHA DEL RECORDATORIO
                     </label>
                     <input
                         type="date"
@@ -93,12 +92,12 @@ const TooltipRecordatorio = ({
 
                 <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">
-                        PROPÓSITO (Opcional)
+                        PROPÓSITO DEL RECORDATORIO
                     </label>
                     <textarea
                         value={proposito}
                         onChange={(e) => setProposito(e.target.value)}
-                        placeholder="Motivo del recordatorio (opcional)"
+                        placeholder="Motivo De Recordatorio"
                         className="w-full border-2 border-gray-200 rounded-lg p-2 text-sm focus:border-green-500 outline-none resize-none"
                         rows={2}
                     />
@@ -299,10 +298,10 @@ export const Nav2 = () => {
                     {mostrarPerfil && <ModalPerfil onClose={() => setMostrarPerfil(false)} />}
                 </div>
 
-                {/* Botón RECORDATORIO sin emoji */}
+                {/* Botón RECORDATORIO con Tooltip desplegable */}
                 <div className="relative">
                     <p className={estiloBoton} onClick={() => setMostrarTooltipRecordatorio(!mostrarTooltipRecordatorio)}> 
-                        RECORDATORIO
+                        📅 RECORDATORIO 
                     </p>
                     <TooltipRecordatorio 
                         isOpen={mostrarTooltipRecordatorio}
