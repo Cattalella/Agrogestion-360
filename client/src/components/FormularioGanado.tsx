@@ -2,36 +2,42 @@ import { useState, useRef, useEffect } from "react";
 import { Plus, Camera } from "lucide-react";
 
 interface FormularioGanadoProps {
-    listaGanado: any[]; // Para filtrar las madres disponibles
+    listaGanado: any[];
     sugerenciaId: string;
     categoriaSeleccionada: string;
     setCategoria: (valor: string) => void;
     onGuardar: (datos: any, salir: boolean) => void;
 }
 
-export const FormularioGanado = ({ listaGanado, sugerenciaId, onGuardar }: FormularioGanadoProps) => {
+export const FormularioGanado = ({ 
+    listaGanado, 
+    sugerenciaId, 
+    onGuardar 
+}: FormularioGanadoProps) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const estadoInicial = {
-        idOficial: "",
-        idLocal: sugerenciaId,
+        oficial: "",           // 🆕 Cambiado de idOficial a oficial
+        local: sugerenciaId,   // 🆕 Cambiado de idLocal a local
         idMadre: "",
         peso: "",
         ingreso: new Date().toISOString().split('T')[0],
         nacimiento: "",
         sexo: "HEMBRA",
-        lote: "",
+        raza: "",              // 🆕 Agregado (antes lote)
+        lote: "",              // Se mantiene para ubicación
         salud: "SANO",
+        origen: "Nacimiento",  // 🆕 Agregado
         foto: null as string | null
     };
 
     const [formData, setFormData] = useState(estadoInicial);
 
     useEffect(() => {
-        setFormData(prev => ({ ...prev, idLocal: sugerenciaId }));
+        setFormData(prev => ({ ...prev, local: sugerenciaId }));
     }, [sugerenciaId]);
 
-    const esCria = formData.idLocal.startsWith("TE") || formData.idLocal.startsWith("NO");
+    const esCria = formData.local.startsWith("TE") || formData.local.startsWith("NO");
 
     const manejarCambio = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -50,11 +56,31 @@ export const FormularioGanado = ({ listaGanado, sugerenciaId, onGuardar }: Formu
     };
 
     const ejecutarEnvio = (salir: boolean) => {
-        if (!formData.idLocal) {
+        if (!formData.local) {
             alert("El ID Local es obligatorio.");
             return;
         }
-        onGuardar(formData, salir);
+
+        // 🆕 Transformar datos al formato que espera el backend
+        const datosParaBackend = {
+            codigo_local: formData.local,
+            num_ica_chapeta: formData.oficial || null,
+            sexo: formData.sexo,
+            raza: formData.raza || 'Criollo',
+            fecha_nacimiento: formData.nacimiento || formData.ingreso,
+            peso_actual: parseFloat(formData.peso) || 0,
+            origen: formData.origen || 'Registro inicial',
+            id_ubicacion: 1, // TODO: Obtener del catálogo de ubicaciones
+            foto_url: formData.foto || null,
+            // Campos adicionales que podemos guardar en otro lado
+            id_madre: formData.idMadre || null,
+            lote: formData.lote || '',
+            salud: formData.salud || 'SANO',
+            fecha_ingreso: formData.ingreso,
+        };
+
+        console.log('📤 Datos a enviar:', datosParaBackend);
+        onGuardar(datosParaBackend, salir);
         
         if (!salir) {
             setFormData(estadoInicial);
@@ -67,8 +93,8 @@ export const FormularioGanado = ({ listaGanado, sugerenciaId, onGuardar }: Formu
             {/* Columna Izquierda: Identificación y Fechas */}
             <div className="flex flex-col gap-3">
                 <input 
-                    name="idOficial" 
-                    value={formData.idOficial}
+                    name="oficial"  // 🆕 Cambiado
+                    value={formData.oficial}
                     onChange={manejarCambio} 
                     type="text" 
                     placeholder="ID OFICIAL (ICA)" 
@@ -76,8 +102,8 @@ export const FormularioGanado = ({ listaGanado, sugerenciaId, onGuardar }: Formu
                 />
                 
                 <input 
-                    name="idLocal" 
-                    value={formData.idLocal} 
+                    name="local"  // 🆕 Cambiado
+                    value={formData.local} 
                     onChange={manejarCambio} 
                     type="text" 
                     placeholder="ID LOCAL (V-01)" 
@@ -149,6 +175,16 @@ export const FormularioGanado = ({ listaGanado, sugerenciaId, onGuardar }: Formu
                     />
                 </div>
                 
+                {/* 🆕 Campo Raza */}
+                <input 
+                    name="raza" 
+                    value={formData.raza}
+                    onChange={manejarCambio} 
+                    type="text" 
+                    placeholder="RAZA (Ej: Brahman)" 
+                    className="border-1 border-purple-200 rounded-full px-6 py-2 text-[12px] focus:outline-none placeholder:text-gray-300" 
+                />
+                
                 <input 
                     name="lote" 
                     value={formData.lote}
@@ -166,6 +202,18 @@ export const FormularioGanado = ({ listaGanado, sugerenciaId, onGuardar }: Formu
                     placeholder="ESTADO DE SALUD" 
                     className="border-1 border-purple-200 rounded-full px-6 py-2 text-[12px] focus:outline-none placeholder:text-gray-300 italic" 
                 />
+                
+                {/* 🆕 Campo Origen */}
+                <select 
+                    name="origen" 
+                    value={formData.origen}
+                    onChange={manejarCambio} 
+                    className="border-1 border-purple-200 rounded-full px-6 py-2 text-[11px] bg-white text-purple-600 focus:outline-none"
+                >
+                    <option value="Nacimiento">NACIMIENTO</option>
+                    <option value="Compra">COMPRA</option>
+                    <option value="Registro inicial">REGISTRO INICIAL</option>
+                </select>
                 
                 <input 
                     type="file" 

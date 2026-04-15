@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import axios from 'axios';
+import apiClient from '../api/apiClient';
 import { LogIn } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import vaca from '../assets/imgs/rvaca.jpg';
 
 export const Login = () => {
     const navigate = useNavigate();
-    const [email, setEmail] = useState('');
+    const [usuario, setUsuario] = useState('');
     const [clave, setClave] = useState('');
     const [error, setError] = useState<string | null>(null);    
     const [cargando, setCargando] = useState(false);
@@ -16,53 +16,40 @@ export const Login = () => {
         setError(null);
 
         try {
-            // INTENTO DE CONEXIÓN REAL CON EL BACKEND
-            const respuesta = await axios.post('http://127.0.0.1:3000/auth/login', {
-                email: email,
-                contrasena: clave 
+            const respuesta = await apiClient.post('/autenticacion/iniciar-sesion', {
+                nombre_usuario: usuario,
+                contrasena: clave
             });
 
-            localStorage.setItem('token', respuesta.data.access_token);
-            localStorage.setItem('nombreUsuario', respuesta.data.user.nombre);
+            // ✅ Guardar token y datos
+            localStorage.setItem('token', respuesta.data.token);
+            localStorage.setItem('usuario', JSON.stringify(respuesta.data.usuario));
             
-            console.log("Login exitoso para:", respuesta.data.user.nombre);
-            navigate('/boss', { replace: true }); 
+            console.log("✅ Login exitoso:", respuesta.data.usuario.nombre);
+            
+            // 🆕 ESPERAR un momento antes de redirigir
+            // Esto asegura que el token esté 100% disponible
+            setTimeout(() => {
+                const rol = respuesta.data.usuario.rol;
+                if (rol === 'Dueño') {
+                    navigate('/boss', { replace: true });
+                } else if (rol === 'Administrador') {
+                    navigate('/admin', { replace: true });
+                } else {
+                    navigate('/boss', { replace: true });
+                }
+            }, 100); // 100ms de delay
 
         } catch (err: any) {
-
-            // ==========================================================
-            //       LA OVEJA NEGRA: BYPASS SI EL SERVER NO ESTÁ
-            // ==========================================================
+            console.error('❌ Error en login:', err);
             
             if (err.code === "ERR_NETWORK") {
-                
-                console.warn("⚠️ MODO EMERGENCIA: Servidor no detectado.");
-                console.log("Accediendo con credenciales quemadas para diseño...");
-
-                // Si ella escribe estos datos específicos, entra aunque no haya server
-                if (email === 'boss@agro.com' && clave === 'clave123') {
-                    
-                    localStorage.setItem('token', 'token-falso-desarrollo');
-                    localStorage.setItem('nombreUsuario', 'Invitada (Modo Diseño)');
-                    
-                    navigate('/boss', { replace: true });
-                    return; // Fin de la oveja negra
-                } else {
-                    setError("MODO OFFLINE: USA LAS CLAVES DE DISEÑO");
-                    return;
-                }
-            }
-
-            // ==========================================================
-
-            // MANEJO DE ERRORES NORMAL (CUANDO EL SERVER SÍ RESPONDE)
-            if (err.response?.status === 401) {
+                setError("ERROR DE CONEXIÓN: El servidor no está disponible");
+            } else if (err.response?.status === 401) {
                 setError("CREDENCIALES INCORRECTAS");
             } else {
-                const mensajeError = err.response?.data?.message || "Error inesperado";
-                setError(Array.isArray(mensajeError) ? mensajeError[0] : mensajeError);
+                setError(err.response?.data?.mensaje || "Error inesperado");
             }
-
         } finally {
             setCargando(false);
         }
@@ -93,11 +80,11 @@ export const Login = () => {
                 </div>
                 
                 <input 
-                    type="email"
+                    type="text"
                     required
                     placeholder="NOMBRE DE USUARIO"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={usuario}
+                    onChange={(e) => setUsuario(e.target.value)}
                     className='w-full bg-transparent border-b-2 border-white text-white py-2 outline-none placeholder:text-gray-500 focus:border-[var(--color-verdeBorde)] transition-colors'
                 />
 

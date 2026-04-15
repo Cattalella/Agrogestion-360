@@ -1,23 +1,22 @@
 import { useState, useEffect } from "react";
-import { useSolicitudesStorage } from "../utils/storage";
+import apiClient from "../api/apiClient";
 
 export type TipoSolicitud = 'insumo' | 'alimento';
-export type EstadoSolicitud = 'Pendiente' | 'Aprobada' | 'Rechazada';
+export type EstadoSolicitud = 'Pendiente' | 'Aprobada' | 'Rechazada' | 'Completada';
 export type CategoriaInsumo = 'fertilizante' | 'herramienta' | 'empaque' | 'otro';
 export type EspecieDestino = 'cerdos' | 'peces' | 'ganado' | 'gallinas';
 export type UnidadMedida = 'kg' | 'litros' | 'sacos' | 'unidades' | 'toneladas';
 
 export interface SolicitudCompra {
-    id: number;
+    id_solicitud: number;
     tipo: TipoSolicitud;
-    fechaPropuesta: string;
+    fecha_compra: string;
     cantidad: number;
-    unidadMedida: UnidadMedida;
+    unidad_medida: UnidadMedida;
     motivo: string;
-    estado: EstadoSolicitud;
-    fechaCreacion: string;
-    horaCreacion: string;
-    usuario: string;
+    estado_sol: EstadoSolicitud;
+    createdAt: string;
+    usuario?: string;
     tipoInsumo?: string;
     categoriaInsumo?: CategoriaInsumo;
     fechaVencimiento?: string;
@@ -25,51 +24,38 @@ export interface SolicitudCompra {
     especieDestino?: EspecieDestino;
     proveedor?: string;
     categoriaAlimento?: string;
-    ejecutada: boolean;
-    fechaEjecucion?: string;
-    eliminada: boolean;
-    motivoEliminacion?: string;
-    fechaAprobacion?: string;
-    aprobadoPor?: string;
-    motivoRechazo?: string;
 }
 
 type Vista = 'lista' | 'formulario' | 'detalle';
 
-const diasParaVencer = (fechaVencimiento: string): number => {
-    const hoy = new Date();
-    const vence = new Date(fechaVencimiento);
-    const diffMs = vence.getTime() - hoy.getTime();
-    return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-};
-
-export const verificarAlertasVencimiento = (solicitudes: SolicitudCompra[]): SolicitudCompra[] => {
-    return solicitudes.filter(s => {
-        if (!s.fechaVencimiento || s.eliminada || s.estado !== 'Aprobada') return false;
-        const dias = diasParaVencer(s.fechaVencimiento);
-        return dias <= 30 && dias >= 0;
-    });
-};
-
-export const useSolicitudCompra = (inicial: SolicitudCompra[] = []) => {
-
-    const [solicitudes, setSolicitudes] = useSolicitudesStorage();
+export const useSolicitudCompra = () => {
+    const [solicitudes, setSolicitudes] = useState<SolicitudCompra[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [vista, setVista] = useState<Vista>('lista');
     const [tipoSeleccionado, setTipoSeleccionado] = useState<TipoSolicitud>('insumo');
     const [solicitudAEditar, setSolicitudAEditar] = useState<SolicitudCompra | null>(null);
-    const [alertasVencimiento, setAlertasVencimiento] = useState<SolicitudCompra[]>([]);
+    const [cargando, setCargando] = useState(false);
 
-    useEffect(() => {
-        // Inicializar si el localStorage está vacío y se provee un array 'inicial' no vacío
-        if (solicitudes.length === 0 && inicial.length > 0) {
-            setSolicitudes(inicial);
+    const cargarSolicitudes = async () => {
+        setCargando(true);
+        try {
+            // Nota: El controlador actual no tiene un GET específico para solicitudes solas, 
+            // pero podemos obtenerlas a través de un endpoint que crearemos o adaptaremos.
+            // Por ahora, asumimos que obtendremos las solicitudes pendientes/activas.
+            const respuesta = await apiClient.get('/inventario/solicitudes');
+            setSolicitudes(respuesta.data);
+        } catch (error) {
+            console.error("Error al cargar solicitudes:", error);
+        } finally {
+            setCargando(false);
         }
-    }, []);
+    };
 
     useEffect(() => {
-        setAlertasVencimiento(verificarAlertasVencimiento(solicitudes));
-    }, [solicitudes]);
+        if (isModalOpen) {
+            // cargarSolicitudes(); // Descomentar cuando el endpoint esté listo
+        }
+    }, [isModalOpen]);
 
     const abrirModal = () => {
         setVista('lista');
@@ -82,51 +68,56 @@ export const useSolicitudCompra = (inicial: SolicitudCompra[] = []) => {
         setVista('lista');
     };
 
-    const cambiarVista = (nuevaVista: Vista) => {
-        setVista(nuevaVista);
+    const cambiarVista = (nuevaVista: Vista) => setVista(nuevaVista);
+
+    const crearSolicitud = async (datos: any) => {
+        setCargando(true);
+        try {
+            // Mapeo de campos del frontend a lo que espera el backend
+            const payload = {
+                nombre_insumo: datos.tipo === 'insumo' ? datos.tipoInsumo : datos.tipoAlimento,
+                unidad_medida: datos.unidadMedida,
+                categoria: datos.tipo === 'insumo' ? datos.categoriaInsumo : 'alimento',
+                especie_destino: datos.especieDestino,
+                cantidad: datos.cantidad,
+                fecha_compra_propuesta: datos.fechaPropuesta,
+                motivo: datos.motivo,
+                proveedor: datos.proveedor
+            };
+
+            await apiClient.post('/inventario/solicitudes', payload);
+            await cargarSolicitudes();
+            setVista('lista');
+            return true;
+        } catch (error) {
+            console.error("Error al crear solicitud:", error);
+            return false;
+        } finally {
+            setCargando(false);
+        }
     };
 
-    const crearSolicitud = (datos: any, usuario: string) => {
-        const ahora = new Date();
-        const fotoGuardada = localStorage.getItem("foto_perfil") || undefined;
-        const nuevaSolicitud: SolicitudCompra = {
-            ...datos,
-            id: Date.now(),
-            estado: 'Pendiente',
-            ejecutada: false,
-            eliminada: false,
-            fechaCreacion: ahora.toISOString().split('T')[0],
-            horaCreacion: ahora.toTimeString().slice(0, 5),
-            usuario: usuario,
-            fotoUsuario: fotoGuardada,
-        };
-        setSolicitudes([nuevaSolicitud, ...solicitudes]);
-        setVista('lista');
-        return true;
+    const procesarSolicitud = async (id: number, estado: EstadoSolicitud, observaciones?: string) => {
+        try {
+            await apiClient.patch(`/inventario/solicitudes/${id}/procesar`, { estado, observaciones });
+            await cargarSolicitudes();
+        } catch (error) {
+            console.error("Error al procesar solicitud:", error);
+        }
     };
 
-    const cambiarEstadoSolicitud = (id: number, nuevoEstado: EstadoSolicitud) => {
-        setSolicitudes(solicitudes.map(s => s.id === id ? { ...s, estado: nuevoEstado } : s));
-    };
-
-    const solicitudesActivas = solicitudes.filter(s => !s.eliminada);
-    const solicitudesPendientes = solicitudesActivas.filter(s => s.estado === 'Pendiente');
-    const solicitudesAprobadas = solicitudesActivas.filter(s => s.estado === 'Aprobada');
-    const solicitudesInsumo = solicitudesActivas.filter(s => s.tipo === 'insumo');
-    const solicitudesAlimento = solicitudesActivas.filter(s => s.tipo === 'alimento');
+    const solicitudesPendientes = solicitudes.filter(s => s.estado_sol === 'Pendiente');
+    const solicitudesAprobadas = solicitudes.filter(s => s.estado_sol === 'Aprobada');
 
     return {
         solicitudes,
-        solicitudesActivas,
         solicitudesPendientes,
         solicitudesAprobadas,
-        solicitudesInsumo,
-        solicitudesAlimento,
-        alertasVencimiento,
         isModalOpen,
         vista,
         tipoSeleccionado,
         solicitudAEditar,
+        cargando,
         setVista,
         setTipoSeleccionado,
         setSolicitudAEditar,
@@ -134,6 +125,7 @@ export const useSolicitudCompra = (inicial: SolicitudCompra[] = []) => {
         cerrarModal,
         cambiarVista,
         crearSolicitud,
-        cambiarEstadoSolicitud,
+        procesarSolicitud,
+        cambiarEstadoSolicitud: procesarSolicitud,
     };
 };

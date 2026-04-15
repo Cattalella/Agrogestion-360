@@ -1,31 +1,46 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import apiClient from "../api/apiClient";
 
 // ─────────────────────────────────────────
 // TIPOS — RI. 8.1.1
 // ─────────────────────────────────────────
-export type EstadoPago = "Pagado con firma" | "Pendiente de firma" | "No pagado";
-
 export interface Pago {
-    id: number;
-    id_trabajador: string;
-    tipo_trabajo: string;
+    id_pago: number;
+    id_trabajador: number;
+    id_trabajo?: number;
     fecha_pago: string;
     monto_total: number;
     concepto: string;
-    estado: EstadoPago;
-    contabilizado: boolean;
-    anulado: boolean;
+    estado_pago: string;
+    firma_url?: string;
     justificacion_anulacion?: string;
+    Trabajador?: { nombre_completo: string };
 }
 
 type Vista = 'lista' | 'formulario';
 
-export const useRegistrarPagos = (inicial: Pago[] = []) => {
-
-    const [listaPagos, setListaPagos] = useState<Pago[]>(inicial);
+export const useRegistrarPagos = () => {
+    const [pagos, setPagos] = useState<Pago[]>([]);
+    const [loading, setLoading] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [vista, setVista] = useState<Vista>('lista');
     const [pagoAEditar, setPagoAEditar] = useState<Pago | null>(null);
+
+    const cargarPagos = async () => {
+        setLoading(true);
+        try {
+            const response = await apiClient.get('/trabajadores/pagos');
+            setPagos(response.data);
+        } catch (error) {
+            console.error("Error al cargar pagos:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (isModalOpen) cargarPagos();
+    }, [isModalOpen]);
 
     const abrirModal = () => {
         setVista('lista');
@@ -35,81 +50,55 @@ export const useRegistrarPagos = (inicial: Pago[] = []) => {
     const cerrarModal = () => {
         setIsModalOpen(false);
         setPagoAEditar(null);
-        setVista('lista');
     };
 
-    // ✅ NUEVO: cambiarVista para usar en AdminModales
-    const cambiarVista = (nuevaVista: Vista) => {
-        setVista(nuevaVista);
-    };
+    const cambiarVista = (v: Vista) => setVista(v);
 
-    const guardarPago = (datos: Omit<Pago, 'id' | 'contabilizado' | 'anulado'>, cerrar: boolean) => {
-        if (pagoAEditar) {
-            if (pagoAEditar.contabilizado) {
-                alert("Este pago ya fue contabilizado y no puede editarse.");
-                return;
+    const guardarPago = async (datos: any, cerrar: boolean = false) => {
+        setLoading(true);
+        try {
+            await apiClient.post('/trabajadores/pagos', datos);
+            await cargarPagos();
+            
+            if (cerrar) {
+                cerrarModal();
+            } else {
+                setVista('lista');
             }
-            setListaPagos(prev =>
-                prev.map(p => p.id === pagoAEditar.id ? { ...p, ...datos } : p)
-            );
-            setPagoAEditar(null);
-        } else {
-            const nuevo: Pago = {
-                ...datos,
-                id: Date.now(),
-                contabilizado: false,
-                anulado: false,
-            };
-            setListaPagos(prev => [nuevo, ...prev]);
-        }
-
-        if (cerrar) {
-            cerrarModal();
-        } else {
-            setVista('lista');
+            return true;
+        } catch (error) {
+            console.error("Error al registrar pago:", error);
+            return false;
+        } finally {
+            setLoading(false);
         }
     };
 
-    const editarPago = (pago: Pago) => {
-        if (pago.contabilizado) {
-            alert("Este pago ya fue contabilizado y no puede editarse.");
-            return;
-        }
-        setPagoAEditar(pago);
-        setVista('formulario');
-    };
-
-    const anularPago = (id: number, justificacion: string) => {
+    const anularPago = async (id: number, justificacion: string) => {
         if (!justificacion.trim()) {
             alert("Debes ingresar una justificación para anular el pago.");
             return;
         }
-        setListaPagos(prev =>
-            prev.map(p => p.id === id
-                ? { ...p, anulado: true, justificacion_anulacion: justificacion }
-                : p
-            )
-        );
-    };
-
-    const contabilizarPago = (id: number) => {
-        setListaPagos(prev =>
-            prev.map(p => p.id === id ? { ...p, contabilizado: true } : p)
-        );
+        
+        try {
+            await apiClient.patch(`/trabajadores/pagos/${id}/anular`, { justificacion });
+            await cargarPagos();
+        } catch (error) {
+            console.error("Error al anular pago:", error);
+        }
     };
 
     return {
-        listaPagos,
+        listaPagos: pagos,
+        loading,
         isModalOpen,
         vista,
         pagoAEditar,
         setVista,
-        cambiarVista,      // ✅ AGREGADO
+        cambiarVista,
         abrirModal,
         cerrarModal,
         guardarPago,
-        editarPago,
         anularPago,
-        contabilizarPago,
     };
 };

@@ -1,35 +1,47 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import apiClient from "../api/apiClient";
 
 // ─────────────────────────────────────────
 // TIPOS — RI. 8.1.3
 // ─────────────────────────────────────────
-export type EstadoTrabajador = 'activo' | 'inactivo';
-
 export interface Trabajador {
-    id: number;
-    id_trabajador: string;
+    id_trabajador: number;
     nombre_completo: string;
     tipo_documento: string;
-    numero_documento: string;
+    num_documento: string;
     tipo_trabajo: string;
-    telefono: string;
-    telefono_familiar: string;
-    direccion: string;
-    estado: EstadoTrabajador;
+    telefono?: string;
+    telefono_familiar?: string;
+    direccion?: string;
+    estado: string;
     fecha_ingreso: string;
     observaciones?: string;
-    eliminado: boolean;
-    fecha_eliminacion?: string;
 }
 
 type Vista = 'lista' | 'formulario';
 
-export const useNuevoTrabajador = (inicial: Trabajador[] = []) => {
-
-    const [trabajadores, setTrabajadores] = useState<Trabajador[]>(inicial);
+export const useNuevoTrabajador = () => {
+    const [trabajadores, setTrabajadores] = useState<Trabajador[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [vista, setVista] = useState<Vista>('lista');
     const [trabajadorAEditar, setTrabajadorAEditar] = useState<Trabajador | null>(null);
+    const [loading, setLoading] = useState(false);
+
+    const cargarTrabajadores = async () => {
+        setLoading(true);
+        try {
+            const response = await apiClient.get('/trabajadores');
+            setTrabajadores(response.data);
+        } catch (error) {
+            console.error("Error al cargar trabajadores:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (isModalOpen) cargarTrabajadores();
+    }, [isModalOpen]);
 
     const abrirModal = () => {
         setVista('lista');
@@ -39,42 +51,33 @@ export const useNuevoTrabajador = (inicial: Trabajador[] = []) => {
     const cerrarModal = () => {
         setIsModalOpen(false);
         setTrabajadorAEditar(null);
-        setVista('lista');
     };
 
-    // ✅ NUEVO: cambiarVista
-    const cambiarVista = (nuevaVista: Vista) => {
-        setVista(nuevaVista);
-    };
+    const cambiarVista = (v: Vista) => setVista(v);
 
-    const guardarTrabajador = (
-        datos: Omit<Trabajador, 'id' | 'eliminado'>,
-        cerrar: boolean
-    ) => {
-        if (!datos.id_trabajador || !datos.nombre_completo || !datos.fecha_ingreso) {
-            alert("ID, nombre completo y fecha de ingreso son obligatorios.");
-            return;
-        }
-        if (trabajadorAEditar) {
-            setTrabajadores(prev =>
-                prev.map(t => t.id === trabajadorAEditar.id
-                    ? { ...t, ...datos }
-                    : t
-                )
-            );
-            setTrabajadorAEditar(null);
-        } else {
-            const nuevo: Trabajador = {
-                ...datos,
-                id: Date.now(),
-                eliminado: false,
-            };
-            setTrabajadores(prev => [nuevo, ...prev]);
-        }
-        if (cerrar) {
-            cerrarModal();
-        } else {
-            setVista('lista');
+    const guardarTrabajador = async (datos: any, cerrar: boolean = false) => {
+        setLoading(true);
+        try {
+            if (trabajadorAEditar) {
+                await apiClient.patch(`/trabajadores/${trabajadorAEditar.id_trabajador}`, datos);
+            } else {
+                await apiClient.post('/trabajadores', datos);
+            }
+            
+            await cargarTrabajadores();
+            
+            if (cerrar) {
+                cerrarModal();
+            } else {
+                setVista('lista');
+                setTrabajadorAEditar(null);
+            }
+            return true;
+        } catch (error) {
+            console.error("Error al guardar trabajador:", error);
+            return false;
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -83,27 +86,31 @@ export const useNuevoTrabajador = (inicial: Trabajador[] = []) => {
         setVista('formulario');
     };
 
-    const eliminarTrabajador = (id: number) => {
-        setTrabajadores(prev =>
-            prev.map(t => t.id === id
-                ? { ...t, eliminado: true, fecha_eliminacion: new Date().toISOString().split('T')[0] }
-                : t
-            )
-        );
+    const eliminarTrabajador = async (id: number) => {
+        if (!window.confirm('¿Estás seguro de que deseas eliminar este trabajador?')) return;
+        
+        try {
+            await apiClient.post(`/trabajadores/${id}/eliminar`);
+            await cargarTrabajadores();
+        } catch (error) {
+            console.error("Error al eliminar trabajador:", error);
+        }
     };
 
-    const trabajadoresActivos = trabajadores.filter(t => !t.eliminado && t.estado === 'activo');
-    const trabajadoresVisibles = trabajadores.filter(t => !t.eliminado);
+    // Filtros lógicos
+    const trabajadoresActivos = trabajadores.filter(t => t.estado === 'Activo');
+    const trabajadoresVisibles = trabajadores; // El backend ya filtra los eliminados lógicamente
 
     return {
         trabajadores,
         trabajadoresVisibles,
         trabajadoresActivos,
+        loading,
         isModalOpen,
         vista,
         trabajadorAEditar,
         setVista,
-        cambiarVista,      // ✅ AGREGADO
+        cambiarVista,
         abrirModal,
         cerrarModal,
         guardarTrabajador,

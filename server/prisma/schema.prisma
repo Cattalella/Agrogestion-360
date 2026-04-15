@@ -1,182 +1,288 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
-// --- MÓDULO 1: SEGURIDAD Y GESTIÓN DE PERSONAL ---
-
 model Rol {
   id_rol     Int       @id @default(autoincrement())
-  nombre_rol String    @unique @db.VarChar(50) // Dueño, Administrador
+  nombre_rol String    @unique @db.VarChar(50)
   personas   Persona[]
 }
 
 model CatalogoDoc {
   id_tipo_doc Int       @id @default(autoincrement())
-  nombre_tipo String    @db.VarChar(50) // CC, CE, NIT
+  nombre_tipo String    @db.VarChar(50)
   personas    Persona[]
 }
 
 model EstadoPers {
   id_estado Int       @id @default(autoincrement())
-  nombre    String    @db.VarChar(50) // Activo, Inactivo
+  nombre    String    @db.VarChar(50)
   personas  Persona[]
 }
 
 model Persona {
-  id_persona      Int       @id @default(autoincrement())
+  id_persona      Int                 @id @default(autoincrement())
   id_rol          Int
   id_tipo_doc     Int
   id_estado       Int
-  nombre_completo String    @db.VarChar(150)
-  num_documento   String    @unique @db.VarChar(20)
-  email           String    @unique @db.VarChar(100)
-  telefono        String?   @db.VarChar(20)
-  nombre_usuario  String?   @unique @db.VarChar(50)
-  contrasena_hash String?   @db.VarChar(255)
-  creado_en       DateTime  @default(now())
-
-  rol         Rol         @relation(fields: [id_rol], references: [id_rol])
-  tipo_doc    CatalogoDoc @relation(fields: [id_tipo_doc], references: [id_tipo_doc])
-  estado      EstadoPers  @relation(fields: [id_estado], references: [id_estado])
+  nombre_completo String              @db.VarChar(150)
+  num_documento   String              @db.VarChar(20)  // 🆕 Ya NO es @unique
+  email           String              @unique @db.VarChar(100)
+  telefono        String?             @db.VarChar(20)
+  nombre_usuario  String?             @unique @db.VarChar(50)
+  contrasena_hash String?             @db.VarChar(255)
+  creado_en       DateTime            @default(now())
+  color_subtitulo String?             @default("#000000") @db.VarChar(7)
+  color_titulo    String?             @default("#000000") @db.VarChar(7)
+  foto_perfil     String?
+  wallpaper_url   String?
   
-  tokens      RecuperacionClave[]
-  vacunaciones RegVacuna[]
-  solicitudes  Solicitud[] @relation("solicitante")
-  aprobaciones Solicitud[] @relation("aprobador")
-  auditorias   Auditoria[]
+  auditorias      Auditoria[]
+  ConsumoInsumo   ConsumoInsumo[]
+  estado          EstadoPers          @relation(fields: [id_estado], references: [id_estado])
+  rol             Rol                 @relation(fields: [id_rol], references: [id_rol])
+  tipo_doc        CatalogoDoc         @relation(fields: [id_tipo_doc], references: [id_tipo_doc])
+  recordatorios   Recordatorio[]
+  tokens          RecuperacionClave[]
+  vacunaciones    RegVacuna[]
+  solicitudes     Solicitud[]         @relation("solicitante")
+  aprobaciones    Solicitud[]         @relation("aprobador")
+  
+  // 🆕 LLAVE COMPUESTA ÚNICA
+  @@unique([id_tipo_doc, num_documento])
 }
 
 model RecuperacionClave {
-  id_token         Int      @id @default(autoincrement())
-  id_persona       Int
-  token_hash       String   @unique @db.VarChar(255)
-  fecha_expiracion DateTime
-  usado            Boolean  @default(false)
-
-  persona Persona @relation(fields: [id_persona], references: [id_persona])
+  id_token              Int      @id @default(autoincrement())
+  id_persona            Int
+  token_hash            String   @unique @db.VarChar(255)
+  nueva_contrasena_hash String?  @db.VarChar(255)
+  fecha_expiracion      DateTime
+  usado                 Boolean  @default(false)
+  persona               Persona  @relation(fields: [id_persona], references: [id_persona])
 }
-
-// --- MÓDULO 2: GANADERÍA Y SANIDAD ---
 
 model Especie {
   id_especie Int      @id @default(autoincrement())
-  nombre     String   @db.VarChar(50) // Bovino, Porcino
+  nombre     String   @db.VarChar(50)
   animales   Animal[]
 }
 
 model EstadoAni {
   id_estado_ani Int      @id @default(autoincrement())
-  nombre        String   @db.VarChar(50) // Activo, Vendido, Difunto
+  nombre        String   @db.VarChar(50)
   animales      Animal[]
 }
 
 model Ubicacion {
   id_ubicacion Int      @id @default(autoincrement())
-  nombre_ubi   String   @db.VarChar(50) // Potrero 1, Establo A
+  nombre_ubi   String   @db.VarChar(50)
   animales     Animal[]
 }
 
 model Animal {
-  id_animal       Int      @id @default(autoincrement())
-  num_ica_chapeta String?  @unique @db.VarChar(50)
-  codigo_local    String   @unique @db.VarChar(20) // El "Apodo"
-  id_especie      Int
-  id_estado_ani   Int
-  id_ubicacion    Int
-  sexo            String   @db.Char(1)
-  raza            String   @db.VarChar(50)
+  id_animal        Int             @id @default(autoincrement())
+  num_ica_chapeta  String?         @unique @db.VarChar(50)
+  codigo_local     String          @unique @db.VarChar(20)
+  id_especie       Int
+  id_estado_ani    Int
+  id_ubicacion     Int
+  sexo             String          @db.Char(1)
+  raza             String          @db.VarChar(50)
   fecha_nacimiento DateTime
-  peso_actual     Decimal  @db.Decimal(10, 2)
-  origen          String   @db.VarChar(50)
-  foto_url        String?  @db.VarChar(255)
-
-  especie    Especie    @relation(fields: [id_especie], references: [id_especie])
-  estado     EstadoAni  @relation(fields: [id_estado_ani], references: [id_estado_ani])
-  ubicacion  Ubicacion  @relation(fields: [id_ubicacion], references: [id_ubicacion])
-  
-  vacunas    RegVacuna[]
-  pesajes    HistorialPeso[]
+  peso_actual      Decimal         @db.Decimal(10, 2)
+  origen           String          @db.VarChar(50)
+  foto_url         String?         @db.VarChar(255)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime
+  especie          Especie         @relation(fields: [id_especie], references: [id_especie])
+  estado           EstadoAni       @relation(fields: [id_estado_ani], references: [id_estado_ani])
+  ubicacion        Ubicacion       @relation(fields: [id_ubicacion], references: [id_ubicacion])
+  pesajes          HistorialPeso[]
+  vacunas          RegVacuna[]
+  Venta            Venta[]
 }
 
 model HistorialPeso {
-  id_peso       Int      @id @default(autoincrement())
-  id_animal     Int
-  peso          Decimal  @db.Decimal(10, 2)
-  fecha_pesaje  DateTime @default(now())
-
-  animal Animal @relation(fields: [id_animal], references: [id_animal])
+  id_peso      Int      @id @default(autoincrement())
+  id_animal    Int
+  peso         Decimal  @db.Decimal(10, 2)
+  fecha_pesaje DateTime @default(now())
+  animal       Animal   @relation(fields: [id_animal], references: [id_animal])
 }
 
 model CatVacunas {
-  id_vacuna     Int      @id @default(autoincrement())
-  nombre_vacuna String   @db.VarChar(100)
+  id_vacuna     Int         @id @default(autoincrement())
+  nombre_vacuna String      @db.VarChar(100)
   registros     RegVacuna[]
 }
 
 model RegVacuna {
-  id_reg_vac     Int      @id @default(autoincrement())
-  id_animal      Int
-  id_vacuna      Int
-  id_responsable Int
-  fecha_aplicacion DateTime @default(now())
-
-  animal      Animal     @relation(fields: [id_animal], references: [id_animal])
-  vacuna      CatVacunas @relation(fields: [id_vacuna], references: [id_vacuna])
-  responsable Persona    @relation(fields: [id_responsable], references: [id_persona])
+  id_reg_vac       Int        @id @default(autoincrement())
+  id_animal        Int
+  id_vacuna        Int
+  id_responsable   Int
+  fecha_aplicacion DateTime   @default(now())
+  dosis            String?    @db.VarChar(50)
+  lote_vacuna      String?    @db.VarChar(50)
+  observaciones    String?
+  animal           Animal     @relation(fields: [id_animal], references: [id_animal])
+  responsable      Persona    @relation(fields: [id_responsable], references: [id_persona])
+  vacuna           CatVacunas @relation(fields: [id_vacuna], references: [id_vacuna])
 }
 
-// --- MÓDULO 3: INVENTARIO Y LOGÍSTICA ---
-
 model CatInsumos {
-  id_insumo     Int      @id @default(autoincrement())
-  nombre_insumo String   @db.VarChar(100)
-  unidad_medida String   @db.VarChar(20) // Kg, Lts, Bultos
-  
-  lotes         LoteInv[]
-  solicitudes   Solicitud[]
+  id_insumo       Int             @id @default(autoincrement())
+  nombre_insumo   String          @db.VarChar(100)
+  unidad_medida   String          @db.VarChar(20)
+  categoria       String          @db.VarChar(50)
+  createdAt       DateTime        @default(now())
+  especie_destino String?         @db.VarChar(50)
+  stock_minimo    Decimal         @default(0) @db.Decimal(10, 2)
+  updatedAt       DateTime
+  ConsumoInsumo   ConsumoInsumo[]
+  lotes           LoteInv[]
+  solicitudes     Solicitud[]
 }
 
 model Solicitud {
-  id_solicitud  Int      @id @default(autoincrement())
-  id_insumo     Int
-  id_admin      Int
-  id_dueno      Int
-  estado_sol    String   @db.VarChar(20) // Pendiente, Aprobada, Rechazada
-
-  insumo     CatInsumos @relation(fields: [id_insumo], references: [id_insumo])
-  solicitante Persona    @relation("solicitante", fields: [id_admin], references: [id_persona])
-  aprobador   Persona    @relation("aprobador", fields: [id_dueno], references: [id_persona])
+  id_solicitud        Int        @id @default(autoincrement())
+  id_insumo           Int
+  id_admin            Int
+  id_dueno            Int
+  estado_sol          String     @db.VarChar(20)
+  cantidad            Decimal    @db.Decimal(10, 2)
+  createdAt           DateTime   @default(now())
+  fecha_aprobacion    DateTime?
+  fecha_compra        DateTime
+  motivo              String?
+  observaciones_aprob String?
+  proveedor           String?    @db.VarChar(100)
+  updatedAt           DateTime
+  solicitante         Persona    @relation("solicitante", fields: [id_admin], references: [id_persona])
+  aprobador           Persona    @relation("aprobador", fields: [id_dueno], references: [id_persona])
+  insumo              CatInsumos @relation(fields: [id_insumo], references: [id_insumo])
 }
 
 model LoteInv {
-  id_lote       Int      @id @default(autoincrement())
-  id_insumo     Int
-  cant_actual   Decimal  @db.Decimal(10, 2)
-  fecha_venc    DateTime?
-
-  insumo CatInsumos @relation(fields: [id_insumo], references: [id_insumo])
+  id_lote      Int        @id @default(autoincrement())
+  id_insumo    Int
+  cant_actual  Decimal    @db.Decimal(10, 2)
+  fecha_venc   DateTime?
+  cant_inicial Decimal    @db.Decimal(10, 2)
+  createdAt    DateTime   @default(now())
+  fecha_compra DateTime   @default(now())
+  numero_lote  String?    @db.VarChar(50)
+  proveedor    String?    @db.VarChar(100)
+  updatedAt    DateTime
+  insumo       CatInsumos @relation(fields: [id_insumo], references: [id_insumo])
 }
 
-// --- MÓDULO 4: AUDITORÍA Y TRAZABILIDAD ---
+
+model Recordatorio {
+  id             String    @id @default(uuid())
+  id_persona     Int
+  fecha          DateTime
+  proposito      String?
+  cumplido       Boolean   @default(false)
+  fecha_cumplida DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime @updatedAt
+  persona        Persona   @relation(fields: [id_persona], references: [id_persona])
+}
+
+model ConsumoInsumo {
+  id_consumo     Int        @id @default(autoincrement())
+  id_insumo      Int
+  id_responsable Int
+  actividad      String     @db.VarChar(50)
+  cantidad       Decimal    @db.Decimal(10, 2)
+  fecha_consumo  DateTime   @default(now())
+  observaciones  String?
+  createdAt      DateTime   @default(now())
+  CatInsumos     CatInsumos @relation(fields: [id_insumo], references: [id_insumo])
+  Persona        Persona    @relation(fields: [id_responsable], references: [id_persona])
+}
+
+model PagoTrabajador {
+  id_pago                 Int               @id @default(autoincrement())
+  id_trabajador           Int
+  id_trabajo              Int?
+  fecha_pago              DateTime          @default(now())
+  monto_total             Decimal           @db.Decimal(12, 2)
+  concepto                String            @db.VarChar(200)
+  estado_pago             String            @db.VarChar(30)
+  firma_url               String?           @db.VarChar(500)
+  justificacion_anulacion String?
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime
+  Trabajador              Trabajador        @relation(fields: [id_trabajador], references: [id_trabajador])
+  TrabajoRealizado        TrabajoRealizado? @relation(fields: [id_trabajo], references: [id_trabajo])
+}
+
+model Trabajador {
+  id_trabajador     Int                @id @default(autoincrement())
+  nombre_completo   String             @db.VarChar(150)
+  tipo_documento    String             @db.VarChar(20)
+  num_documento     String             @unique @db.VarChar(20)
+  tipo_trabajo      String             @db.VarChar(50)
+  telefono          String?            @db.VarChar(20)
+  telefono_familiar String?            @db.VarChar(20)
+  direccion         String?            @db.VarChar(200)
+  estado            String             @default("Activo") @db.VarChar(20)
+  fecha_ingreso     DateTime           @default(now())
+  observaciones     String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime
+  PagoTrabajador    PagoTrabajador[]
+  TrabajoRealizado  TrabajoRealizado[]
+}
+
+model TrabajoRealizado {
+  id_trabajo        Int              @id @default(autoincrement())
+  id_trabajador     Int
+  categoria_trabajo String           @db.VarChar(50)
+  tipo_actividad    String           @db.VarChar(100)
+  fecha_inicio      DateTime
+  fecha_fin         DateTime
+  duracion_horas    Decimal          @db.Decimal(5, 2)
+  evidencia_url     String           @db.VarChar(500)
+  observaciones     String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime
+  PagoTrabajador    PagoTrabajador[]
+  Trabajador        Trabajador       @relation(fields: [id_trabajador], references: [id_trabajador])
+}
+
+model Venta {
+  id_venta      Int      @id @default(autoincrement())
+  id_animal     Int
+  fecha_venta   DateTime @default(now())
+  peso_venta    Decimal  @db.Decimal(10, 2)
+  precio_total  Decimal  @db.Decimal(12, 2)
+  comprador     String   @db.VarChar(150)
+  num_factura   String?  @db.VarChar(50)
+  metodo_pago   String   @db.VarChar(30)
+  observaciones String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  Animal        Animal   @relation(fields: [id_animal], references: [id_animal])
+}
 
 model Auditoria {
-  id_auditoria   Int      @id @default(autoincrement())
-  id_usuario     Int
-  fecha_hora     DateTime @default(now())
-  accion         String   @db.VarChar(50) // INSERT, UPDATE, DELETE
-  tabla_afectada String   @db.VarChar(50)
-  valor_anterior String?  @db.Text
-
-  usuario Persona @relation(fields: [id_usuario], references: [id_persona])
+  id_auditoria Int      @id @default(autoincrement())
+  id_usuario   Int
+  accion       String   @db.VarChar(100)
+  descripcion  String   @db.Text
+  entidad      String   @db.VarChar(50)
+  id_entidad   Int?
+  fecha        DateTime @default(now())
+  rol          String   @db.VarChar(20)
+  Persona      Persona  @relation(fields: [id_usuario], references: [id_persona])
 }

@@ -137,7 +137,7 @@ export const Admin = () => {
             />
 
             {/* Encabezado */}
-            <Encabezado id="admin" titulos="PANEL PRINCIPAL">
+            <Encabezado id="admin" titulo="PANEL PRINCIPAL">
                 <img src={admin2} alt="Fondo" className="w-full h-full object-cover object-center" />
             </Encabezado>
 

@@ -1,38 +1,115 @@
-import { useContext, useState, useEffect, useRef } from "react";
-import { AuthContext } from "../context/AuthContext";
+import { useState, useEffect, useRef } from "react";
+import apiClient from "../api/apiClient";
 
 export const Navegar = () => {
-    const context = useContext(AuthContext);
-    const user = context?.user;
+    // 1. Estados para los datos del usuario
+    const [nombre, setNombre] = useState("");
+    const [rol, setRol] = useState("");
+    const [avatar, setAvatar] = useState<string | null>(() => {
+        return localStorage.getItem('userAvatar') || null;
+    });
     
-    // 1. Gestión de Avatar
-    const [avatar, setAvatar] = useState<string | null>(localStorage.getItem('userAvatar'));
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // 2. Cargar datos del backend
     useEffect(() => {
-        if (avatar) localStorage.setItem('userAvatar', avatar);
+        const cargarPerfil = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) return;
+                
+                // 🆕 Obtener rol del localStorage (guardado en el login)
+                const usuarioGuardado = localStorage.getItem('usuario');
+                if (usuarioGuardado) {
+                    const usuario = JSON.parse(usuarioGuardado);
+                    setRol(usuario.rol || "");
+                }
+                
+                const respuesta = await apiClient.get('/encabezado/perfil');
+                
+                if (respuesta.status === 200) {
+                    const datos = respuesta.data;
+                    console.log('📋 Datos del perfil:', datos);
+                    
+                    setNombre(datos.nombre || "Usuario");
+                    
+                    // Si el backend devuelve rol, lo usamos; si no, ya lo tenemos del localStorage
+                    if (datos.rol) {
+                        setRol(datos.rol);
+                    }
+                    
+                    // Si hay foto de perfil en el backend, usarla
+                    if (datos.foto_perfil) {
+                        setAvatar(datos.foto_perfil);
+                        localStorage.setItem('userAvatar', datos.foto_perfil);
+                    }
+                }
+            } catch (error) {
+                console.error('Error al cargar perfil:', error);
+            }
+        };
+        
+        cargarPerfil();
+    }, []);
+
+    // 3. Guardar avatar en localStorage cuando cambie
+    useEffect(() => {
+        if (avatar) {
+            localStorage.setItem('userAvatar', avatar);
+        }
     }, [avatar]);
 
-    // 2. Mapeo de Roles (Para mostrar nombres elegantes según la DB)
-    const displayRole = () => {
-        if (!user?.rol) return "ADMINISTRADOR"; // Valor por defecto
+    // 4. Formatear el rol para mostrar
+    const formatearRol = (rolTexto: string): string => {
+        if (!rolTexto) return "ADMINISTRADOR";
+        
         const roles: Record<string, string> = {
-            admin: "ADMINISTRADOR",
-            owner: "PROPIETARIO"
+            'Administrador': 'ADMINISTRADOR',
+            'administrador': 'ADMINISTRADOR',
+            'Dueño': 'PROPIETARIO',
+            'dueño': 'PROPIETARIO',
+            'Boss': 'PROPIETARIO',
+            'boss': 'PROPIETARIO'
         };
-        return roles[user.rol.toLowerCase()] || user.rol.toUpperCase();
+        return roles[rolTexto] || rolTexto.toUpperCase();
     };
 
-    // 3. Handlers
+    // 5. Handlers para la foto
     const handleAvatarClick = () => fileInputRef.current?.click();
 
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file && file.type.startsWith('image/')) {
+            // Mostrar preview inmediato
             const reader = new FileReader();
             reader.onloadend = () => setAvatar(reader.result as string);
             reader.readAsDataURL(file);
+            
+            // Subir al backend
+            try {
+                const token = localStorage.getItem('token');
+                if (token) {
+                    const formData = new FormData();
+                    formData.append('foto', file);
+                    
+                    await apiClient.post('/encabezado/perfil/foto', formData, {
+                        headers: { 'Content-Type': 'multipart/form-data' }
+                    });
+                    
+                    console.log('✅ Foto de perfil actualizada');
+                }
+            } catch (error) {
+                console.error('Error al subir foto:', error);
+            }
         }
+    };
+
+    // 6. Obtener inicial para el avatar
+    const obtenerInicial = (): string => {
+        if (nombre && nombre !== "Usuario" && nombre !== "Cargando...") {
+            return nombre.charAt(0).toUpperCase();
+        }
+        return "U";
     };
 
     return (
@@ -52,10 +129,10 @@ export const Navegar = () => {
                 className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden cursor-pointer group relative border border-black/10 hover:border-emerald-500 transition-all shadow-inner"
             >
                 {avatar ? (
-                    <img src={avatar} alt="User" className="w-full h-full object-cover" />
+                    <img src={avatar} alt="Perfil" className="w-full h-full object-cover" />
                 ) : (
                     <span className="text-emerald-700 font-black text-lg">
-                        {user?.nombre?.charAt(0) || "U"}
+                        {obtenerInicial()}
                     </span>
                 )}
                 
@@ -67,10 +144,10 @@ export const Navegar = () => {
             {/* Información del Usuario */}
             <div className="flex flex-col text-right min-w-[80px]">
                 <span className="text-[12px] font-black uppercase leading-tight text-slate-800">
-                    {user?.nombre || "Usuario"} {user?.apellido || ""}
+                    {nombre || "Cargando..."}
                 </span>
                 <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">
-                    {displayRole()}
+                    {formatearRol(rol) || "ADMINISTRADOR"}
                 </span>
             </div>
 

@@ -31,15 +31,25 @@ export const Boss = () => {
         }
     }, [navigate]);
 
-    // Datos seguros: siempre tienen las propiedades necesarias
+    // Datos seguros: siempre tienen las propiedades necesarias (Uso de ?. para evitar crashes)
     const dashboard = {
         ganancias: data?.ganancias || { tipo1: "GANANCIA NETA", cantidad1: 0 },
         inversion: data?.inversion || { tipo1: "INVERSIÓN", cantidad1: 0 },
-        gastosPorSector: data?.gastosPorSector || MOCK_GASTOS_SECTOR,
-        insumosCriticos: data?.insumosCriticos || { dias: 0, titulo: "Insumos Críticos", lista: [] },
-        pagosTrabajadores: data?.pagosTrabajadores || { titulo: "", lista: [] },
-        trabajadoresActivos: data?.trabajadoresActivos || { titulo: "PERSONAL", lista: [] },
-        filtrosDisponibles: data?.filtrosDisponibles || MOCK_FILTROS,
+        gastosPorSector: Array.isArray(data?.gastosPorSector) ? data.gastosPorSector : MOCK_GASTOS_SECTOR,
+        insumosCriticos: {
+            dias: data?.insumosCriticos?.dias || 0,
+            titulo: data?.insumosCriticos?.titulo || "Insumos Críticos",
+            lista: Array.isArray(data?.insumosCriticos?.lista) ? data.insumosCriticos.lista : []
+        },
+        pagosTrabajadores: {
+            titulo: data?.pagosTrabajadores?.titulo || "",
+            lista: Array.isArray(data?.pagosTrabajadores?.lista) ? data.pagosTrabajadores.lista : []
+        },
+        trabajadoresActivos: {
+            titulo: data?.trabajadoresActivos?.titulo || "PERSONAL",
+            lista: Array.isArray(data?.trabajadoresActivos?.lista) ? data.trabajadoresActivos.lista : []
+        },
+        filtrosDisponibles: Array.isArray(data?.filtrosDisponibles) ? data.filtrosDisponibles : MOCK_FILTROS,
     };
 
     // Datos para el reporte exportable

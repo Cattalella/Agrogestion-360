@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Navegar } from "./Navegar"; 
 import { useNavigate } from "react-router-dom";
+import { Navegar } from "./Navegar";
+import apiClient from "../api/apiClient";
 
 interface EncabezadoProps {
     children: React.ReactNode; 
@@ -11,9 +12,6 @@ interface EncabezadoProps {
     id: string; 
 }
 
-// ============================================================
-// 📌 TIPOS PARA RECORDATORIOS
-// ============================================================
 interface Recordatorio {
     id: string;
     fecha: string;
@@ -23,7 +21,7 @@ interface Recordatorio {
 }
 
 // ============================================================
-// 📌 TOOLTIP DE RECORDATORIO (desplegable debajo del botón)
+// 📌 TOOLTIP DE RECORDATORIO
 // ============================================================
 const TooltipRecordatorio = ({ 
     isOpen, 
@@ -38,7 +36,6 @@ const TooltipRecordatorio = ({
     const [proposito, setProposito] = useState("");
     const tooltipRef = useRef<HTMLDivElement>(null);
 
-    // Cerrar al hacer clic fuera
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (tooltipRef.current && !tooltipRef.current.contains(event.target as Node)) {
@@ -71,7 +68,7 @@ const TooltipRecordatorio = ({
     return (
         <div 
             ref={tooltipRef}
-            className="absolute top-full right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 z-[200] overflow-hidden animate-in fade-in zoom-in duration-200"
+            className="absolute top-full right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 z-[200] overflow-hidden"
         >
             <div className="bg-green-700 p-3 text-white">
                 <h3 className="text-sm font-bold text-center">📅 NUEVO RECORDATORIO</h3>
@@ -123,7 +120,7 @@ const TooltipRecordatorio = ({
 };
 
 // ============================================================
-// 📌 BANNER DE RECORDATORIO (Verde, no se quita hasta hacer clic)
+// 📌 BANNER DE RECORDATORIO
 // ============================================================
 const BannerRecordatorio = ({ 
     recordatorio, 
@@ -134,8 +131,18 @@ const BannerRecordatorio = ({
 }) => {
     const [visible, setVisible] = useState(true);
 
-    const handleClick = () => {
+    const handleClick = async () => {
         setVisible(false);
+        
+        try {
+            const token = localStorage.getItem('token');
+            if (token) {
+                await apiClient.delete(`/recordatorios/${recordatorio.id}`);
+            }
+        } catch (error) {
+            console.error('Error al eliminar recordatorio:', error);
+        }
+        
         onCerrar(recordatorio.id);
     };
 
@@ -144,7 +151,7 @@ const BannerRecordatorio = ({
     return (
         <div 
             onClick={handleClick}
-            className="fixed bottom-5 right-5 z-[150] bg-green-500 text-white p-4 rounded-xl shadow-2xl cursor-pointer hover:bg-green-600 transition-all animate-in slide-in-from-right duration-300 max-w-md"
+            className="fixed bottom-5 right-5 z-[150] bg-green-500 text-white p-4 rounded-xl shadow-2xl cursor-pointer hover:bg-green-600 transition-all duration-300 max-w-md"
         >
             <div className="flex items-center gap-3">
                 <div className="text-3xl">✅</div>
@@ -166,6 +173,33 @@ const ModalPerfil = ({ onClose }: { onClose: () => void }) => {
     const modalRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [fotoPerfil, setFotoPerfil] = useState<string | null>(() => localStorage.getItem("foto_perfil"));
+    const [email, setEmail] = useState("");
+    const [telefono, setTelefono] = useState("");
+    const [nombre, setNombre] = useState("");
+
+    useEffect(() => {
+        const cargarPerfil = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const respuesta = await apiClient.get('/encabezado/perfil');
+                
+                if (respuesta.status === 200) {
+                    const datos = respuesta.data;
+                    setNombre(datos.nombre || "Usuario");
+                    setEmail(datos.email || "");
+                    setTelefono(datos.telefono || "");
+                    if (datos.foto_perfil) {
+                        setFotoPerfil(datos.foto_perfil);
+                        localStorage.setItem("foto_perfil", datos.foto_perfil);
+                    }
+                }
+            } catch (error) {
+                console.error('Error al cargar perfil:', error);
+            }
+        };
+        
+        cargarPerfil();
+    }, []);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -180,7 +214,7 @@ const ModalPerfil = ({ onClose }: { onClose: () => void }) => {
         };
     }, [onClose]);
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
             const reader = new FileReader();
@@ -190,11 +224,44 @@ const ModalPerfil = ({ onClose }: { onClose: () => void }) => {
                 setFotoPerfil(base64String);
             };
             reader.readAsDataURL(file);
+            
+            try {
+                const token = localStorage.getItem('token');
+                if (token) {
+                    const formData = new FormData();
+                    formData.append('foto', file);
+                    
+                    await apiClient.post('/encabezado/perfil/foto', formData, {
+                        headers: { 'Content-Type': 'multipart/form-data' }
+                    });
+                }
+            } catch (error) {
+                console.error('Error al subir foto:', error);
+            }
+        }
+    };
+
+    const handleGuardarCambios = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) return;
+            
+            const respuesta = await apiClient.put('/encabezado/perfil', { email, telefono });
+            
+            if (respuesta.status === 200) {
+                alert('Perfil actualizado correctamente');
+                onClose();
+            } else {
+                alert('Error al guardar los cambios');
+            }
+        } catch (error) {
+            console.error('Error al guardar:', error);
+            alert('Error al guardar los cambios');
         }
     };
 
     return (
-        <div ref={modalRef} className="absolute top-14 right-0 w-64 backdrop-blur-xl bg-white/90 p-6 rounded-2xl shadow-2xl border border-white/50 z-50 flex flex-col gap-4 text-black animate-in fade-in zoom-in duration-200">
+        <div ref={modalRef} className="absolute top-14 right-0 w-64 backdrop-blur-xl bg-white/90 p-6 rounded-2xl shadow-2xl border border-white/50 z-50 flex flex-col gap-4 text-black">
             <div className="flex flex-col items-center gap-2">
                 <input 
                     type="file" 
@@ -222,15 +289,36 @@ const ModalPerfil = ({ onClose }: { onClose: () => void }) => {
             </div>
 
             <div className="space-y-3 text-xs font-bold">
-                <p className="flex items-center gap-2">NOMBRE: JUAN PÉREZ 🔒</p>
+                <p className="flex items-center gap-2">NOMBRE: {nombre || "Cargando..."} 🔒</p>
                 <div className="flex flex-col gap-1">
-                    <p>CORREO: <span className="font-normal text-gray-600">[ editable ]</span></p>
-                    <p>TELÉFONO: <span className="font-normal text-gray-600">[ editable ]</span></p>
+                    <p>CORREO: 
+                        <input 
+                            type="email" 
+                            value={email} 
+                            onChange={(e) => setEmail(e.target.value)}
+                            className="ml-1 font-normal text-gray-600 border-b border-gray-300 focus:outline-none focus:border-green-500"
+                            placeholder="correo@ejemplo.com"
+                        />
+                    </p>
+                    <p>TELÉFONO: 
+                        <input 
+                            type="text" 
+                            value={telefono} 
+                            onChange={(e) => setTelefono(e.target.value)}
+                            className="ml-1 font-normal text-gray-600 border-b border-gray-300 focus:outline-none focus:border-green-500"
+                            placeholder="123456789"
+                        />
+                    </p>
                 </div>
             </div>
 
             <div className="flex flex-col gap-2 mt-2">
-                <button className="bg-black text-white py-2 rounded-lg text-[10px] uppercase hover:bg-green-700 transition-colors">Guardar cambios</button>
+                <button 
+                    onClick={handleGuardarCambios}
+                    className="bg-black text-white py-2 rounded-lg text-[10px] uppercase hover:bg-green-700 transition-colors"
+                >
+                    Guardar cambios
+                </button>
                 <button onClick={onClose} className="border border-black py-2 rounded-lg text-[10px] uppercase hover:bg-gray-100 transition-colors">Cancelar</button>
             </div>
 
@@ -244,7 +332,7 @@ const ModalPerfil = ({ onClose }: { onClose: () => void }) => {
 };
 
 // ============================================================
-// 📌 NAV2 CON SISTEMA DE RECORDATORIOS (Sin intervalo, verificación inmediata)
+// 📌 NAV2 CON SISTEMA DE RECORDATORIOS (BACKEND)
 // ============================================================
 export const Nav2 = () => {
     const navigate = useNavigate();
@@ -253,58 +341,46 @@ export const Nav2 = () => {
     const [recordatorios, setRecordatorios] = useState<Recordatorio[]>([]);
     const [recordatoriosActivos, setRecordatoriosActivos] = useState<Recordatorio[]>([]);
 
-    // Función para verificar recordatorios vencidos
-    const verificarRecordatoriosVencidos = () => {
-        const hoy = new Date().toISOString().split("T")[0];
-        const nuevosActivos: Recordatorio[] = [];
-        
-        const actualizados = recordatorios.map(recordatorio => {
-            // Solo verificar los que NO están cumplidos
-            if (!recordatorio.cumplido && recordatorio.fecha <= hoy) {
-                nuevosActivos.push({
-                    ...recordatorio,
-                    fechaCumplida: hoy,
-                    cumplido: true
-                });
-                return { ...recordatorio, cumplido: true, fechaCumplida: hoy };
-            }
-            return recordatorio;
-        });
-        
-        if (nuevosActivos.length > 0) {
-            setRecordatorios(actualizados);
-            setRecordatoriosActivos(prev => [...prev, ...nuevosActivos]);
-        }
-    };
-
-    // Cargar recordatorios guardados y verificar al iniciar
     useEffect(() => {
-        const guardados = localStorage.getItem("recordatorios");
-        if (guardados) {
-            const parsed = JSON.parse(guardados);
-            setRecordatorios(parsed);
-        }
+        const cargarRecordatorios = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) return;
+                
+                const respuesta = await apiClient.get('/recordatorios');
+                
+                if (respuesta.status === 200) {
+                    setRecordatorios(respuesta.data);
+                }
+            } catch (error) {
+                console.error('Error al cargar recordatorios:', error);
+            }
+        };
+        
+        cargarRecordatorios();
     }, []);
 
-    // Verificar cuando cambien los recordatorios (después de cargar o guardar)
+    // Solo verificamos una vez al cargar si hay vencidos
     useEffect(() => {
-        verificarRecordatoriosVencidos();
-    }, [recordatorios]);
+        if (recordatorios.length > 0) {
+            const hoy = new Date().toISOString().split("T")[0];
+            const vencidos = recordatorios.filter(r => !r.cumplido && r.fecha <= hoy);
+            
+            if (vencidos.length > 0) {
+                // Actualizar localmente solo una vez
+                setRecordatoriosActivos(vencidos.map(v => ({ ...v, cumplido: true, fechaCumplida: hoy })));
+            }
+        }
+    }, [recordatorios.length]); // Solo re-ejecutar si la cantidad cambia (nuevo recordatorio)
 
-    // Guardar recordatorios cada vez que cambian
-    useEffect(() => {
-        localStorage.setItem("recordatorios", JSON.stringify(recordatorios));
-    }, [recordatorios]);
-
-    const handleGuardarRecordatorio = (recordatorio: { fecha: string; proposito: string }) => {
-        const nuevoRecordatorio: Recordatorio = {
-            id: Date.now().toString(),
-            fecha: recordatorio.fecha,
-            proposito: recordatorio.proposito,
-            cumplido: false
-        };
-        setRecordatorios(prev => [...prev, nuevoRecordatorio]);
-        // La verificación se hará automáticamente cuando se actualice recordatorios
+    const handleGuardarRecordatorio = async (datos: { fecha: string; proposito: string }) => {
+        try {
+            const respuesta = await apiClient.post('/recordatorios', datos);
+            setRecordatorios(prev => [...prev, respuesta.data]);
+        } catch (error) {
+            console.error('Error:', error);
+            alert('No se pudo guardar el recordatorio');
+        }
     };
 
     const handleCerrarBanner = (id: string) => {
@@ -315,6 +391,7 @@ export const Nav2 = () => {
 
     const handleCerrarSesion = () => {
         localStorage.removeItem('token');
+        localStorage.removeItem('usuario');
         localStorage.removeItem('nombreUsuario');
         navigate('/', { replace: true });
         console.log("Sesión cerrada correctamente");
@@ -330,7 +407,6 @@ export const Nav2 = () => {
                     {mostrarPerfil && <ModalPerfil onClose={() => setMostrarPerfil(false)} />}
                 </div>
 
-                {/* Botón RECORDATORIO con Tooltip desplegable */}
                 <div className="relative">
                     <p className={estiloBoton} onClick={() => setMostrarTooltipRecordatorio(!mostrarTooltipRecordatorio)}> 
                         📅 RECORDATORIO 
@@ -347,7 +423,6 @@ export const Nav2 = () => {
                 </p>
             </nav>
 
-            {/* Banners de recordatorios activos */}
             {recordatoriosActivos.map(recordatorio => (
                 <BannerRecordatorio 
                     key={recordatorio.id}
@@ -365,17 +440,82 @@ export const Nav2 = () => {
 export const Encabezado = ({ children, estilos, titulo, id, titulos, subtitulo }: EncabezadoProps) => {
     const keyH1 = `colorH1_${id}`;
     const keyH2 = `colorH2_${id}`;
+    const keyFondo = `fondo_${id}`;
 
     const [colorH1, setColorH1] = useState(() => localStorage.getItem(keyH1) || "#000000");
     const [colorH2, setColorH2] = useState(() => localStorage.getItem(keyH2) || "#000000");
+    const [fondoImagen, setFondoImagen] = useState<string | null>(() => {
+        return localStorage.getItem(keyFondo) || null;
+    });
 
     const inputH1Ref = useRef<HTMLInputElement>(null);
     const inputH2Ref = useRef<HTMLInputElement>(null);
+    const inputFondoRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         localStorage.setItem(keyH1, colorH1);
         localStorage.setItem(keyH2, colorH2);
+        
+        const guardarColores = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                if (token) {
+                    await apiClient.put('/encabezado/colores', {
+                        color_titulo: colorH1,
+                        color_subtitulo: colorH2
+                    });
+                }
+            } catch (error) {
+                console.error('Error al guardar colores:', error);
+            }
+        };
+        
+        guardarColores();
     }, [colorH1, colorH2, keyH1, keyH2]);
+
+    const handleFondoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            if (file.size > 4 * 1024 * 1024) {
+                alert("El tamaño de la imagen no debe superar los 4MB.");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+                const base64String = reader.result as string;
+                try {
+                    localStorage.setItem(keyFondo, base64String);
+                    setFondoImagen(base64String);
+                    
+                    const token = localStorage.getItem('token');
+                    if (token) {
+                        await apiClient.put('/encabezado/wallpaper', { wallpaper_url: base64String });
+                    }
+                } catch (error) {
+                    alert("Error al guardar la imagen de fondo.");
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const restaurarFondoOriginal = async () => {
+        localStorage.removeItem(keyFondo);
+        setFondoImagen(null);
+        if (inputFondoRef.current) {
+            inputFondoRef.current.value = '';
+        }
+        
+        try {
+            const token = localStorage.getItem('token');
+            if (token) {
+                await apiClient.delete('/encabezado/wallpaper');
+            }
+        } catch (error) {
+            console.error('Error al restaurar fondo:', error);
+        }
+    };
 
     return ( 
         <div className={`relative w-full flex justify-end overflow-hidden min-h-[45rem] ${estilos || ""}`}>
@@ -393,12 +533,49 @@ export const Encabezado = ({ children, estilos, titulo, id, titulos, subtitulo }
                 onChange={(e) => setColorH2(e.target.value)} 
                 className="hidden" 
             />
+            <input 
+                type="file" 
+                ref={inputFondoRef} 
+                accept="image/*" 
+                onChange={handleFondoChange} 
+                className="hidden" 
+            />
 
-            <div className="absolute inset-0 z-0 w-full h-full max-h-[200rem]">
-                {children}
+            <div 
+                className="absolute inset-0 z-0 w-full h-full max-h-[200rem] cursor-pointer group"
+                onClick={() => inputFondoRef.current?.click()}
+                title="Haz clic para cambiar la imagen de fondo"
+            >
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-300 z-10 flex items-center justify-center">
+                    <span className="opacity-0 group-hover:opacity-100 text-white text-sm font-bold bg-black/50 px-4 py-2 rounded-full backdrop-blur-sm transition-all duration-300">
+                        📸 CAMBIAR IMAGEN
+                    </span>
+                </div>
+                
+                {fondoImagen ? (
+                    <img 
+                        src={fondoImagen} 
+                        alt="Fondo personalizado" 
+                        className="w-full h-full object-cover object-center" 
+                    />
+                ) : (
+                    children
+                )}
             </div>
 
-            <div className="flex items-center absolute w-fit h-fit gap-100 left-10 top-10 z-30">
+            {fondoImagen && (
+                <button 
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        restaurarFondoOriginal();
+                    }} 
+                    className="absolute bottom-5 right-5 z-30 bg-black/50 text-white px-4 py-2 rounded-full text-xs font-bold hover:bg-black/80 transition-all backdrop-blur-md shadow-lg"
+                >
+                    ↻ RESTAURAR FONDO ORIGINAL
+                </button>
+            )}
+
+            <div className="flex items-center absolute w-fit h-fit gap-100 left-10 top-10 z-30 pointer-events-auto">
                 <Navegar />
                 <Nav2 />
             </div>
@@ -413,13 +590,9 @@ export const Encabezado = ({ children, estilos, titulo, id, titulos, subtitulo }
                     className="text-[6rem] leading-[1.2] cursor-pointer select-none pointer-events-auto w-fit transition-colors duration-200 font-black"
                 >
                     BIENVENIDO<br /> 
-                    <span>
-                        {titulo ? titulo : "ESTE ES EL"}
-                    </span>
+                    <span>{titulo ? titulo : "ESTE ES EL"}</span>
                     <br />
-                    <span>
-                        {titulos ? titulos : ""}
-                    </span>
+                    <span>{titulos ? titulos : ""}</span>
                 </h1>
 
                 <div className="absolute top-68">
@@ -428,9 +601,7 @@ export const Encabezado = ({ children, estilos, titulo, id, titulos, subtitulo }
                         style={{ color: colorH2 }}
                         className="text-[2.5rem] leading-[1.2] cursor-pointer select-none pointer-events-auto w-fit transition-colors duration-200 font-black"
                     >
-                        <span>
-                            {subtitulo ? subtitulo : ""}
-                        </span>
+                        <span>{subtitulo ? subtitulo : ""}</span>
                     </h2>
                 </div>
             </div>

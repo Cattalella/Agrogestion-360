@@ -1,52 +1,99 @@
-import { useState } from 'react';
+import { useState, useEffect } from "react";
+import apiClient from "../api/apiClient";
 
-interface Cerdo {
-    id: number;
-    local: string;
-    oficial: string;
+export interface Cerdo {
+    id_animal: number;
+    codigo_local: string;
+    num_ica_chapeta?: string;
+    id_especie: number;
+    id_estado_ani: number;
+    id_ubicacion: number;
     sexo: string;
-    estado: string;
-    foto?: string;
+    raza: string;
+    fecha_nacimiento: string;
+    peso_actual: number;
+    origen: string;
+    foto_url?: string;
+    EstadoAni?: { nombre: string };
+    Ubicacion?: { nombre_ubi: string };
 }
 
-export const useCerdos = (listaInicial: Cerdo[]) => {
-    const [listaCerdos, setListaCerdos] = useState<Cerdo[]>(listaInicial);
-    const [categoriaCerdo, setCategoriaCerdo] = useState("HEMBRA");
-    const [sugerenciaId, setSugerenciaId] = useState<string>(() => {
-        const nextId = listaInicial.length + 1;
-        return `C-${nextId.toString().padStart(2, '0')}`;
-    });
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [vista, setVista] = useState<'lista' | 'formulario'>('lista');
+type Vista = 'lista' | 'formulario';
 
-    const abrirModal = () => setIsModalOpen(true);
-    
+export const useCerdos = () => {
+    const [cerdos, setCerdos] = useState<Cerdo[]>([]);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [vista, setVista] = useState<Vista>('lista');
+    const [cargando, setCargando] = useState(false);
+
+    const cargarCerdos = async () => {
+        setCargando(true);
+        try {
+            const respuesta = await apiClient.get('/porcicultura/cerdos');
+            setCerdos(respuesta.data);
+        } catch (error) {
+            console.error("Error al cargar cerdos:", error);
+        } finally {
+            setCargando(false);
+        }
+    };
+
+    useEffect(() => {
+        if (isModalOpen) cargarCerdos();
+    }, [isModalOpen]);
+
+    const abrirModal = () => {
+        setVista('lista');
+        setIsModalOpen(true);
+    };
+
     const cerrarModal = () => {
         setIsModalOpen(false);
         setVista('lista');
     };
 
-    const cambiarVista = (nuevaVista: 'lista' | 'formulario') => setVista(nuevaVista);
+    const cambiarVista = (v: Vista) => setVista(v);
 
-    const guardarCerdo = (datos: any, cerrar: boolean) => {
-        console.log("Guardando cerdo...", datos);
-        
-        const nuevoId = listaCerdos.length + 1;
-        setSugerenciaId(`C-${nuevoId.toString().padStart(2, '0')}`);
-        
-        if (cerrar) {
-            setIsModalOpen(false);
-            setVista('lista');
+    const guardarCerdo = async (datos: any, cerrar: boolean = true) => {
+        setCargando(true);
+        try {
+            await apiClient.post('/porcicultura/cerdos', datos);
+            await cargarCerdos();
+            if (cerrar) {
+                cerrarModal();
+            } else {
+                setVista('lista');
+            }
+            return true;
+        } catch (error) {
+            console.error("Error al guardar cerdo:", error);
+            return false;
+        } finally {
+            setCargando(false);
         }
     };
 
+    const [categoriaCerdo, setCategoriaCerdo] = useState("C");
+    const [sugerenciaId, setSugerenciaId] = useState("");
+
+    useEffect(() => {
+        const registrosMismoTipo = cerdos.filter(c => c.codigo_local?.startsWith(categoriaCerdo));
+        const ultimoNumero = registrosMismoTipo.reduce((max, curr) => {
+            const partes = curr.codigo_local?.split('-') || [];
+            const num = partes.length > 1 ? parseInt(partes[1]) : 0;
+            return !isNaN(num) && num > max ? num : max;
+        }, 0);
+        setSugerenciaId(`${categoriaCerdo}-${String(ultimoNumero + 1).padStart(2, '0')}`);
+    }, [categoriaCerdo, cerdos]);
+
     return {
-        listaCerdos,
-        categoriaCerdo,
-        setCategoriaCerdo,
-        sugerenciaId,
+        listaCerdos: cerdos,
+        cargando,
         isModalOpen,
         vista,
+        sugerenciaId,
+        categoriaCerdo,
+        setCategoriaCerdo,
         abrirModal,
         cerrarModal,
         cambiarVista,
