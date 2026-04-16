@@ -19,7 +19,11 @@ import { TrabajadoresModule } from './modulos/trabajadores/trabajadores.module';
 import { VentasModule } from './modulos/ventas/ventas.module';
 import { ReportesModule } from './modulos/reportes/reportes.module';
 import { AuditoriaModule } from './modulos/auditoria/auditoria.module';
+<<<<<<< HEAD
 import { VacunacionModule } from './modulos/vacunacion/vacunacion.module';
+=======
+import { AnaliticasModule } from './modulos/analiticas/analiticas.module';
+>>>>>>> 1d75247059d160be2411fa5b685aab0591b2bc60
 
 // Componentes compartidos
 import { ExcepcionGlobalFiltro } from './compartido/filtros/excepcion-global.filtro';
@@ -31,28 +35,32 @@ import { AppService } from './app.service';
 
 @Module({
   imports: [
-    // ============================================================
-    // SERVIR ARCHIVOS ESTÁTICOS (IMÁGENES SUBIDAS)
-    // ============================================================
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'archivos-subidos'),
       serveRoot: '/archivos-subidos',
     }),
 
-    // ============================================================
-    // JWT GLOBAL (Disponible en todos los módulos)
-    // ============================================================
     JwtModule.register({
       secret: process.env.JWT_SECRETO || 'agro360_secreto_super_seguro_2024',
       signOptions: { expiresIn: '7d' },
       global: true,
     }),
 
-    // ============================================================
-    // MÓDULO DE BASE DE DATOS (PRISMA)
-    // ============================================================
     PrismaModule,
+    AutenticacionModule,
+    EncabezadoModule,
+    RecordatoriosModule,
+    GanaderiaModule,
+    PorciculturaModule,
+    InventarioModule,
+    TrabajadoresModule,
+    VentasModule,
+    AuditoriaModule,
+    ReportesModule,
+    AnaliticasModule,
+  ],
 
+<<<<<<< HEAD
     // ============================================================
     // MÓDULOS DE LA APLICACIÓN (ACTIVOS)
     // ============================================================
@@ -71,6 +79,12 @@ import { AppService } from './app.service';
   
   controllers: [AppController],
   
+=======
+  controllers: [
+    AppController,
+  ],
+
+>>>>>>> 1d75247059d160be2411fa5b685aab0591b2bc60
   providers: [
     AppService,
     {

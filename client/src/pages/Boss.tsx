@@ -33,21 +33,35 @@ export const Boss = () => {
 
     // Datos seguros: siempre tienen las propiedades necesarias (Uso de ?. para evitar crashes)
     const dashboard = {
-        ganancias: data?.ganancias || { tipo1: "GANANCIA NETA", cantidad1: 0 },
-        inversion: data?.inversion || { tipo1: "INVERSIÓN", cantidad1: 0 },
-        gastosPorSector: Array.isArray(data?.gastosPorSector) ? data.gastosPorSector : MOCK_GASTOS_SECTOR,
+        ganancias: { 
+            tipo1: "TOTAL VENTAS", 
+            cantidad1: data?.ganancias?.total_ventas || 0 
+        },
+        inversion: { 
+            tipo1: "TOTAL INVERSIÓN", 
+            cantidad1: data?.ganancias?.total_inversion || 0 
+        },
+        gastosPorSector: Array.isArray(data?.gastos_por_sector) 
+            ? data.gastos_por_sector.map((item: any) => ({
+                name: item.sector?.toUpperCase() || "SIN NOMBRE",
+                valor: item.total || 0,
+                color: item.sector?.toUpperCase() === "PORCICULTURA" ? "#10b981" : 
+                       item.sector?.toUpperCase() === "GANADERÍA" ? "#8b5cf6" : "#f43f5e",
+                detalle: `Acumulado: ${item.total || 0}`
+            }))
+            : MOCK_GASTOS_SECTOR,
         insumosCriticos: {
-            dias: data?.insumosCriticos?.dias || 0,
-            titulo: data?.insumosCriticos?.titulo || "Insumos Críticos",
-            lista: Array.isArray(data?.insumosCriticos?.lista) ? data.insumosCriticos.lista : []
+            dias: data?.supervision?.insumos_criticos || 0,
+            titulo: "Insumos Críticos",
+            lista: []
         },
         pagosTrabajadores: {
-            titulo: data?.pagosTrabajadores?.titulo || "",
-            lista: Array.isArray(data?.pagosTrabajadores?.lista) ? data.pagosTrabajadores.lista : []
+            titulo: `Pagado: $${data?.supervision?.pagos_trabajadores?.total_pagado || 0}`,
+            lista: new Array(data?.supervision?.pagos_trabajadores?.num_pagos || 0).fill("")
         },
         trabajadoresActivos: {
-            titulo: data?.trabajadoresActivos?.titulo || "PERSONAL",
-            lista: Array.isArray(data?.trabajadoresActivos?.lista) ? data.trabajadoresActivos.lista : []
+            titulo: "Trabajadores",
+            lista: new Array(data?.supervision?.trabajadores_activos || 0).fill("")
         },
         filtrosDisponibles: Array.isArray(data?.filtrosDisponibles) ? data.filtrosDisponibles : MOCK_FILTROS,
     };
@@ -57,7 +71,7 @@ export const Boss = () => {
         { item: "Ganancias Netas", valor: dashboard.ganancias.cantidad1 },
         { item: "Inversión Total", valor: dashboard.inversion.cantidad1 },
         { item: "Total Trabajadores", valor: dashboard.trabajadoresActivos.lista.length },
-        { item: "Insumos por Vencer", valor: dashboard.insumosCriticos.lista.length }
+        { item: "Insumos Críticos", valor: dashboard.insumosCriticos.dias }
     ];
 
     const handleFiltrar = (filtro: string) => {

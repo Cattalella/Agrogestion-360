@@ -34,8 +34,8 @@ export const ListaInsumos = ({ items, titulo }: ListaInsumosProps) => {
                         </p>
                     ))
                 ) : (
-                    <p className="text-[0.8rem] text-gray-400 italic">
-                        
+                    <p className="text-[0.8rem] text-gray-400 italic text-center py-4">
+                        Sin datos disponibles
                     </p>
                 )}
             </div>

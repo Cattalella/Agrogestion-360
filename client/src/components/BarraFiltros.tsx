@@ -40,10 +40,10 @@ export const BarraFiltros = ({ onFiltrar, filtrosDisponibles = ["ESTE MES", "SEI
                             </li>
                         ))}
                         <li 
-                            onClick={() => handleFiltro("RESETEAR")}
+                            onClick={() => handleFiltro("FECHA ACTUAL")}
                             className="cursor-pointer hover:bg-red-50 p-1 rounded text-sm text-red-600"
                         > 
-                            📅 RESETEAR 
+                            📅 FECHA ACTUAL
                         </li>
                     </ul>
                 </div>
