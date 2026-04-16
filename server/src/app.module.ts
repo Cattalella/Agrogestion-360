@@ -13,14 +13,13 @@ import { AutenticacionModule } from './modulos/autenticacion/autenticacion.modul
 import { EncabezadoModule } from './modulos/encabezado/encabezado.module';
 import { RecordatoriosModule } from './modulos/recordatorio/recordatorio.module';
 import { GanaderiaModule } from './modulos/ganaderia/ganaderia.module';
-
-// Módulos futuros (cuando los crees)
 import { PorciculturaModule } from './modulos/porcicultura/porcicultura.module';
 import { InventarioModule } from './modulos/inventario/inventario.module';
 import { TrabajadoresModule } from './modulos/trabajadores/trabajadores.module';
 import { VentasModule } from './modulos/ventas/ventas.module';
 import { ReportesModule } from './modulos/reportes/reportes.module';
 import { AuditoriaModule } from './modulos/auditoria/auditoria.module';
+import { AnaliticasModule } from './modulos/analiticas/analiticas.module';
 
 // Componentes compartidos
 import { ExcepcionGlobalFiltro } from './compartido/filtros/excepcion-global.filtro';
@@ -32,61 +31,41 @@ import { AppService } from './app.service';
 
 @Module({
   imports: [
-    // ============================================================
-    // SERVIR ARCHIVOS ESTÁTICOS (IMÁGENES SUBIDAS)
-    // ============================================================
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'archivos-subidos'),
       serveRoot: '/archivos-subidos',
     }),
 
-    // ============================================================
-    // JWT GLOBAL (Disponible en todos los módulos)
-    // ============================================================
     JwtModule.register({
       secret: process.env.JWT_SECRETO || 'agro360_secreto_super_seguro_2024',
       signOptions: { expiresIn: '7d' },
       global: true,
     }),
 
-    // ============================================================
-    // MÓDULO DE BASE DE DATOS (PRISMA)
-    // ============================================================
     PrismaModule,
+    AutenticacionModule,
+    EncabezadoModule,
+    RecordatoriosModule,
+    GanaderiaModule,
+    PorciculturaModule,
+    InventarioModule,
+    TrabajadoresModule,
+    VentasModule,
+    AuditoriaModule,
+    ReportesModule,
+    AnaliticasModule,
+  ],
 
-    // ============================================================
-    // MÓDULOS DE LA APLICACIÓN (ACTIVOS)
-    // ============================================================
-    AutenticacionModule,   // Login, logout, recuperar contraseña
-    EncabezadoModule,      // Perfil, wallpaper, colores, foto
-    RecordatoriosModule,   // CRUD de recordatorios
-    GanaderiaModule,       // Gestión de animales bovinos
-    PorciculturaModule,    // Gestión de cerdos
-    InventarioModule,      // Insumos y solicitudes
-    TrabajadoresModule,    // Personal y pagos
-    VentasModule,          // Registro de ventas
-    AuditoriaModule,       // Trazabilidad de acciones
-    ReportesModule,        // Reportes estadísticos
-  ],
-  
   controllers: [
-    AppController,  // Controlador base (health check)
+    AppController,
   ],
-  
+
   providers: [
-    AppService,     // Servicio base
-    
-    // ============================================================
-    // FILTRO GLOBAL DE EXCEPCIONES
-    // ============================================================
+    AppService,
     {
       provide: APP_FILTER,
       useClass: ExcepcionGlobalFiltro,
     },
-    
-    // ============================================================
-    // TUBERÍA GLOBAL DE VALIDACIÓN (DTOS)
-    // ============================================================
     {
       provide: APP_PIPE,
       useClass: ValidacionTuberia,

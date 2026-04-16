@@ -106,7 +106,7 @@ export const Hero2 = ({ insumos, pagos, trabajadoresactivos }: Hero2Props) => {
                 <div className="flex justify-around items-center mx-auto my-auto w-full px-5 gap-6 max-w-[46rem]">
                     <div className="flex flex-col shadow-[0_2px_5px_rgba(0,0,0,0.5)] p-5 rounded-2xl flex-1 bg-white h-[18rem] min-w-[0]">
                         <div className="flex flex-col border-b-1 border-dashed pb-2 gap-2 shrink-0">
-                            <p className={`tracking-[3px] font-black ${colorDias}`}> <span>{insumos.dias}</span>/DIAS </p>
+                            <p className={`tracking-[3px] font-black ${colorDias}`}> <span>{insumos.dias}</span> INSUMOS CRÍTICOS </p>
                             <p className="text-red-800 text-[0.8rem] font-bold uppercase"> {insumos.titulo} </p>
                         </div>
                         <ListaInsumos items={insumos.lista} />
@@ -145,7 +145,7 @@ export const Hero2 = ({ insumos, pagos, trabajadoresactivos }: Hero2Props) => {
                                 <button onClick={() => setVerModalTrabajadores(false)} className="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white border-none cursor-pointer"> ✕ </button>
                             </div>
                             <div className="p-8 max-h-[50vh] overflow-y-auto no-scrollbar bg-gray-50">
-                                {trabajadoresactivos.lista?.length > 0 ? (
+                                {trabajadoresactivos.lista?.length > 0 && trabajadoresactivos.lista[0] !== "" ? (
                                     trabajadoresactivos.lista.map((nombre: string, i: number) => (
                                         <div key={i} className="flex items-center p-4 bg-white border border-gray-100 rounded-2xl mb-2 shadow-sm">
                                             <span className="w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center text-[10px] font-black mr-4">{i + 1}</span>
@@ -153,7 +153,7 @@ export const Hero2 = ({ insumos, pagos, trabajadoresactivos }: Hero2Props) => {
                                         </div>
                                     ))
                                 ) : (
-                                    <p className="text-center text-gray-400 py-10">No hay trabajadores registrados</p>
+                                    <p className="text-center text-gray-400 py-10 italic">Sin datos detallados disponibles</p>
                                 )}
                             </div>
                         </div>
