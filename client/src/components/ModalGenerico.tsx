@@ -1,5 +1,6 @@
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import { X, Plus } from "lucide-react";
+import { useScrollPersonalizado } from "../hooks/useScrollPersonalizado";  // 🆕 Importar
 
 interface ModalGenericoProps {
     titulo: string;
@@ -17,11 +18,25 @@ export const ModalGenerico = ({
     children 
 }: ModalGenericoProps) => {
     
+    // 🆕 Usar tu hook de scroll personalizado
+    const { scrollRef, estilosScroll } = useScrollPersonalizado();
+    
+    // Bloquear scroll del body cuando el modal está abierto
+    useEffect(() => {
+        if (isOpen) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = 'unset';
+        }
+        
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
+    }, [isOpen]);
+
     if (!isOpen) return null;
 
-    // Función para manejar el clic en el fondo
     const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
-        // Si el id del elemento clickeado es 'modal-overlay', cerramos
         if ((e.target as HTMLDivElement).id === "modal-overlay") {
             onClose();
         }
@@ -33,8 +48,6 @@ export const ModalGenerico = ({
             onClick={handleBackdropClick}
             className="fixed inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center z-50 p-4 animate-in fade-in duration-200"
         >
-            
-            {/* Contenedor del Modal */}
             <div className={`
                 bg-white 
                 w-full 
@@ -46,18 +59,20 @@ export const ModalGenerico = ({
                 border-[1px] 
                 border-gray-100
                 animate-in zoom-in-95 duration-200
+                max-h-[90vh]
+                flex
+                flex-col
             `}>
                 
-                {/* Botón de cerrar */}
                 <button 
                     onClick={onClose} 
-                    className="absolute top-6 right-8 text-gray-300 hover:text-red-500 transition-all cursor-pointer active:scale-90"
+                    className="absolute top-6 right-8 text-gray-300 hover:text-red-500 transition-all cursor-pointer active:scale-90 z-10"
                 >
                     <X size={28} strokeWidth={2.5} />
                 </button>
 
-                {/* Encabezado */}
-                <div className="flex flex-col items-center mb-8">
+                {/* Encabezado - Fijo */}
+                <div className="flex flex-col items-center mb-4 flex-shrink-0">
                     <div className="w-14 h-14 rounded-full border-2 border-blue-400 flex items-center justify-center mb-3 shadow-sm">
                         <Plus className="text-blue-500 w-6 h-6" /> 
                     </div>
@@ -67,8 +82,12 @@ export const ModalGenerico = ({
                     </h2>
                 </div>
 
-                {/* Contenido */}
-                <div className="w-full">
+                {/* 🆕 Contenido con scroll personalizado */}
+                <div 
+                    ref={scrollRef}
+                    style={estilosScroll}
+                    className="flex-1 overflow-y-auto pr-2"
+                >
                     {children}
                 </div>
 

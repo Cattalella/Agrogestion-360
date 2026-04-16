@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import apiClient from '../api/apiClient';
 
 // ============================================================
@@ -34,11 +34,25 @@ interface CatalogoEstado {
 }
 
 // ============================================================
+// 📌 INTERFAZ PARA STATS DE LA CARD
+// ============================================================
+export interface GanadoStats {
+    tipo1: string;
+    cantidad1: number;
+    tipo2: string;
+    cantidad2: number;
+    tipo3: string;
+    cantidad3: number;
+    tipo4: string;
+    cantidad4: number;
+}
+
+// ============================================================
 // 📌 HOOK PRINCIPAL
 // ============================================================
-export const useGanado = (listaInicial: Animal[] = []) => {
+export const useGanado = () => {
     // Estados
-    const [listaGanado, setListaGanado] = useState<Animal[]>(listaInicial);
+    const [listaGanado, setListaGanado] = useState<Animal[]>([]);
     const [categoriaSeleccionada, setCategoriaSeleccionada] = useState("VA");
     const [sugerenciaId, setSugerenciaId] = useState("");
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -53,20 +67,20 @@ export const useGanado = (listaInicial: Animal[] = []) => {
     // ============================================================
     // CARGAR ANIMALES DEL BACKEND AL INICIAR
     // ============================================================
-    useEffect(() => {
-        const cargarAnimales = async () => {
-            setCargando(true);
-            try {
-                const respuesta = await apiClient.get('/ganaderia');
-                console.log('✅ Animales cargados:', respuesta.data.length);
-                setListaGanado(respuesta.data);
-            } catch (error) {
-                console.error('❌ Error al cargar animales:', error);
-            } finally {
-                setCargando(false);
-            }
-        };
+    const cargarAnimales = async () => {
+        setCargando(true);
+        try {
+            const respuesta = await apiClient.get('/ganaderia');
+            console.log('✅ Animales cargados:', respuesta.data.length);
+            setListaGanado(respuesta.data);
+        } catch (error) {
+            console.error('❌ Error al cargar animales:', error);
+        } finally {
+            setCargando(false);
+        }
+    };
 
+    useEffect(() => {
         cargarAnimales();
     }, []);
 
@@ -81,11 +95,7 @@ export const useGanado = (listaInicial: Animal[] = []) => {
                 setEspecies(datos.especies || []);
                 setUbicaciones(datos.ubicaciones || []);
                 setEstados(datos.estados || []);
-                console.log('✅ Catálogos cargados:', {
-                    especies: datos.especies?.length,
-                    ubicaciones: datos.ubicaciones?.length,
-                    estados: datos.estados?.length
-                });
+                console.log('✅ Catálogos cargados');
             } catch (error) {
                 console.error('❌ Error al cargar catálogos:', error);
             }
@@ -93,6 +103,42 @@ export const useGanado = (listaInicial: Animal[] = []) => {
 
         cargarCatalogos();
     }, []);
+
+    // ============================================================
+    // 🆕 CALCULAR STATS PARA LA CARD (SE ACTUALIZA AUTOMÁTICAMENTE)
+    // ============================================================
+    const stats = useMemo((): GanadoStats => {
+        // Vacas: Hembras con prefijo VA
+        const vacas = listaGanado.filter(a => 
+            a.local?.startsWith('VA') && a.sexo === 'HEMBRA'
+        ).length;
+        
+        // Toros: Machos con prefijo TO
+        const toros = listaGanado.filter(a => 
+            a.local?.startsWith('TO') && a.sexo === 'MACHO'
+        ).length;
+        
+        // Novillos/as: Prefijo NO (sin importar sexo)
+        const novillos = listaGanado.filter(a => 
+            a.local?.startsWith('NO')
+        ).length;
+        
+        // Terneros/as: Prefijo TE (sin importar sexo)
+        const terneros = listaGanado.filter(a => 
+            a.local?.startsWith('TE')
+        ).length;
+
+        return {
+            tipo1: "VACAS",
+            cantidad1: vacas,
+            tipo2: "TOROS",
+            cantidad2: toros,
+            tipo3: "NOVILLOS",
+            cantidad3: novillos,
+            tipo4: "TERNEROS",
+            cantidad4: terneros
+        };
+    }, [listaGanado]);
 
     // ============================================================
     // GENERAR SUGERENCIA DE ID LOCAL
@@ -115,7 +161,10 @@ export const useGanado = (listaInicial: Animal[] = []) => {
     // ============================================================
     // ABRIR / CERRAR MODAL
     // ============================================================
-    const abrirModal = () => setIsModalOpen(true);
+    const abrirModal = () => {
+        cargarAnimales();
+        setIsModalOpen(true);
+    };
     
     const cerrarModal = () => {
         setIsModalOpen(false);
@@ -130,18 +179,15 @@ export const useGanado = (listaInicial: Animal[] = []) => {
     const guardarAnimal = async (nuevoAnimal: any, cerrar: boolean) => {
         setCargando(true);
         try {
-            // Construir datos para el backend
             const datosParaBackend = {
                 codigo_local: nuevoAnimal.local || sugerenciaId,
                 num_ica_chapeta: nuevoAnimal.oficial || null,
-                sexo: nuevoAnimal.sexo || 'HEMBRA',
+                sexo: nuevoAnimal.sexo || (categoriaSeleccionada === 'TO' ? 'MACHO' : 'HEMBRA'),
                 raza: nuevoAnimal.raza || 'Criollo',
-                fecha_nacimiento: nuevoAnimal.nacimiento || new Date().toISOString().split('T')[0],
+                fecha_nacimiento: nuevoAnimal.nacimiento || null,
                 peso_actual: parseFloat(nuevoAnimal.peso) || 0,
                 origen: nuevoAnimal.origen || 'Registro inicial',
-                foto_url: nuevoAnimal.foto || null,
-                id_ubicacion: parseInt(nuevoAnimal.ubicacion || "1"),
-                id_estado_ani: parseInt(nuevoAnimal.estado || "1")
+                foto_url: null  // 🆕 No enviar foto por ahora (evita error de tamaño)
             };
 
             console.log('📤 Enviando a backend:', datosParaBackend);
@@ -150,15 +196,8 @@ export const useGanado = (listaInicial: Animal[] = []) => {
             const animalCreado = respuesta.data;
             console.log('✅ Animal creado:', animalCreado);
 
-            // Actualizar lista local
-            setListaGanado(prev => [...prev, {
-                id: animalCreado.id,
-                oficial: animalCreado.oficial,
-                local: animalCreado.local,
-                sexo: animalCreado.sexo,
-                estado: animalCreado.estado,
-                raza: animalCreado.raza,
-            }]);
+            // 🆕 RECARGAR LISTA COMPLETA para actualizar stats
+            await cargarAnimales();
 
             if (cerrar) {
                 cerrarModal();
@@ -179,9 +218,7 @@ export const useGanado = (listaInicial: Animal[] = []) => {
     const actualizarAnimal = async (id: number, datos: Partial<Animal>) => {
         try {
             const respuesta = await apiClient.put(`/ganaderia/${id}`, datos);
-            setListaGanado(prev => prev.map(a => 
-                a.id === id ? { ...a, ...datos } : a
-            ));
+            await cargarAnimales();  // 🆕 Recargar para actualizar stats
             return respuesta.data;
         } catch (error) {
             console.error('❌ Error al actualizar:', error);
@@ -194,7 +231,7 @@ export const useGanado = (listaInicial: Animal[] = []) => {
     const eliminarAnimal = async (id: number) => {
         try {
             const respuesta = await apiClient.delete(`/ganaderia/${id}`);
-            setListaGanado(prev => prev.filter(a => a.id !== id));
+            await cargarAnimales();  // 🆕 Recargar para actualizar stats
             return respuesta.data;
         } catch (error) {
             console.error('❌ Error al eliminar:', error);
@@ -212,6 +249,9 @@ export const useGanado = (listaInicial: Animal[] = []) => {
         ubicaciones,
         estados,
         
+        // Stats (se actualiza automáticamente)
+        stats,
+        
         // Modal
         categoriaSeleccionada,
         setCategoriaSeleccionada,
@@ -226,5 +266,6 @@ export const useGanado = (listaInicial: Animal[] = []) => {
         guardarAnimal,
         actualizarAnimal,
         eliminarAnimal,
+        recargarLista: cargarAnimales,
     };
 };

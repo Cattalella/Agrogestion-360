@@ -21,6 +21,18 @@ export class TrabajadoresService {
   }
 
   async crearTrabajador(datos: any) {
+    // Validar que no exista un trabajador con el mismo documento
+    const existente = await this.prisma.trabajador.findFirst({
+      where: {
+        tipo_documento: datos.tipo_documento,
+        num_documento: datos.num_documento
+      }
+    });
+
+    if (existente) {
+      throw new BadRequestException('Ya existe un trabajador con ese tipo y número de documento');
+    }
+
     return this.prisma.trabajador.create({
       data: {
         nombre_completo: datos.nombre_completo,
@@ -31,7 +43,7 @@ export class TrabajadoresService {
         telefono_familiar: datos.telefono_familiar || null,
         direccion: datos.direccion || null,
         estado: datos.estado || 'Activo',
-        fecha_ingreso: new Date(datos.fecha_ingreso),
+        fecha_ingreso: datos.fecha_ingreso ? new Date(datos.fecha_ingreso) : new Date(),
         observaciones: datos.observaciones || null,
         updatedAt: new Date()
       }
@@ -39,17 +51,41 @@ export class TrabajadoresService {
   }
 
   async actualizarTrabajador(id: number, datos: any) {
+    const trabajador = await this.prisma.trabajador.findUnique({
+      where: { id_trabajador: id }
+    });
+
+    if (!trabajador) {
+      throw new NotFoundException('Trabajador no encontrado');
+    }
+
     return this.prisma.trabajador.update({
       where: { id_trabajador: id },
       data: {
-        ...datos,
+        nombre_completo: datos.nombre_completo,
+        tipo_documento: datos.tipo_documento,
+        num_documento: datos.num_documento,
+        tipo_trabajo: datos.tipo_trabajo,
+        telefono: datos.telefono,
+        telefono_familiar: datos.telefono_familiar,
+        direccion: datos.direccion,
+        estado: datos.estado,
         fecha_ingreso: datos.fecha_ingreso ? new Date(datos.fecha_ingreso) : undefined,
+        observaciones: datos.observaciones,
         updatedAt: new Date()
       }
     });
   }
 
   async eliminarTrabajador(id: number) {
+    const trabajador = await this.prisma.trabajador.findUnique({
+      where: { id_trabajador: id }
+    });
+
+    if (!trabajador) {
+      throw new NotFoundException('Trabajador no encontrado');
+    }
+
     // RM.8.1.3: Borrado lógico para mantener historial
     return this.prisma.trabajador.update({
       where: { id_trabajador: id },
@@ -78,7 +114,7 @@ export class TrabajadoresService {
   async registrarTrabajo(datos: any) {
     // Validar que el trabajador esté activo
     const trabajador = await this.prisma.trabajador.findUnique({
-      where: { id_trabajador: datos.id_trabajador }
+      where: { id_trabajador: parseInt(datos.id_trabajador) }
     });
 
     if (!trabajador || trabajador.estado !== 'Activo') {
@@ -95,13 +131,13 @@ export class TrabajadoresService {
 
     return this.prisma.trabajoRealizado.create({
       data: {
-        id_trabajador: datos.id_trabajador,
+        id_trabajador: parseInt(datos.id_trabajador),
         categoria_trabajo: datos.categoria_trabajo,
         tipo_actividad: datos.tipo_actividad,
         fecha_inicio: new Date(datos.fecha_inicio),
         fecha_fin: new Date(datos.fecha_fin),
         duracion_horas: new Decimal(duracion || 0),
-        evidencia_url: datos.evidencia_url || '',
+        evidencia_url: datos.evidencia_url || datos.evidencia_fotografica || '',
         observaciones: datos.observaciones || null,
         updatedAt: new Date()
       }
@@ -117,6 +153,9 @@ export class TrabajadoresService {
       include: {
         Trabajador: {
           select: { nombre_completo: true }
+        },
+        TrabajoRealizado: {
+          select: { tipo_actividad: true }
         }
       },
       orderBy: { fecha_pago: 'desc' }
@@ -124,23 +163,42 @@ export class TrabajadoresService {
   }
 
   async registrarPago(datos: any) {
+    // Validar que el trabajador exista y esté activo
+    const trabajador = await this.prisma.trabajador.findUnique({
+      where: { id_trabajador: parseInt(datos.id_trabajador) }
+    });
+
+    if (!trabajador) {
+      throw new BadRequestException('Trabajador no encontrado');
+    }
+
+    if (trabajador.estado !== 'Activo') {
+      throw new BadRequestException('Solo se puede pagar a trabajadores activos');
+    }
+
     const pago = await this.prisma.pagoTrabajador.create({
       data: {
-        id_trabajador: datos.id_trabajador,
-        id_trabajo: datos.id_trabajo || null,
+        id_trabajador: parseInt(datos.id_trabajador),
+        id_trabajo: datos.id_trabajo ? parseInt(datos.id_trabajo) : null,
         fecha_pago: new Date(datos.fecha_pago),
         monto_total: new Decimal(datos.monto_total),
         concepto: datos.concepto,
-        estado_pago: datos.estado_pago || 'Pendiente de firma',
+        estado_pago: datos.estado || 'No pagado',  // 🆕 CORREGIDO
         firma_url: datos.firma_url || null,
         updatedAt: new Date()
+      },
+      include: {
+        Trabajador: {
+          select: { nombre_completo: true }
+        }
       }
     });
 
+    // Registrar en auditoría
     await this.auditoria.registrar({
-      id_usuario: datos.id_usuario_actual || 1,
+      id_usuario: datos.id_usuario_actual || 5, // ID del admin
       accion: 'REGISTRO_PAGO',
-      descripcion: `Pago registrado para trabajador ${datos.id_trabajador} por $${datos.monto_total}`,
+      descripcion: `Pago registrado para ${trabajador.nombre_completo} por $${datos.monto_total}`,
       entidad: 'PagoTrabajador',
       id_entidad: pago.id_pago,
       rol: 'Administrador'
@@ -149,8 +207,37 @@ export class TrabajadoresService {
     return pago;
   }
 
+  async obtenerPago(id: number) {
+    const pago = await this.prisma.pagoTrabajador.findUnique({
+      where: { id_pago: id },
+      include: {
+        Trabajador: {
+          select: { nombre_completo: true }
+        }
+      }
+    });
+
+    if (!pago) {
+      throw new NotFoundException('Pago no encontrado');
+    }
+
+    return pago;
+  }
+
   async anularPago(id: number, justificacion: string) {
-    const pago = await this.prisma.pagoTrabajador.update({
+    const pago = await this.prisma.pagoTrabajador.findUnique({
+      where: { id_pago: id }
+    });
+
+    if (!pago) {
+      throw new NotFoundException('Pago no encontrado');
+    }
+
+    if (pago.estado_pago === 'Anulado') {
+      throw new BadRequestException('El pago ya está anulado');
+    }
+
+    const pagoAnulado = await this.prisma.pagoTrabajador.update({
       where: { id_pago: id },
       data: {
         estado_pago: 'Anulado',
@@ -159,15 +246,55 @@ export class TrabajadoresService {
       }
     });
 
+    // Registrar en auditoría
     await this.auditoria.registrar({
-      id_usuario: 1, // Placeholder
+      id_usuario: 5, // ID del admin
       accion: 'ANULACION_PAGO',
-      descripcion: `Pago id ${id} anulado. Justificación: ${justificacion}`,
+      descripcion: `Pago #${id} anulado. Justificación: ${justificacion}`,
       entidad: 'PagoTrabajador',
       id_entidad: id,
       rol: 'Administrador'
     });
 
-    return pago;
+    return pagoAnulado;
+  }
+
+  // ============================================================
+  // 📌 OBTENER PAGOS PENDIENTES DE FIRMA
+  // ============================================================
+  async obtenerPagosPendientes() {
+    return this.prisma.pagoTrabajador.findMany({
+      where: {
+        estado_pago: 'Pendiente de firma'
+      },
+      include: {
+        Trabajador: {
+          select: { nombre_completo: true }
+        }
+      },
+      orderBy: { fecha_pago: 'asc' }
+    });
+  }
+
+  // ============================================================
+  // 📌 CONFIRMAR PAGO CON FIRMA
+  // ============================================================
+  async confirmarPagoConFirma(id: number, firma_url: string) {
+    const pago = await this.prisma.pagoTrabajador.findUnique({
+      where: { id_pago: id }
+    });
+
+    if (!pago) {
+      throw new NotFoundException('Pago no encontrado');
+    }
+
+    return this.prisma.pagoTrabajador.update({
+      where: { id_pago: id },
+      data: {
+        estado_pago: 'Pagado con firma',
+        firma_url: firma_url,
+        updatedAt: new Date()
+      }
+    });
   }
 }

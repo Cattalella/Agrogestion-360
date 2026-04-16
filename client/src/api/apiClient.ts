@@ -36,18 +36,20 @@ apiClient.interceptors.response.use(
         return response;
     },
     (error) => {
+        // 🆕 Verificar que existe response antes de acceder a status
         if (error.response?.status === 401) {
-            const token = localStorage.getItem('token');
-            const enLogin = window.location.pathname === '/';
-            // Solo redirigir si NO hay token Y no estamos ya en el login
-            // Esto evita el loop: Boss llama API → 401 → redirect → loop
-            if (!token && !enLogin) {
-                console.warn('⚠️ Sesión no válida. Redirigiendo al login...');
-                window.location.href = '/';
-            } else {
-                console.warn('⚠️ API retornó 401. Continuando con datos locales.');
+            // Limpiar datos de sesión inválidos
+            localStorage.removeItem('token');
+            localStorage.removeItem('usuario');
+
+            // Redirigir al login en caso del error de datos inválidos
+            const enLogin = window.location.pathname === '/start';
+            if (!enLogin) {
+                console.warn('🔐 Sesión inválida, redirigiendo al login...');
+                window.location.href = '/start';
             }
         }
+
         return Promise.reject(error);
     }
 );

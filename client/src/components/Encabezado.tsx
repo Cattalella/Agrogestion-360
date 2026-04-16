@@ -120,6 +120,75 @@ const TooltipRecordatorio = ({
 };
 
 // ============================================================
+// 📌 MODAL DE CONFIRMACIÓN PARA CERRAR SESIÓN
+// ============================================================
+const ModalConfirmacion = ({ 
+    isOpen, 
+    onConfirmar, 
+    onCancelar 
+}: { 
+    isOpen: boolean; 
+    onConfirmar: () => void; 
+    onCancelar: () => void;
+}) => {
+    const modalRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
+                onCancelar();
+            }
+        };
+        
+        if (isOpen) {
+            document.addEventListener("mousedown", handleClickOutside);
+        }
+        
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [isOpen, onCancelar]);
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onCancelar} />
+            
+            <div 
+                ref={modalRef}
+                className="relative bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4 animate-in zoom-in-95 duration-200"
+            >
+                <div className="text-center">
+                    <div className="text-4xl mb-3">⚠️</div>
+                    <h3 className="text-lg font-bold text-gray-800 mb-2">
+                        ¿Cerrar sesión?
+                    </h3>
+                    <p className="text-sm text-gray-500 mb-6">
+                        ¿Estás seguro que deseas salir de tu cuenta?
+                    </p>
+                </div>
+                
+                <div className="flex gap-3">
+                    <button 
+                        onClick={onCancelar}
+                        className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-2 rounded-lg text-sm font-bold transition-colors"
+                    >
+                        CANCELAR
+                    </button>
+                    <button 
+                        onClick={onConfirmar}
+                        className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg text-sm font-bold transition-colors"
+                    >
+                        CERRAR SESIÓN
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ============================================================
 // 📌 BANNER DE RECORDATORIO
 // ============================================================
 const BannerRecordatorio = ({ 
@@ -135,10 +204,7 @@ const BannerRecordatorio = ({
         setVisible(false);
         
         try {
-            const token = localStorage.getItem('token');
-            if (token) {
-                await apiClient.delete(`/recordatorios/${recordatorio.id}`);
-            }
+            await apiClient.delete(`/recordatorios/${recordatorio.id}`);
         } catch (error) {
             console.error('Error al eliminar recordatorio:', error);
         }
@@ -177,10 +243,10 @@ const ModalPerfil = ({ onClose }: { onClose: () => void }) => {
     const [telefono, setTelefono] = useState("");
     const [nombre, setNombre] = useState("");
 
+    // Cargar perfil del backend
     useEffect(() => {
         const cargarPerfil = async () => {
             try {
-                const token = localStorage.getItem('token');
                 const respuesta = await apiClient.get('/encabezado/perfil');
                 
                 if (respuesta.status === 200) {
@@ -201,6 +267,20 @@ const ModalPerfil = ({ onClose }: { onClose: () => void }) => {
         cargarPerfil();
     }, []);
 
+    // 🆕 Escuchar cambios de foto desde Navegar
+    useEffect(() => {
+        const handleFotoActualizada = () => {
+            const nuevaFoto = localStorage.getItem('foto_perfil');
+            if (nuevaFoto) {
+                setFotoPerfil(nuevaFoto);
+            }
+        };
+        
+        window.addEventListener('fotoPerfilActualizada', handleFotoActualizada);
+        return () => window.removeEventListener('fotoPerfilActualizada', handleFotoActualizada);
+    }, []);
+
+    // Cerrar al hacer clic fuera
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
@@ -222,19 +302,17 @@ const ModalPerfil = ({ onClose }: { onClose: () => void }) => {
                 const base64String = reader.result as string;
                 localStorage.setItem("foto_perfil", base64String);
                 setFotoPerfil(base64String);
+                window.dispatchEvent(new Event('fotoPerfilActualizada')); // 🆕 Sincronizar
             };
             reader.readAsDataURL(file);
             
             try {
-                const token = localStorage.getItem('token');
-                if (token) {
-                    const formData = new FormData();
-                    formData.append('foto', file);
-                    
-                    await apiClient.post('/encabezado/perfil/foto', formData, {
-                        headers: { 'Content-Type': 'multipart/form-data' }
-                    });
-                }
+                const formData = new FormData();
+                formData.append('foto', file);
+                
+                await apiClient.post('/encabezado/perfil/foto', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
             } catch (error) {
                 console.error('Error al subir foto:', error);
             }
@@ -243,9 +321,6 @@ const ModalPerfil = ({ onClose }: { onClose: () => void }) => {
 
     const handleGuardarCambios = async () => {
         try {
-            const token = localStorage.getItem('token');
-            if (!token) return;
-            
             const respuesta = await apiClient.put('/encabezado/perfil', { email, telefono });
             
             if (respuesta.status === 200) {
@@ -340,15 +415,12 @@ export const Nav2 = () => {
     const [mostrarTooltipRecordatorio, setMostrarTooltipRecordatorio] = useState(false);
     const [recordatorios, setRecordatorios] = useState<Recordatorio[]>([]);
     const [recordatoriosActivos, setRecordatoriosActivos] = useState<Recordatorio[]>([]);
+    const [mostrarModalCerrar, setMostrarModalCerrar] = useState(false);
 
     useEffect(() => {
         const cargarRecordatorios = async () => {
             try {
-                const token = localStorage.getItem('token');
-                if (!token) return;
-                
                 const respuesta = await apiClient.get('/recordatorios');
-                
                 if (respuesta.status === 200) {
                     setRecordatorios(respuesta.data);
                 }
@@ -360,18 +432,42 @@ export const Nav2 = () => {
         cargarRecordatorios();
     }, []);
 
-    // Solo verificamos una vez al cargar si hay vencidos
     useEffect(() => {
-        if (recordatorios.length > 0) {
+        const verificarVencidos = () => {
+            if (recordatorios.length === 0) return;
+            
             const hoy = new Date().toISOString().split("T")[0];
             const vencidos = recordatorios.filter(r => !r.cumplido && r.fecha <= hoy);
             
             if (vencidos.length > 0) {
-                // Actualizar localmente solo una vez
-                setRecordatoriosActivos(vencidos.map(v => ({ ...v, cumplido: true, fechaCumplida: hoy })));
+                vencidos.forEach(async (r) => {
+                    try {
+                        await apiClient.put(`/recordatorios/${r.id}/cumplido`);
+                    } catch (error) {
+                        console.error('Error al marcar cumplido:', error);
+                    }
+                });
+                
+                setRecordatorios(prev => prev.map(r => {
+                    const vencido = vencidos.find(v => v.id === r.id);
+                    if (vencido) {
+                        return { ...r, cumplido: true, fechaCumplida: hoy };
+                    }
+                    return r;
+                }));
+                
+                setRecordatoriosActivos(prev => [
+                    ...prev.filter(activo => !vencidos.some(v => v.id === activo.id)),
+                    ...vencidos.map(v => ({ ...v, cumplido: true, fechaCumplida: hoy }))
+                ]);
             }
-        }
-    }, [recordatorios.length]); // Solo re-ejecutar si la cantidad cambia (nuevo recordatorio)
+        };
+
+        verificarVencidos();
+        const intervalo = setInterval(verificarVencidos, 30000);
+        
+        return () => clearInterval(intervalo);
+    }, [recordatorios]);
 
     const handleGuardarRecordatorio = async (datos: { fecha: string; proposito: string }) => {
         try {
@@ -393,7 +489,7 @@ export const Nav2 = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('usuario');
         localStorage.removeItem('nombreUsuario');
-        navigate('/', { replace: true });
+        navigate('/star', { replace: true });
         console.log("Sesión cerrada correctamente");
     };
 
@@ -418,10 +514,19 @@ export const Nav2 = () => {
                     />
                 </div>
                 
-                <p className={estiloBoton} onClick={handleCerrarSesion}> 
+                <p className={estiloBoton} onClick={() => setMostrarModalCerrar(true)}> 
                     CERRAR 
                 </p>
             </nav>
+
+            <ModalConfirmacion 
+                isOpen={mostrarModalCerrar}
+                onConfirmar={() => {
+                    setMostrarModalCerrar(false);
+                    handleCerrarSesion();
+                }}
+                onCancelar={() => setMostrarModalCerrar(false)}
+            />
 
             {recordatoriosActivos.map(recordatorio => (
                 <BannerRecordatorio 
@@ -458,13 +563,10 @@ export const Encabezado = ({ children, estilos, titulo, id, titulos, subtitulo }
         
         const guardarColores = async () => {
             try {
-                const token = localStorage.getItem('token');
-                if (token) {
-                    await apiClient.put('/encabezado/colores', {
-                        color_titulo: colorH1,
-                        color_subtitulo: colorH2
-                    });
-                }
+                await apiClient.put('/encabezado/colores', {
+                    color_titulo: colorH1,
+                    color_subtitulo: colorH2
+                });
             } catch (error) {
                 console.error('Error al guardar colores:', error);
             }
@@ -488,10 +590,7 @@ export const Encabezado = ({ children, estilos, titulo, id, titulos, subtitulo }
                     localStorage.setItem(keyFondo, base64String);
                     setFondoImagen(base64String);
                     
-                    const token = localStorage.getItem('token');
-                    if (token) {
-                        await apiClient.put('/encabezado/wallpaper', { wallpaper_url: base64String });
-                    }
+                    await apiClient.put('/encabezado/wallpaper', { wallpaper_url: base64String });
                 } catch (error) {
                     alert("Error al guardar la imagen de fondo.");
                 }
@@ -508,10 +607,7 @@ export const Encabezado = ({ children, estilos, titulo, id, titulos, subtitulo }
         }
         
         try {
-            const token = localStorage.getItem('token');
-            if (token) {
-                await apiClient.delete('/encabezado/wallpaper');
-            }
+            await apiClient.delete('/encabezado/wallpaper');
         } catch (error) {
             console.error('Error al restaurar fondo:', error);
         }
@@ -519,45 +615,21 @@ export const Encabezado = ({ children, estilos, titulo, id, titulos, subtitulo }
 
     return ( 
         <div className={`relative w-full flex justify-end overflow-hidden min-h-[45rem] ${estilos || ""}`}>
-            <input 
-                type="color" 
-                ref={inputH1Ref} 
-                value={colorH1} 
-                onChange={(e) => setColorH1(e.target.value)} 
-                className="hidden" 
-            />
-            <input 
-                type="color" 
-                ref={inputH2Ref} 
-                value={colorH2} 
-                onChange={(e) => setColorH2(e.target.value)} 
-                className="hidden" 
-            />
-            <input 
-                type="file" 
-                ref={inputFondoRef} 
-                accept="image/*" 
-                onChange={handleFondoChange} 
-                className="hidden" 
-            />
+            <input type="color" ref={inputH1Ref} value={colorH1} onChange={(e) => setColorH1(e.target.value)} className="hidden" />
+            <input type="color" ref={inputH2Ref} value={colorH2} onChange={(e) => setColorH2(e.target.value)} className="hidden" />
+            <input type="file" ref={inputFondoRef} accept="image/*" onChange={handleFondoChange} className="hidden" />
 
             <div 
                 className="absolute inset-0 z-0 w-full h-full max-h-[200rem] cursor-pointer group"
                 onClick={() => inputFondoRef.current?.click()}
                 title="Haz clic para cambiar la imagen de fondo"
             >
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-300 z-10 flex items-center justify-center">
-                    <span className="opacity-0 group-hover:opacity-100 text-white text-sm font-bold bg-black/50 px-4 py-2 rounded-full backdrop-blur-sm transition-all duration-300">
-                        📸 CAMBIAR IMAGEN
-                    </span>
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-300 z-10 flex items-center justify-end">
+                    
                 </div>
                 
                 {fondoImagen ? (
-                    <img 
-                        src={fondoImagen} 
-                        alt="Fondo personalizado" 
-                        className="w-full h-full object-cover object-center" 
-                    />
+                    <img src={fondoImagen} alt="Fondo personalizado" className="w-full h-full object-cover object-center" />
                 ) : (
                     children
                 )}
@@ -565,10 +637,7 @@ export const Encabezado = ({ children, estilos, titulo, id, titulos, subtitulo }
 
             {fondoImagen && (
                 <button 
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        restaurarFondoOriginal();
-                    }} 
+                    onClick={(e) => { e.stopPropagation(); restaurarFondoOriginal(); }} 
                     className="absolute bottom-5 right-5 z-30 bg-black/50 text-white px-4 py-2 rounded-full text-xs font-bold hover:bg-black/80 transition-all backdrop-blur-md shadow-lg"
                 >
                     ↻ RESTAURAR FONDO ORIGINAL
@@ -580,27 +649,15 @@ export const Encabezado = ({ children, estilos, titulo, id, titulos, subtitulo }
                 <Nav2 />
             </div>
 
-            <div 
-                style={{ borderColor: colorH1 }} 
-                className="absolute inset-0 z-20 flex flex-col w-fit h-fit top-60 left-10 border-b-3 pb-3"
-            >
-                <h1 
-                    onClick={() => inputH1Ref.current?.click()}
-                    style={{ color: colorH1 }}
-                    className="text-[6rem] leading-[1.2] cursor-pointer select-none pointer-events-auto w-fit transition-colors duration-200 font-black"
-                >
+            <div style={{ borderColor: colorH1 }} className="absolute inset-0 z-20 flex flex-col w-fit h-fit top-60 left-10 border-b-3 pb-3">
+                <h1 onClick={() => inputH1Ref.current?.click()} style={{ color: colorH1 }} className="text-[6rem] leading-[1.2] cursor-pointer select-none pointer-events-auto w-fit transition-colors duration-200 font-black">
                     BIENVENIDO<br /> 
-                    <span>{titulo ? titulo : "ESTE ES EL"}</span>
-                    <br />
+                    <span>{titulo ? titulo : "ESTE ES EL"}</span><br />
                     <span>{titulos ? titulos : ""}</span>
                 </h1>
 
                 <div className="absolute top-68">
-                    <h2 
-                        onClick={() => inputH2Ref.current?.click()}
-                        style={{ color: colorH2 }}
-                        className="text-[2.5rem] leading-[1.2] cursor-pointer select-none pointer-events-auto w-fit transition-colors duration-200 font-black"
-                    >
+                    <h2 onClick={() => inputH2Ref.current?.click()} style={{ color: colorH2 }} className="text-[2.5rem] leading-[1.2] cursor-pointer select-none pointer-events-auto w-fit transition-colors duration-200 font-black">
                         <span>{subtitulo ? subtitulo : ""}</span>
                     </h2>
                 </div>

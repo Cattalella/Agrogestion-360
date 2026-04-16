@@ -13,25 +13,18 @@ import { FormularioTrabajoRealizado } from "../components/FormularioTrabajoReali
 import { FormularioNuevoTrabajador } from "../components/FormularioNuevoTrabajador";
 import { FormularioCompra } from "../components/FormularioCompra";
 
-// Tipos
-import type { Pago } from "../hooks/useRegistrarPagos";
-import type { TrabajoRealizado } from "../hooks/useTrabajoRealizado";
-import type { Trabajador } from "../hooks/useNuevoTrabajador";
-import type { SolicitudCompra as SolicitudCompraAntigua, CategoriaGeneral } from "../hooks/useRegistrarCompra";
-
 // PDF
 import { FormularioGenerarPagoPDF } from "../components/FormularioGenerarPagoPDF";
-import type { FormatoPago } from "../hooks/useGenerarPagoPDF";
 
 // Solicitudes
 import { FormularioSolicitudCompra } from "../components/FormularioSolicitudCompra";
-import type { SolicitudCompra, TipoSolicitud } from "../hooks/useSolicitudCompra";
 
 // Consumo de Insumos
 import { FormularioConsumoInsumos } from "../components/FormularioConsumoInsumos";
-import type { RegistroConsumo, VistaConsumo, EstadoConsumo, InsumoInventario } from "../hooks/useConsumoInsumos";
 
-// Interfaces
+// ============================================================
+// 📌 INTERFACES
+// ============================================================
 interface GanadoHook {
     isModalOpen: boolean;
     vista: 'lista' | 'formulario';
@@ -60,103 +53,95 @@ interface VacunasHook {
     isModalOpen: boolean;
     vista: 'lista' | 'formulario';
     listaVacunas: any[];
+    animalesDisponibles: any[];
     cerrarModal: () => void;
     cambiarVista: (vista: 'lista' | 'formulario') => void;
-    guardarVacuna: (datos: any) => void;
+    guardarVacuna: (datos: any, cerrar: boolean) => void;
 }
 
 interface VentasHook {
     isModalOpen: boolean;
     vista: 'lista' | 'formulario';
     listaVentas: any[];
+    animalesDisponibles: any[];
     cerrarModal: () => void;
     cambiarVista: (vista: 'lista' | 'formulario') => void;
-    guardarVenta: (datos: any) => void;
+    guardarVenta: (datos: any, cerrar: boolean) => void;
 }
 
 interface PagosHook {
     isModalOpen: boolean;
     vista: 'lista' | 'formulario';
-    listaPagos: Pago[];
-    pagoAEditar: Pago | null;
+    listaPagos: any[];
+    trabajadores: any[];
+    pagoAEditar: any | null;
     cerrarModal: () => void;
     cambiarVista: (vista: 'lista' | 'formulario') => void;
-    guardarPago: (datos: Omit<Pago, 'id' | 'contabilizado' | 'anulado'>, cerrar: boolean) => void;
+    guardarPago: (datos: any, cerrar: boolean) => void;
 }
 
 interface TrabajoHook {
     isModalOpen: boolean;
     vista: 'lista' | 'formulario';
-    listaTrabajos: TrabajoRealizado[];
-    trabajosActivos: TrabajoRealizado[];
-    trabajoAEditar: TrabajoRealizado | null;
+    trabajos: any[];
+    trabajoAEditar: any | null;
     cerrarModal: () => void;
     cambiarVista: (vista: 'lista' | 'formulario') => void;
-    guardarTrabajo: (datos: Omit<TrabajoRealizado, 'id' | 'duracion_trabajo' | 'eliminado'>, cerrar: boolean) => void;
+    registrarTrabajo: (datos: any, cerrar: boolean) => void;
 }
 
 interface TrabajadoresHook {
     isModalOpen: boolean;
     vista: 'lista' | 'formulario';
-    trabajadores: Trabajador[];
-    trabajadoresVisibles: Trabajador[];
-    trabajadoresActivos: Trabajador[];
-    trabajadorAEditar: Trabajador | null;
+    trabajadores: any[];
+    trabajadoresActivos: any[];
+    trabajadorAEditar: any | null;
     cerrarModal: () => void;
     cambiarVista: (vista: 'lista' | 'formulario') => void;
-    guardarTrabajador: (datos: Omit<Trabajador, 'id' | 'eliminado'>, cerrar: boolean) => void;
+    guardarTrabajador: (datos: any, cerrar: boolean) => void;
 }
 
 interface ComprasHook {
     isModalOpen: boolean;
     vista: 'lista' | 'formulario';
-    solicitudesVisibles: SolicitudCompraAntigua[];
-    alertasVencimiento: SolicitudCompraAntigua[];
-    tipoSeleccionado: CategoriaGeneral;
+    solicitudesVisibles: any[];
+    alertasVencimiento: any[];
+    tipoSeleccionado: 'insumo' | 'alimento';
     cerrarModal: () => void;
     cambiarVista: (vista: 'lista' | 'formulario') => void;
-    crearSolicitud: (datos: Omit<SolicitudCompraAntigua, 'id' | 'estado' | 'ejecutada' | 'eliminada' | 'fecha_creacion' | 'hora_creacion'>) => void;
-    setTipoSeleccionado: (tipo: CategoriaGeneral) => void;
+    crearSolicitud: (datos: any, cerrar: boolean) => void;
+    setTipoSeleccionado: (tipo: 'insumo' | 'alimento') => void;
 }
 
 interface GenerarPDFHook {
     isModalOpen: boolean;
     vista: 'lista' | 'formulario' | 'vistaPrevia';
-    formatosPago: FormatoPago[];
-    historialPagosFirmados: FormatoPago[];
-    formatoSeleccionado: FormatoPago | null;
+    formatosPago: any[];
     generandoPDF: boolean;
     cerrarModal: () => void;
     cambiarVista: (vista: 'lista' | 'formulario' | 'vistaPrevia') => void;
-    setFormatoSeleccionado: (formato: FormatoPago | null) => void;
-    generarFormatoPago: (pago: Pago, trabajador: Trabajador, trabajos: TrabajoRealizado[], periodo: string) => Promise<FormatoPago>;
-    registrarFirma: (idFormato: string, tipo: 'digital' | 'escaneo', firmaData: string) => void;
-    confirmarPagoConFirma: (idFormato: string, pagoId: number, onConfirmarPago?: () => void) => boolean;
+    generarFormatoPago: (pago: any, trabajador: any, trabajos: any[], periodo: string) => Promise<any>;
 }
 
 interface SolicitudCompraHook {
     isModalOpen: boolean;
-    vista: 'lista' | 'formulario' | 'detalle';
-    solicitudes: SolicitudCompra[];
-    solicitudesPendientes: SolicitudCompra[];
-    solicitudesAprobadas: SolicitudCompra[];
-    tipoSeleccionado: TipoSolicitud;
-    setTipoSeleccionado: (tipo: TipoSolicitud) => void;
+    vista: 'lista' | 'formulario';
+    solicitudesPendientes: any[];
+    tipoSeleccionado: 'insumo' | 'alimento';
     cerrarModal: () => void;
-    cambiarVista: (vista: 'lista' | 'formulario' | 'detalle') => void;
-    crearSolicitud: (datos: any, usuario: string) => void;
+    cambiarVista: (vista: 'lista' | 'formulario') => void;
+    crearSolicitud: (datos: any, cerrar: boolean) => void;
+    setTipoSeleccionado: (tipo: 'insumo' | 'alimento') => void;
 }
 
 interface ConsumoInsumosHook {
     isModalOpen: boolean;
-    vista: VistaConsumo;
-    consumos: RegistroConsumo[];
-    inventarioDisponible: InsumoInventario[];
-    consumoAEditar: RegistroConsumo | null;
+    vista: 'lista' | 'formulario';
+    consumos: any[];
+    inventario: any[];
     cerrarModal: () => void;
-    cambiarVista: (vista: VistaConsumo) => void;
-    registrarConsumo: (datos: any) => boolean;
-    cambiarEstado: (id: number, estado: EstadoConsumo) => void;
+    cambiarVista: (vista: 'lista' | 'formulario') => void;
+    registrarConsumo: (datos: any, cerrar: boolean) => void;
 }
 
 interface Props {
@@ -173,17 +158,27 @@ interface Props {
     consumoInsumos: ConsumoInsumosHook;
 }
 
+// ============================================================
+// 📌 COMPONENTE PRINCIPAL
+// ============================================================
 export const AdminModales = ({ 
     ganado, cerdos, vacunas, ventas, 
     pagos, trabajo, trabajadores, compras, generarPDF, solicitudCompra, consumoInsumos
 }: Props) => {
 
-    const [pagoSeleccionado, setPagoSeleccionado] = useState<Pago | null>(null);
+    const [pagoSeleccionado, setPagoSeleccionado] = useState<any | null>(null);
 
     return (
         <>
+            {/* ============================================================ */}
             {/* GANADO */}
-            <ModalGenerico isOpen={ganado?.isModalOpen ?? false} onClose={ganado?.cerrarModal ?? (() => {})} titulo={ganado?.vista === 'lista' ? "CONTROL DE INVENTARIO" : "REGISTRO DE GANADO"} width="max-w-2xl">
+            {/* ============================================================ */}
+            <ModalGenerico 
+                isOpen={ganado?.isModalOpen ?? false} 
+                onClose={ganado?.cerrarModal ?? (() => {})} 
+                titulo={ganado?.vista === 'lista' ? "CONTROL DE INVENTARIO" : "REGISTRO DE GANADO"} 
+                width="max-w-2xl"
+            >
                 {ganado?.vista === 'lista' ? (
                     <div className="flex flex-col gap-6 p-4">
                         <div className="overflow-hidden rounded-xl border border-gray-100 shadow-sm">
@@ -200,27 +195,51 @@ export const AdminModales = ({
                                     {ganado?.listaGanado?.length > 0 ? ganado.listaGanado.map((animal: any) => (
                                         <tr key={animal.id} className="border-t border-gray-50 hover:bg-gray-50 transition-colors">
                                             <td className="p-3 font-bold">{animal.local}</td>
-                                            <td className="p-3">{animal.oficial}</td>
+                                            <td className="p-3">{animal.oficial || '—'}</td>
                                             <td className="p-3">{animal.sexo}</td>
-                                            <td className="p-3"><span className="bg-emerald-100 text-emerald-600 px-2 py-1 rounded-full text-[9px]">{animal.estado}</span></td>
+                                            <td className="p-3">
+                                                <span className="bg-emerald-100 text-emerald-600 px-2 py-1 rounded-full text-[9px]">
+                                                    {animal.estado?.nombre || animal.estado || 'Activo'}
+                                                </span>
+                                            </td>
                                         </tr>
                                     )) : (
                                         <tr>
-                                            <td colSpan={4} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">— Sin registros aún —</td>
+                                            <td colSpan={4} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">
+                                                — Sin registros aún —
+                                            </td>
                                         </tr>
                                     )}
                                 </tbody>
                             </table>
                         </div>
-                        <button onClick={() => ganado?.cambiarVista?.('formulario')} className="bg-emerald-600 text-white py-3 rounded-full font-bold uppercase tracking-widest text-[10px] shadow-lg hover:bg-emerald-700 active:scale-95 transition-all">+ Añadir Nuevo Animal</button>
+                        <button 
+                            onClick={() => ganado?.cambiarVista?.('formulario')} 
+                            className="bg-emerald-600 text-white py-3 rounded-full font-bold uppercase tracking-widest text-[10px] shadow-lg hover:bg-emerald-700 active:scale-95 transition-all"
+                        >
+                            + Añadir Nuevo Animal
+                        </button>
                     </div>
                 ) : (
-                    <FormularioGanado listaGanado={ganado?.listaGanado ?? []} sugerenciaId={ganado?.sugerenciaId ?? ""} categoriaSeleccionada={ganado?.categoriaSeleccionada ?? ""} setCategoria={ganado?.setCategoriaSeleccionada ?? (() => {})} onGuardar={(animal: any) => ganado?.guardarAnimal?.(animal, true)} />
+                    <FormularioGanado 
+                        listaGanado={ganado?.listaGanado ?? []} 
+                        sugerenciaId={ganado?.sugerenciaId ?? ""} 
+                        categoriaSeleccionada={ganado?.categoriaSeleccionada ?? ""} 
+                        setCategoria={ganado?.setCategoriaSeleccionada ?? (() => {})} 
+                        onGuardar={(datos: any, cerrar: boolean) => ganado?.guardarAnimal?.(datos, cerrar)} 
+                    />
                 )}
             </ModalGenerico>
 
+            {/* ============================================================ */}
             {/* CERDOS */}
-            <ModalGenerico isOpen={cerdos?.isModalOpen ?? false} onClose={cerdos?.cerrarModal ?? (() => {})} titulo={cerdos?.vista === 'lista' ? "INVENTARIO PORCINO" : "REGISTRAR CERDOS"} width="max-w-2xl">
+            {/* ============================================================ */}
+            <ModalGenerico 
+                isOpen={cerdos?.isModalOpen ?? false} 
+                onClose={cerdos?.cerrarModal ?? (() => {})} 
+                titulo={cerdos?.vista === 'lista' ? "INVENTARIO PORCINO" : "REGISTRAR CERDOS"} 
+                width="max-w-2xl"
+            >
                 {cerdos?.vista === 'lista' ? (
                     <div className="flex flex-col gap-6 p-4">
                         <div className="overflow-hidden rounded-xl border border-emerald-100 shadow-sm">
@@ -228,34 +247,64 @@ export const AdminModales = ({
                                 <thead className="bg-emerald-50 text-emerald-700">
                                     <tr>
                                         <th className="p-3">ID LOCAL</th>
+                                        <th className="p-3">OFICIAL</th>
                                         <th className="p-3">SEXO</th>
                                         <th className="p-3">ESTADO</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {cerdos?.listaCerdos?.length > 0 ? cerdos.listaCerdos.map((cerdo: any) => (
-                                        <tr key={cerdo.id} className="border-t border-emerald-50">
-                                            <td className="p-3 font-bold">{cerdo.local}</td>
-                                            <td className="p-3">{cerdo.sexo}</td>
-                                            <td className="p-3"><span className="bg-emerald-100 text-emerald-600 px-2 py-1 rounded-full">{cerdo.estado}</span></td>
-                                        </tr>
-                                    )) : (
-                                        <tr>
-                                            <td colSpan={3} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">— Sin registros aún —</td>
-                                        </tr>
-                                    )}
+                                    {cerdos?.listaCerdos?.length > 0 
+                                        ? [...cerdos.listaCerdos]
+                                            .sort((a: any, b: any) => (a.local || a.codigo_local || '').localeCompare(b.local || b.codigo_local || ''))
+                                            .map((cerdo: any) => (
+                                                <tr key={cerdo.id_animal || cerdo.id} className="border-t border-emerald-50">
+                                                    <td className="p-3 font-bold">{cerdo.local || cerdo.codigo_local || '—'}</td>
+                                                    <td className="p-3">{cerdo.oficial || cerdo.num_ica_chapeta || '—'}</td>
+                                                    <td className="p-3">{cerdo.sexo || '—'}</td>
+                                                    <td className="p-3">
+                                                        <span className="bg-emerald-100 text-emerald-600 px-2 py-1 rounded-full text-[9px]">
+                                                            {cerdo.estado?.nombre || cerdo.EstadoAni?.nombre || 'Activo'}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        : (
+                                            <tr>
+                                                <td colSpan={4} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">
+                                                    — Sin registros aún —
+                                                </td>
+                                            </tr>
+                                        )}
                                 </tbody>
                             </table>
                         </div>
-                        <button onClick={() => cerdos?.cambiarVista?.('formulario')} className="bg-emerald-600 text-white py-3 rounded-full font-bold uppercase text-[10px] shadow-lg hover:shadow-emerald-200 transition-all">+ Registrar Nuevo Cerdo</button>
+                        <button 
+                            onClick={() => cerdos?.cambiarVista?.('formulario')} 
+                            className="bg-emerald-600 text-white py-3 rounded-full font-bold uppercase text-[10px] shadow-lg hover:shadow-emerald-200 transition-all"
+                        >
+                            + Registrar Nuevo Cerdo
+                        </button>
                     </div>
                 ) : (
-                    <FormularioCerdo sugerenciaId={cerdos?.sugerenciaId ?? ""} categoriaSeleccionada={cerdos?.categoriaCerdo ?? ""} setCategoria={cerdos?.setCategoriaCerdo ?? (() => {})} onGuardar={(datos: any, cerrar: boolean) => cerdos?.guardarCerdo?.(datos, cerrar)} />
+                    <FormularioCerdo 
+                        listaCerdos={cerdos?.listaCerdos ?? []}
+                        sugerenciaId={cerdos?.sugerenciaId ?? ""} 
+                        categoriaSeleccionada={cerdos?.categoriaCerdo ?? "C"} 
+                        setCategoria={cerdos?.setCategoriaCerdo ?? (() => {})} 
+                        onGuardar={(datos: any, cerrar: boolean) => cerdos?.guardarCerdo?.(datos, cerrar)} 
+                    />
                 )}
             </ModalGenerico>
 
+            {/* ============================================================ */}
             {/* VACUNAS */}
-            <ModalGenerico isOpen={vacunas?.isModalOpen ?? false} onClose={vacunas?.cerrarModal ?? (() => {})} titulo={vacunas?.vista === 'lista' ? "HISTORIAL DE VACUNACIÓN" : "REGISTRAR VACUNAS"} width="max-w-2xl">
+            {/* ============================================================ */}
+            <ModalGenerico 
+                isOpen={vacunas?.isModalOpen ?? false} 
+                onClose={vacunas?.cerrarModal ?? (() => {})} 
+                titulo={vacunas?.vista === 'lista' ? "HISTORIAL DE VACUNACIÓN" : "REGISTRAR VACUNAS"} 
+                width="max-w-2xl"
+            >
                 {vacunas?.vista === 'lista' ? (
                     <div className="flex flex-col gap-6 p-4">
                         <div className="overflow-hidden rounded-xl border border-cyan-100 shadow-sm">
@@ -270,140 +319,239 @@ export const AdminModales = ({
                                 </thead>
                                 <tbody className="text-gray-600">
                                     {vacunas?.listaVacunas?.length > 0 ? vacunas.listaVacunas.map((v: any) => (
-                                        <tr key={v.id} className="border-t border-cyan-50">
-                                            <td className="p-3 font-bold">{v.animal}</td>
-                                            <td className="p-3">{v.vacuna}</td>
-                                            <td className="p-3">{v.fecha}</td>
-                                            <td className="p-3 font-semibold text-orange-500">{v.refuerzo}</td>
+                                        <tr key={v.id_reg_vac || v.id} className="border-t border-cyan-50">
+                                            <td className="p-3 font-bold">
+                                                {v.animal?.codigo_local || v.Animal?.codigo_local || '—'}
+                                            </td>
+                                            <td className="p-3">
+                                                {v.vacuna?.nombre_vacuna || v.tipo_vacuna || '—'}
+                                            </td>
+                                            <td className="p-3">
+                                                {v.fecha_aplicacion?.split('T')[0] || v.fecha || '—'}
+                                            </td>
+                                            <td className="p-3 font-semibold text-orange-500">
+                                                {v.proximo_refuerzo?.split('T')[0] || v.refuerzo || '—'}
+                                            </td>
                                         </tr>
                                     )) : (
                                         <tr>
-                                            <td colSpan={4} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">— Sin registros aún —</td>
+                                            <td colSpan={4} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">
+                                                — Sin registros aún —
+                                            </td>
                                         </tr>
                                     )}
                                 </tbody>
                             </table>
                         </div>
-                        <button onClick={() => vacunas?.cambiarVista?.('formulario')} className="bg-cyan-600 text-white py-3 rounded-full font-bold uppercase text-[10px] shadow-lg hover:shadow-cyan-200 transition-all">+ Registrar Nueva Aplicación</button>
+                        <button 
+                            onClick={() => vacunas?.cambiarVista?.('formulario')} 
+                            className="bg-cyan-600 text-white py-3 rounded-full font-bold uppercase text-[10px] shadow-lg hover:shadow-cyan-200 transition-all"
+                        >
+                            + Registrar Nueva Aplicación
+                        </button>   
                     </div>
                 ) : (
-                    <FormularioVacuna onGuardar={vacunas?.guardarVacuna ?? (() => {})} />
+                    <FormularioVacuna
+                        listaAnimales={vacunas?.animalesDisponibles ?? []} 
+                        onGuardar={(datos: any, cerrar: boolean) => vacunas?.guardarVacuna?.(datos, cerrar)} 
+                    />
                 )}
             </ModalGenerico>
 
+            {/* ============================================================ */}
             {/* VENTAS */}
-            <ModalGenerico isOpen={ventas?.isModalOpen ?? false} onClose={ventas?.cerrarModal ?? (() => {})} titulo={ventas?.vista === 'lista' ? "HISTORIAL DE VENTAS" : "REGISTRAR VENTAS"} width="max-w-2xl">
+            {/* ============================================================ */}
+            <ModalGenerico 
+                isOpen={ventas?.isModalOpen ?? false} 
+                onClose={ventas?.cerrarModal ?? (() => {})} 
+                titulo={ventas?.vista === 'lista' ? "HISTORIAL DE VENTAS" : "REGISTRAR VENTAS"} 
+                width="max-w-2xl"
+            >
                 {ventas?.vista === 'lista' ? (
                     <div className="flex flex-col gap-6 p-4">
                         <div className="overflow-hidden rounded-xl border border-orange-100 shadow-sm">
                             <table className="w-full text-left text-[11px] uppercase">
                                 <thead className="bg-orange-50 text-orange-700">
                                     <tr>
-                                        <th className="p-3">ID ANIMAL</th>
-                                        <th className="p-3">CLIENTE/VEND.</th>
+                                        <th className="p-3">ANIMAL</th>
+                                        <th className="p-3">COMPRADOR</th>
                                         <th className="p-3">FECHA</th>
                                         <th className="p-3">MONTO TOTAL</th>
                                     </tr>
                                 </thead>
                                 <tbody className="text-gray-600">
                                     {ventas?.listaVentas?.length > 0 ? ventas.listaVentas.map((v: any) => (
-                                        <tr key={v.id} className="border-t border-orange-50 hover:bg-orange-50/30 transition-colors">
-                                            <td className="p-3 font-bold">{v.animal}</td>
-                                            <td className="p-3">{v.cliente}</td>
-                                            <td className="p-3">{v.fecha}</td>
-                                            <td className="p-3 font-bold text-emerald-600">{v.monto}</td>
+                                        <tr key={v.id_venta || v.id} className="border-t border-orange-50 hover:bg-orange-50/30 transition-colors">
+                                            <td className="p-3 font-bold">
+                                                {v.animal?.codigo_local || v.Animal?.codigo_local || '—'}
+                                            </td>
+                                            <td className="p-3">{v.comprador || '—'}</td>
+                                            <td className="p-3">{v.fecha_venta?.split('T')[0] || '—'}</td>
+                                            <td className="p-3 font-bold text-emerald-600">
+                                                ${v.precio_total?.toLocaleString() || '0'}
+                                            </td>
                                         </tr>
                                     )) : (
                                         <tr>
-                                            <td colSpan={4} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">— Sin registros aún —</td>
+                                            <td colSpan={4} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">
+                                                — Sin registros aún —
+                                            </td>
                                         </tr>
                                     )}
                                 </tbody>
                             </table>
                         </div>
-                        <button onClick={() => ventas?.cambiarVista?.('formulario')} className="bg-orange-600 text-white py-3 rounded-full font-bold uppercase text-[10px] shadow-lg hover:bg-orange-700 transition-all">+ Generar Nueva Venta</button>
+                        <button 
+                            onClick={() => ventas?.cambiarVista?.('formulario')} 
+                            className="bg-orange-600 text-white py-3 rounded-full font-bold uppercase text-[10px] shadow-lg hover:bg-orange-700 transition-all"
+                        >
+                            + Generar Nueva Venta
+                        </button>
                     </div>
                 ) : (
-                    <FormularioVenta onGuardar={ventas?.guardarVenta ?? (() => {})} />
+                    <FormularioVenta 
+                        listaAnimales={ventas?.animalesDisponibles ?? []} 
+                        onGuardar={(datos: any, cerrar: boolean) => ventas?.guardarVenta?.(datos, cerrar)} 
+                    />
                 )}
             </ModalGenerico>
 
+            {/* ============================================================ */}
             {/* PAGOS */}
-            <ModalGenerico isOpen={pagos?.isModalOpen ?? false} onClose={pagos?.cerrarModal ?? (() => {})} titulo={pagos?.vista === 'lista' ? "REGISTRO DE PAGOS" : "REGISTRAR NUEVO PAGO"} width="max-w-2xl">
+            {/* ============================================================ */}
+            <ModalGenerico 
+                isOpen={pagos?.isModalOpen ?? false} 
+                onClose={pagos?.cerrarModal ?? (() => {})} 
+                titulo={pagos?.vista === 'lista' ? "REGISTRO DE PAGOS" : "REGISTRAR NUEVO PAGO"} 
+                width="max-w-2xl"
+            >
                 {pagos?.vista === 'lista' ? (
                     <div className="flex flex-col gap-6 p-4">
                         <div className="overflow-hidden rounded-xl border border-purple-100 shadow-sm">
                             <table className="w-full text-left text-[11px] uppercase">
                                 <thead className="bg-purple-50 text-purple-700">
                                     <tr>
-                                        <th className="p-3">ID TRABAJADOR</th>
+                                        <th className="p-3">TRABAJADOR</th>
                                         <th className="p-3">MONTO</th>
                                         <th className="p-3">FECHA</th>
                                         <th className="p-3">ESTADO</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {pagos?.listaPagos?.length > 0 ? pagos.listaPagos.map((p) => (
-                                        <tr key={p.id} className="border-t border-purple-50">
-                                            <td className="p-3 font-bold">{p.id_trabajador}</td>
-                                            <td className="p-3">${p.monto_total.toLocaleString()}</td>
-                                            <td className="p-3">{p.fecha_pago}</td>
-                                            <td className="p-3"><span className={`px-2 py-1 rounded-full text-[9px] ${p.estado === 'Pagado con firma' ? 'bg-green-100 text-green-600' : p.estado === 'Pendiente de firma' ? 'bg-yellow-100 text-yellow-600' : 'bg-red-100 text-red-600'}`}>{p.estado}</span></td>
+                                    {pagos?.listaPagos?.length > 0 ? pagos.listaPagos.map((p: any) => (
+                                        <tr key={p.id_pago || p.id} className="border-t border-purple-50">
+                                            <td className="p-3 font-bold">{p.Trabajador?.nombre_completo || p.id_trabajador || '—'}</td>
+                                            <td className="p-3">${p.monto_total?.toLocaleString() || '0'}</td>
+                                            <td className="p-3">{p.fecha_pago?.split('T')[0] || '—'}</td>
+                                            <td className="p-3">
+                                                <span className={`px-2 py-1 rounded-full text-[9px] ${
+                                                    p.estado_pago === 'Pagado con firma' ? 'bg-green-100 text-green-600' : 
+                                                    p.estado_pago === 'Pendiente de firma' ? 'bg-yellow-100 text-yellow-600' : 
+                                                    'bg-red-100 text-red-600'
+                                                }`}>
+                                                    {p.estado_pago || p.estado || 'No pagado'}
+                                                </span>
+                                            </td>
                                         </tr>
                                     )) : (
                                         <tr>
-                                            <td colSpan={4} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">— Sin pagos registrados —</td>
+                                            <td colSpan={4} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">
+                                                — Sin pagos registrados —
+                                            </td>
                                         </tr>
                                     )}
                                 </tbody>
                             </table>
                         </div>
-                        <button onClick={() => pagos?.cambiarVista?.('formulario')} className="bg-purple-600 text-white py-3 rounded-full font-bold uppercase text-[10px] shadow-lg hover:bg-purple-700 transition-all">+ Registrar Nuevo Pago</button>
+                        <button 
+                            onClick={() => pagos?.cambiarVista?.('formulario')} 
+                            className="bg-purple-600 text-white py-3 rounded-full font-bold uppercase text-[10px] shadow-lg hover:bg-purple-700 transition-all"
+                        >
+                            + Registrar Nuevo Pago
+                        </button>
                     </div>
                 ) : (
-                    <FormularioPagos pagoAEditar={pagos?.pagoAEditar ?? null} onGuardar={(datos, cerrar) => pagos?.guardarPago?.(datos, cerrar)} onCancelar={() => pagos?.cambiarVista?.('lista')} />
+                    <FormularioPagos 
+                        pagoAEditar={pagos?.pagoAEditar ?? null} 
+                        listaTrabajadores={pagos?.trabajadores ?? []}
+                        onGuardar={(datos: any, cerrar: boolean) => pagos?.guardarPago?.(datos, cerrar)} 
+                        onCancelar={() => pagos?.cambiarVista?.('lista')} 
+                    />
                 )}
             </ModalGenerico>
 
+            {/* ============================================================ */}
             {/* TRABAJO REALIZADO */}
-            <ModalGenerico isOpen={trabajo?.isModalOpen ?? false} onClose={trabajo?.cerrarModal ?? (() => {})} titulo={trabajo?.vista === 'lista' ? "HORAS Y TAREAS" : "REGISTRAR TRABAJO REALIZADO"} width="max-w-2xl">
+            {/* ============================================================ */}
+            <ModalGenerico 
+                isOpen={trabajo?.isModalOpen ?? false} 
+                onClose={trabajo?.cerrarModal ?? (() => {})} 
+                titulo={trabajo?.vista === 'lista' ? "HORAS Y TAREAS" : "REGISTRAR TRABAJO REALIZADO"} 
+                width="max-w-2xl"
+            >
                 {trabajo?.vista === 'lista' ? (
                     <div className="flex flex-col gap-6 p-4">
                         <div className="overflow-hidden rounded-xl border border-blue-100 shadow-sm">
                             <table className="w-full text-left text-[11px] uppercase">
                                 <thead className="bg-blue-50 text-blue-700">
                                     <tr>
-                                        <th className="p-3">ID TRABAJADOR</th>
+                                        <th className="p-3">TRABAJADOR</th>
                                         <th className="p-3">ACTIVIDAD</th>
-                                        <th className="p-3">DURACIÓN</th>
                                         <th className="p-3">FECHA INICIO</th>
+                                        <th className="p-3">ESTADO</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {trabajo?.trabajosActivos?.length > 0 ? trabajo.trabajosActivos.map((t) => (
-                                        <tr key={t.id} className="border-t border-blue-50">
-                                            <td className="p-3 font-bold">{t.id_trabajador}</td>
-                                            <td className="p-3">{t.tipo_actividad}</td>
-                                            <td className="p-3">{t.duracion_trabajo}</td>
-                                            <td className="p-3">{t.fecha_inicio}</td>
+                                    {trabajo?.trabajos?.length > 0 ? trabajo.trabajos.map((t: any) => (
+                                        <tr key={t.id_trabajo || t.id} className="border-t border-blue-50">
+                                            <td className="p-3 font-bold">{t.Trabajador?.nombre_completo || t.id_trabajador || '—'}</td>
+                                            <td className="p-3">{t.tipo_actividad || t.descripcion || '—'}</td>
+                                            <td className="p-3">{t.fecha_inicio?.split('T')[0] || '—'}</td>
+                                            <td className="p-3">
+                                                <span className={`px-2 py-1 rounded-full text-[9px] ${
+                                                    t.estado_trabajo === 'Completado' ? 'bg-green-100 text-green-600' : 
+                                                    'bg-yellow-100 text-yellow-600'
+                                                }`}>
+                                                    {t.estado_trabajo || 'Pendiente'}
+                                                </span>
+                                            </td>
                                         </tr>
                                     )) : (
                                         <tr>
-                                            <td colSpan={4} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">— Sin registros de trabajo —</td>
+                                            <td colSpan={4} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">
+                                                — Sin registros de trabajo —
+                                            </td>
                                         </tr>
                                     )}
                                 </tbody>
                             </table>
                         </div>
-                        <button onClick={() => trabajo?.cambiarVista?.('formulario')} className="bg-blue-600 text-white py-3 rounded-full font-bold uppercase text-[10px] shadow-lg hover:bg-blue-700 transition-all">+ Registrar Trabajo Realizado</button>
+                        <button 
+                            onClick={() => trabajo?.cambiarVista?.('formulario')} 
+                            className="bg-blue-600 text-white py-3 rounded-full font-bold uppercase text-[10px] shadow-lg hover:bg-blue-700 transition-all"
+                        >
+                            + Registrar Trabajo Realizado
+                        </button>
                     </div>
                 ) : (
-                    <FormularioTrabajoRealizado trabajoAEditar={trabajo?.trabajoAEditar ?? null} onGuardar={(datos, cerrar) => trabajo?.guardarTrabajo?.(datos, cerrar)} onCancelar={() => trabajo?.cambiarVista?.('lista')} />
+                    <FormularioTrabajoRealizado 
+                        trabajoAEditar={trabajo?.trabajoAEditar ?? null} 
+                        listaTrabajadores={trabajadores?.trabajadoresActivos ?? []}
+                        onGuardar={(datos: any, cerrar: boolean) => trabajo?.registrarTrabajo?.(datos, cerrar)} 
+                        onCancelar={() => trabajo?.cambiarVista?.('lista')} 
+                    />
                 )}
             </ModalGenerico>
 
+            {/* ============================================================ */}
             {/* NUEVO TRABAJADOR */}
-            <ModalGenerico isOpen={trabajadores?.isModalOpen ?? false} onClose={trabajadores?.cerrarModal ?? (() => {})} titulo={trabajadores?.vista === 'lista' ? "LISTA DE TRABAJADORES" : "CONTRATAR NUEVO TRABAJADOR"} width="max-w-2xl">
+            {/* ============================================================ */}
+            <ModalGenerico 
+                isOpen={trabajadores?.isModalOpen ?? false} 
+                onClose={trabajadores?.cerrarModal ?? (() => {})} 
+                titulo={trabajadores?.vista === 'lista' ? "LISTA DE TRABAJADORES" : "CONTRATAR NUEVO TRABAJADOR"} 
+                width="max-w-2xl"
+            >
                 {trabajadores?.vista === 'lista' ? (
                     <div className="flex flex-col gap-6 p-4">
                         <div className="overflow-hidden rounded-xl border border-indigo-100 shadow-sm">
@@ -418,34 +566,64 @@ export const AdminModales = ({
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {trabajadores?.trabajadoresVisibles?.length > 0 ? trabajadores.trabajadoresVisibles.map((t) => (
-                                        <tr key={t.id} className="border-t border-indigo-50">
-                                            <td className="p-3 font-bold">{t.id_trabajador}</td>
-                                            <td className="p-3">{t.nombre_completo}</td>
-                                            <td className="p-3">{t.tipo_trabajo}</td>
-                                            <td className="p-3">{t.telefono}</td>
-                                            <td className="p-3"><span className={`px-2 py-1 rounded-full text-[9px] ${t.estado === 'activo' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>{t.estado.toUpperCase()}</span></td>
+                                    {trabajadores?.trabajadores?.length > 0 ? trabajadores.trabajadores.map((t: any) => (
+                                        <tr key={t.id_trabajador || t.id} className="border-t border-indigo-50">
+                                            <td className="p-3 font-bold">{t.id_trabajador || '—'}</td>
+                                            <td className="p-3">{t.nombre_completo || '—'}</td>
+                                            <td className="p-3">{t.tipo_trabajo || '—'}</td>
+                                            <td className="p-3">{t.telefono || '—'}</td>
+                                            <td className="p-3">
+                                                <span className={`px-2 py-1 rounded-full text-[9px] ${
+                                                    t.estado === 'Activo' || t.estado === 'activo' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
+                                                }`}>
+                                                    {t.estado?.toUpperCase() || 'ACTIVO'}
+                                                </span>
+                                            </td>
                                         </tr>
                                     )) : (
                                         <tr>
-                                            <td colSpan={5} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">— Sin trabajadores registrados —</td>
+                                            <td colSpan={5} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">
+                                                — Sin trabajadores registrados —
+                                            </td>
                                         </tr>
                                     )}
                                 </tbody>
                             </table>
                         </div>
-                        <button onClick={() => trabajadores?.cambiarVista?.('formulario')} className="bg-indigo-600 text-white py-3 rounded-full font-bold uppercase text-[10px] shadow-lg hover:bg-indigo-700 transition-all">+ Contratar Nuevo Trabajador</button>
+                        <button 
+                            onClick={() => trabajadores?.cambiarVista?.('formulario')} 
+                            className="bg-indigo-600 text-white py-3 rounded-full font-bold uppercase text-[10px] shadow-lg hover:bg-indigo-700 transition-all"
+                        >
+                            + Contratar Nuevo Trabajador
+                        </button>
                     </div>
                 ) : (
-                    <FormularioNuevoTrabajador trabajadorAEditar={trabajadores?.trabajadorAEditar ?? null} onGuardar={(datos, cerrar) => trabajadores?.guardarTrabajador?.(datos, cerrar)} onCancelar={() => trabajadores?.cambiarVista?.('lista')} />
+                    <FormularioNuevoTrabajador 
+                        trabajadorAEditar={trabajadores?.trabajadorAEditar ?? null} 
+                        onGuardar={(datos: any, cerrar: boolean) => trabajadores?.guardarTrabajador?.(datos, cerrar)} 
+                        onCancelar={() => trabajadores?.cambiarVista?.('lista')} 
+                    />
                 )}
             </ModalGenerico>
 
+            {/* ============================================================ */}
             {/* COMPRAS */}
-            <ModalGenerico isOpen={compras?.isModalOpen ?? false} onClose={compras?.cerrarModal ?? (() => {})} titulo={compras?.vista === 'lista' ? "SOLICITUDES DE COMPRA" : "NUEVA SOLICITUD"} width="max-w-2xl">
+            {/* ============================================================ */}
+            <ModalGenerico 
+                isOpen={compras?.isModalOpen ?? false} 
+                onClose={compras?.cerrarModal ?? (() => {})} 
+                titulo={compras?.vista === 'lista' ? "SOLICITUDES DE COMPRA" : "NUEVA SOLICITUD"} 
+                width="max-w-2xl"
+            >
                 {compras?.vista === 'lista' ? (
                     <div className="flex flex-col gap-6 p-4">
-                        {compras?.alertasVencimiento?.length > 0 && <div className="bg-red-50 border border-red-200 rounded-xl p-3"><p className="text-red-600 text-[10px] uppercase font-bold">⚠️ {compras.alertasVencimiento.length} solicitud(es) por vencer</p></div>}
+                        {compras?.alertasVencimiento?.length > 0 && (
+                            <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                                <p className="text-red-600 text-[10px] uppercase font-bold">
+                                    ⚠️ {compras.alertasVencimiento.length} solicitud(es) por vencer
+                                </p>
+                            </div>
+                        )}
                         <div className="overflow-hidden rounded-xl border border-amber-100 shadow-sm">
                             <table className="w-full text-left text-[11px] uppercase">
                                 <thead className="bg-amber-50 text-amber-700">
@@ -458,31 +636,58 @@ export const AdminModales = ({
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {compras?.solicitudesVisibles?.length > 0 ? compras.solicitudesVisibles.map((s) => (
+                                    {compras?.solicitudesVisibles?.length > 0 ? compras.solicitudesVisibles.map((s: any) => (
                                         <tr key={s.id} className="border-t border-amber-50">
-                                            <td className="p-3 font-bold">{s.categoria_general}</td>
+                                            <td className="p-3 font-bold">{s.categoria_general || '—'}</td>
                                             <td className="p-3">{s.tipo_insumo || s.tipo_alimento || '—'}</td>
-                                            <td className="p-3">{s.cantidad}</td>
-                                            <td className="p-3">{s.fecha_propuesta}</td>
-                                            <td className="p-3"><span className={`px-2 py-1 rounded-full text-[9px] ${s.estado === 'Aprobada' ? 'bg-green-100 text-green-600' : s.estado === 'Rechazada' ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-600'}`}>{s.estado}</span></td>
+                                            <td className="p-3">{s.cantidad || 0}</td>
+                                            <td className="p-3">{s.fecha_propuesta || s.fecha_compra || '—'}</td>
+                                            <td className="p-3">
+                                                <span className={`px-2 py-1 rounded-full text-[9px] ${
+                                                    s.estado === 'Aprobada' ? 'bg-green-100 text-green-600' : 
+                                                    s.estado === 'Rechazada' ? 'bg-red-100 text-red-600' : 
+                                                    'bg-yellow-100 text-yellow-600'
+                                                }`}>
+                                                    {s.estado || 'Pendiente'}
+                                                </span>
+                                            </td>
                                         </tr>
                                     )) : (
                                         <tr>
-                                            <td colSpan={5} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">— Sin solicitudes registradas —</td>
+                                            <td colSpan={5} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">
+                                                — Sin solicitudes registradas —
+                                            </td>
                                         </tr>
                                     )}
                                 </tbody>
                             </table>
                         </div>
-                        <button onClick={() => compras?.cambiarVista?.('formulario')} className="bg-amber-600 text-white py-3 rounded-full font-bold uppercase text-[10px] shadow-lg hover:bg-amber-700 transition-all">+ Nueva Solicitud de Compra</button>
+                        <button 
+                            onClick={() => compras?.cambiarVista?.('formulario')} 
+                            className="bg-amber-600 text-white py-3 rounded-full font-bold uppercase text-[10px] shadow-lg hover:bg-amber-700 transition-all"
+                        >
+                            + Nueva Solicitud de Compra
+                        </button>
                     </div>
                 ) : (
-                    <FormularioCompra tipoSeleccionado={compras?.tipoSeleccionado ?? 'insumo'} setTipoSeleccionado={compras?.setTipoSeleccionado ?? (() => {})} onGuardar={compras?.crearSolicitud ?? (() => {})} onCancelar={() => compras?.cambiarVista?.('lista')} />
+                    <FormularioCompra 
+                        tipoSeleccionado={compras?.tipoSeleccionado ?? 'insumo'} 
+                        setTipoSeleccionado={compras?.setTipoSeleccionado ?? (() => {})} 
+                        onGuardar={(datos: any, cerrar: boolean) => compras?.crearSolicitud?.(datos, cerrar)} 
+                        onCancelar={() => compras?.cambiarVista?.('lista')} 
+                    />
                 )}
             </ModalGenerico>
 
+            {/* ============================================================ */}
             {/* PDF */}
-            <ModalGenerico isOpen={generarPDF?.isModalOpen ?? false} onClose={generarPDF?.cerrarModal ?? (() => {})} titulo="FORMATO DE PAGO - FIRMA DEL TRABAJADOR" width="max-w-3xl">
+            {/* ============================================================ */}
+            <ModalGenerico 
+                isOpen={generarPDF?.isModalOpen ?? false} 
+                onClose={generarPDF?.cerrarModal ?? (() => {})} 
+                titulo="FORMATO DE PAGO - FIRMA DEL TRABAJADOR" 
+                width="max-w-3xl"
+            >
                 {generarPDF?.vista === 'lista' ? (
                     <div className="flex flex-col gap-6 p-4">
                         <div className="overflow-hidden rounded-xl border border-teal-100 shadow-sm">
@@ -492,22 +697,24 @@ export const AdminModales = ({
                                         <th className="p-3">ID FORMATO</th>
                                         <th className="p-3">TRABAJADOR</th>
                                         <th className="p-3">MONTO</th>
-                                        <th className="p-3">ESTADO FIRMA</th>
                                         <th className="p-3">FECHA</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {generarPDF?.formatosPago?.length > 0 ? generarPDF.formatosPago.map((f) => (
+                                    {generarPDF?.formatosPago?.length > 0 ? generarPDF.formatosPago.map((f: any) => (
                                         <tr key={f.id} className="border-t border-teal-50 hover:bg-teal-50/30 transition-colors">
-                                            <td className="p-3 font-bold">{f.id}</td>
-                                            <td className="p-3">{f.detalles.nombreTrabajador}</td>
-                                            <td className="p-3 font-bold text-green-600">${f.detalles.montoTotal.toLocaleString()}</td>
-                                            <td className="p-3"><span className={`px-2 py-1 rounded-full text-[9px] ${f.estadoFirma === 'firmado' ? 'bg-green-100 text-green-600' : f.estadoFirma === 'escaneado' ? 'bg-blue-100 text-blue-600' : 'bg-yellow-100 text-yellow-600'}`}>{f.estadoFirma === 'firmado' ? 'FIRMADO' : f.estadoFirma === 'escaneado' ? 'ES-CANEADO' : 'PENDIENTE'}</span></td>
-                                            <td className="p-3">{new Date(f.fechaGeneracion).toLocaleDateString()}</td>
+                                            <td className="p-3 font-bold">{f.id || '—'}</td>
+                                            <td className="p-3">{f.detalles?.nombreTrabajador || '—'}</td>
+                                            <td className="p-3 font-bold text-green-600">
+                                                ${f.detalles?.montoTotal?.toLocaleString() || '0'}
+                                            </td>
+                                            <td className="p-3">{f.fechaGeneracion ? new Date(f.fechaGeneracion).toLocaleDateString() : '—'}</td>
                                         </tr>
                                     )) : (
                                         <tr>
-                                            <td colSpan={5} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">— Sin formatos de pago generados —</td>
+                                            <td colSpan={4} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">
+                                                — Sin formatos de pago generados —
+                                            </td>
                                         </tr>
                                     )}
                                 </tbody>
@@ -516,27 +723,73 @@ export const AdminModales = ({
                         <div className="flex flex-col gap-4">
                             <label className="text-xs font-bold text-gray-600 uppercase">Seleccionar Pago</label>
                             {pagos?.listaPagos?.length === 0 ? (
-                                <div className="text-center text-red-500 text-sm py-2 bg-red-50 rounded">⚠️ No hay pagos registrados. Ve a "REGISTRAR PAGOS" primero.</div>
+                                <div className="text-center text-red-500 text-sm py-2 bg-red-50 rounded">
+                                    ⚠️ No hay pagos registrados.
+                                </div>
                             ) : (
                                 <>
-                                    <select className="border rounded-lg p-2 text-sm bg-white" value={pagoSeleccionado?.id || ''} onChange={(e) => { const pago = pagos?.listaPagos?.find(p => p.id === Number(e.target.value)); setPagoSeleccionado(pago || null); }}>
+                                    <select 
+                                        className="border rounded-lg p-2 text-sm bg-white" 
+                                        value={pagoSeleccionado?.id_pago || pagoSeleccionado?.id || ''} 
+                                        onChange={(e) => { 
+                                            const pago = pagos?.listaPagos?.find((p: any) => (p.id_pago || p.id) === Number(e.target.value)); 
+                                            setPagoSeleccionado(pago || null); 
+                                        }}
+                                    >
                                         <option value="">-- Selecciona un pago --</option>
-                                        {pagos?.listaPagos?.map(p => <option key={p.id} value={p.id}>#{p.id} - {p.id_trabajador} - ${p.monto_total.toLocaleString()} - {p.fecha_pago}</option>)}
+                                        {pagos?.listaPagos?.map((p: any) => (
+                                            <option key={p.id_pago || p.id} value={p.id_pago || p.id}>
+                                                #{p.id_pago || p.id} - {p.Trabajador?.nombre_completo || p.id_trabajador} - ${p.monto_total?.toLocaleString()}
+                                            </option>
+                                        ))}
                                     </select>
-                                    <button onClick={() => { if (pagoSeleccionado) { generarPDF?.cambiarVista?.('formulario'); } else { alert("Por favor selecciona un pago primero"); } }} disabled={!pagoSeleccionado} className="bg-teal-600 text-white py-3 rounded-full font-bold uppercase text-[10px] shadow-lg hover:bg-teal-700 transition-all">+ Generar Nuevo Formato de Pago</button>
+                                    <button 
+                                        onClick={() => { 
+                                            if (pagoSeleccionado) { 
+                                                generarPDF?.cambiarVista?.('formulario'); 
+                                            } else { 
+                                                alert("Por favor selecciona un pago primero"); 
+                                            } 
+                                        }} 
+                                        disabled={!pagoSeleccionado} 
+                                        className="bg-teal-600 text-white py-3 rounded-full font-bold uppercase text-[10px] shadow-lg hover:bg-teal-700 transition-all disabled:opacity-50"
+                                    >
+                                        + Generar Nuevo Formato de Pago
+                                    </button>
                                 </>
                             )}
                         </div>
                     </div>
                 ) : generarPDF?.vista === 'formulario' && pagoSeleccionado ? (
-                    <FormularioGenerarPagoPDF pagoSeleccionado={pagoSeleccionado} trabajadores={trabajadores?.trabajadoresActivos ?? []} trabajosRealizados={trabajo?.listaTrabajos ?? []} onGenerarPDF={generarPDF?.generarFormatoPago ?? (() => Promise.reject())} onCancelar={() => { generarPDF?.cambiarVista?.('lista'); setPagoSeleccionado(null); }} />
+                    <FormularioGenerarPagoPDF 
+                        pagoSeleccionado={pagoSeleccionado} 
+                        trabajadores={trabajadores?.trabajadoresActivos ?? []} 
+                        trabajosRealizados={trabajo?.trabajos ?? []} 
+                        onGenerarPDF={generarPDF?.generarFormatoPago ?? (() => Promise.reject())} 
+                        onCancelar={() => { generarPDF?.cambiarVista?.('lista'); setPagoSeleccionado(null); }} 
+                    />
                 ) : (
-                    <div className="p-4 text-center"><p className="text-gray-500">Vista previa del PDF - Próximamente</p><button onClick={() => generarPDF?.cambiarVista?.('lista')} className="mt-4 bg-gray-500 text-white px-4 py-2 rounded">Volver</button></div>
+                    <div className="p-4 text-center">
+                        <p className="text-gray-500">Vista previa del PDF - Próximamente</p>
+                        <button 
+                            onClick={() => generarPDF?.cambiarVista?.('lista')} 
+                            className="mt-4 bg-gray-500 text-white px-4 py-2 rounded"
+                        >
+                            Volver
+                        </button>
+                    </div>
                 )}
             </ModalGenerico>
 
+            {/* ============================================================ */}
             {/* SOLICITUDES DE COMPRA */}
-            <ModalGenerico isOpen={solicitudCompra?.isModalOpen ?? false} onClose={solicitudCompra?.cerrarModal ?? (() => {})} titulo="SOLICITUDES DE COMPRA" width="max-w-3xl">
+            {/* ============================================================ */}
+            <ModalGenerico 
+                isOpen={solicitudCompra?.isModalOpen ?? false} 
+                onClose={solicitudCompra?.cerrarModal ?? (() => {})} 
+                titulo="SOLICITUDES DE COMPRA" 
+                width="max-w-3xl"
+            >
                 {solicitudCompra?.vista === 'lista' ? (
                     <div className="flex flex-col gap-6 p-4">
                         <div className="overflow-hidden rounded-xl border border-amber-100 shadow-sm">
@@ -551,26 +804,34 @@ export const AdminModales = ({
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {solicitudCompra?.solicitudesPendientes?.length > 0 ? solicitudCompra.solicitudesPendientes.map((s) => (
+                                    {solicitudCompra?.solicitudesPendientes?.length > 0 ? solicitudCompra.solicitudesPendientes.map((s: any) => (
                                         <tr key={s.id} className="border-t border-amber-50">
-                                            <td className="p-3 font-bold">{s.tipo}</td>
-                                            <td className="p-3">{s.tipoInsumo || s.tipoAlimento || '—'}</td>
-                                            <td className="p-3">{s.cantidad} {s.unidadMedida}</td>
-                                            <td className="p-3">{s.fechaPropuesta}</td>
-                                            <td className="p-3"><span className="px-2 py-1 rounded-full text-[9px] bg-yellow-100 text-yellow-600">{s.estado}</span></td>
+                                            <td className="p-3 font-bold">{s.categoria_general || s.tipo || '—'}</td>
+                                            <td className="p-3">{s.tipo_insumo || s.tipo_alimento || '—'}</td>
+                                            <td className="p-3">{s.cantidad || 0} {s.unidad_medida || ''}</td>
+                                            <td className="p-3">{s.fecha_propuesta || s.fecha_compra || '—'}</td>
+                                            <td className="p-3">
+                                                <span className="px-2 py-1 rounded-full text-[9px] bg-yellow-100 text-yellow-600">
+                                                    {s.estado || 'Pendiente'}
+                                                </span>
+                                            </td>
                                         </tr>
                                     )) : (
                                         <tr>
-                                            <td colSpan={5} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">— Sin solicitudes pendientes —</td>
+                                            <td colSpan={5} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">
+                                                — Sin solicitudes pendientes —
+                                            </td>
                                         </tr>
                                     )}
                                 </tbody>
                             </table>
                         </div>
-                        <div className="flex gap-4">
-                            <button onClick={() => solicitudCompra?.cambiarVista?.('formulario')} className="flex-1 bg-amber-600 text-white py-3 rounded-full font-bold uppercase text-[10px] shadow-lg hover:bg-amber-700 transition-all">+ Nueva Solicitud</button>
-                            <button onClick={() => { if(window.confirm('¿Deseas eliminar TODAS las solicitudes para limpiar tus reportes de pruebas/datos pasados?')) { localStorage.removeItem('solicitudes_compra'); window.dispatchEvent(new Event('solicitudes_compra_actualizadas')); } }} className="bg-red-600 text-white py-3 px-6 rounded-full font-bold uppercase text-[10px] shadow-lg hover:bg-red-700 transition-all">Limpiar Reportes</button>
-                        </div>
+                        <button 
+                            onClick={() => solicitudCompra?.cambiarVista?.('formulario')} 
+                            className="bg-amber-600 text-white py-3 rounded-full font-bold uppercase text-[10px] shadow-lg hover:bg-amber-700 transition-all"
+                        >
+                            + Nueva Solicitud
+                        </button>
                     </div>
                 ) : (
                     <FormularioSolicitudCompra
@@ -578,15 +839,22 @@ export const AdminModales = ({
                         tipoSeleccionado={solicitudCompra?.tipoSeleccionado ?? 'insumo'}
                         setTipoSeleccionado={solicitudCompra?.setTipoSeleccionado ?? (() => {})}
                         trabajadoresActivos={trabajadores?.trabajadoresActivos ?? []}
-                        onGuardar={solicitudCompra?.crearSolicitud ?? (() => {})}
+                        onGuardar={(datos: any, cerrar: boolean) => solicitudCompra?.crearSolicitud?.(datos, cerrar)}
                         onCancelar={() => solicitudCompra?.cambiarVista?.('lista')}
                         usuarioActual="Admin"
                     />
                 )}
             </ModalGenerico>
 
+            {/* ============================================================ */}
             {/* CONSUMO DE INSUMOS */}
-            <ModalGenerico isOpen={consumoInsumos?.isModalOpen ?? false} onClose={consumoInsumos?.cerrarModal ?? (() => {})} titulo={consumoInsumos?.vista === 'lista' ? "CONSUMO DE INSUMOS" : "REGISTRAR CONSUMO"} width="max-w-3xl">
+            {/* ============================================================ */}
+            <ModalGenerico 
+                isOpen={consumoInsumos?.isModalOpen ?? false} 
+                onClose={consumoInsumos?.cerrarModal ?? (() => {})} 
+                titulo={consumoInsumos?.vista === 'lista' ? "CONSUMO DE INSUMOS" : "REGISTRAR CONSUMO"} 
+                width="max-w-3xl"
+            >
                 {consumoInsumos?.vista === 'lista' ? (
                     <div className="flex flex-col gap-6 p-4">
                         <div className="overflow-hidden rounded-xl border border-emerald-100 shadow-sm">
@@ -597,33 +865,40 @@ export const AdminModales = ({
                                         <th className="p-3">INSUMO</th>
                                         <th className="p-3">CANTIDAD</th>
                                         <th className="p-3">FECHA</th>
-                                        <th className="p-3">ESTADO</th>
+                                        <th className="p-3">RESPONSABLE</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {consumoInsumos?.consumos?.length > 0 ? consumoInsumos.consumos.map((c) => (
+                                    {consumoInsumos?.consumos?.length > 0 ? consumoInsumos.consumos.map((c: any) => (
                                         <tr key={c.id} className="border-t border-emerald-50">
-                                            <td className="p-3 font-bold">{c.actividadSeleccionada}</td>
-                                            <td className="p-3">{c.nombreInsumo}</td>
-                                            <td className="p-3">{c.cantidadSolicitada} {c.unidadMedida}</td>
-                                            <td className="p-3">{c.fechaPropuesta}</td>
-                                            <td className="p-3"><span className={`px-2 py-1 rounded-full text-[9px] ${c.estado === 'Aprobada' ? 'bg-green-100 text-green-600' : c.estado === 'Rechazada' ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-600'}`}>{c.estado}</span></td>
+                                            <td className="p-3 font-bold">{c.actividad || '—'}</td>
+                                            <td className="p-3">{c.nombreInsumo || c.id_insumo || '—'}</td>
+                                            <td className="p-3">{c.cantidad || 0} {c.unidadMedida || ''}</td>
+                                            <td className="p-3">{c.fecha_consumo || c.fecha || '—'}</td>
+                                            <td className="p-3">{c.responsable || '—'}</td>
                                         </tr>
                                     )) : (
                                         <tr>
-                                            <td colSpan={5} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">— Sin consumos registrados —</td>
+                                            <td colSpan={5} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">
+                                                — Sin consumos registrados —
+                                            </td>
                                         </tr>
                                     )}
                                 </tbody>
                             </table>
                         </div>
-                        <button onClick={() => consumoInsumos?.cambiarVista?.('formulario')} className="bg-emerald-600 text-white py-3 rounded-full font-bold uppercase text-[10px] shadow-lg hover:bg-emerald-700 transition-all">+ Registrar Nuevo Consumo</button>
+                        <button 
+                            onClick={() => consumoInsumos?.cambiarVista?.('formulario')} 
+                            className="bg-emerald-600 text-white py-3 rounded-full font-bold uppercase text-[10px] shadow-lg hover:bg-emerald-700 transition-all"
+                        >
+                            + Registrar Nuevo Consumo
+                        </button>
                     </div>
                 ) : (
                     <FormularioConsumoInsumos
-                        inventario={consumoInsumos?.inventarioDisponible ?? []}
+                        inventario={consumoInsumos?.inventario ?? []}
                         trabajadoresActivos={trabajadores?.trabajadoresActivos ?? []}
-                        onGuardar={consumoInsumos?.registrarConsumo ?? (() => false)}
+                        onGuardar={(datos: any, cerrar: boolean) => consumoInsumos?.registrarConsumo?.(datos, cerrar)}
                         onCancelar={() => consumoInsumos?.cambiarVista?.('lista')}
                     />
                 )}

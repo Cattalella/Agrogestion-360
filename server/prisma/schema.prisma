@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
@@ -98,7 +99,7 @@ model Animal {
   fecha_nacimiento DateTime
   peso_actual      Decimal         @db.Decimal(10, 2)
   origen           String          @db.VarChar(50)
-  foto_url         String?         @db.VarChar(255)
+  foto_url         String?         @db.Text
   createdAt        DateTime        @default(now())
   updatedAt        DateTime
   especie          Especie         @relation(fields: [id_especie], references: [id_especie])

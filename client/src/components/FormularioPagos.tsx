@@ -1,107 +1,317 @@
 import { useState, useEffect } from "react";
-import { type Pago, type EstadoPago } from "../hooks/useRegistrarPagos";
+import { User, Briefcase, Calendar, DollarSign, FileText, CreditCard } from "lucide-react";
+
+interface Trabajador {
+    id_trabajador: number;
+    nombre_completo: string;
+    tipo_trabajo: string;
+    estado: string;
+}
+
+interface Pago {
+    id: number;
+    id_trabajador: string;
+    tipo_trabajo: string;
+    fecha_pago: string;
+    monto_total: number;
+    concepto: string;
+    estado: string;
+    contabilizado?: boolean;
+    anulado?: boolean;
+}
+
+type EstadoPago = "No pagado" | "Pendiente de firma" | "Pagado con firma";
 
 interface Props {
     pagoAEditar: Pago | null;
-    onGuardar: (datos: Omit<Pago, 'id' | 'contabilizado' | 'anulado'>, cerrar: boolean) => void;
+    listaTrabajadores: Trabajador[];
+    onGuardar: (datos: any, cerrar: boolean) => void;
     onCancelar: () => void;
 }
 
-export const FormularioPagos = ({ pagoAEditar, onGuardar, onCancelar }: Props) => {
-    const [form, setForm] = useState<Omit<Pago, 'id' | 'contabilizado' | 'anulado'>>({
+export const FormularioPagos = ({ 
+    pagoAEditar, 
+    listaTrabajadores,
+    onGuardar, 
+    onCancelar 
+}: Props) => {
+    
+    const estadoInicial = {
         id_trabajador: "",
         tipo_trabajo: "",
-        fecha_pago: "",
-        monto_total: 0,
+        fecha_pago: new Date().toISOString().split('T')[0],
+        monto_total: "",
         concepto: "",
-        estado: "No pagado",
-    });
+        estado: "No pagado" as EstadoPago,
+    };
 
+    const [formData, setFormData] = useState(estadoInicial);
+    const [errores, setErrores] = useState<Record<string, string>>({});
+
+    // ============================================================
+    // CARGAR DATOS SI ES EDICIÓN
+    // ============================================================
     useEffect(() => {
         if (pagoAEditar) {
-            setForm({
-                id_trabajador: pagoAEditar.id_trabajador,
-                tipo_trabajo: pagoAEditar.tipo_trabajo,
-                fecha_pago: pagoAEditar.fecha_pago,
-                monto_total: pagoAEditar.monto_total,
-                concepto: pagoAEditar.concepto,
-                estado: pagoAEditar.estado,
+            setFormData({
+                id_trabajador: pagoAEditar.id_trabajador || "",
+                tipo_trabajo: pagoAEditar.tipo_trabajo || "",
+                fecha_pago: pagoAEditar.fecha_pago || "",
+                monto_total: pagoAEditar.monto_total?.toString() || "",
+                concepto: pagoAEditar.concepto || "",
+                estado: (pagoAEditar.estado as EstadoPago) || "No pagado",
             });
         }
     }, [pagoAEditar]);
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        onGuardar(form, true);
+    // ============================================================
+    // AUTO-COMPLETAR TIPO DE TRABAJO AL SELECCIONAR TRABAJADOR
+    // ============================================================
+    useEffect(() => {
+        if (formData.id_trabajador) {
+            const trabajador = listaTrabajadores.find(
+                t => t.id_trabajador === parseInt(formData.id_trabajador)
+            );
+            if (trabajador) {
+                setFormData(prev => ({ ...prev, tipo_trabajo: trabajador.tipo_trabajo }));
+            }
+        }
+    }, [formData.id_trabajador, listaTrabajadores]);
+
+    // ============================================================
+    // MANEJADORES
+    // ============================================================
+    const manejarCambio = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+        if (value) {
+            setErrores(prev => ({ ...prev, [name]: '' }));
+        }
     };
 
+    const manejarCambioNumerico = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        if (value === '' || /^\d*\.?\d*$/.test(value)) {
+            setFormData(prev => ({ ...prev, [name]: value }));
+            if (value && parseFloat(value) > 0) {
+                setErrores(prev => ({ ...prev, [name]: '' }));
+            }
+        }
+    };
+
+    // ============================================================
+    // VALIDACIÓN
+    // ============================================================
+    const validarFormulario = (): boolean => {
+        const nuevosErrores: Record<string, string> = {};
+        
+        if (!formData.id_trabajador) nuevosErrores.id_trabajador = 'Selecciona un trabajador';
+        if (!formData.fecha_pago) nuevosErrores.fecha_pago = 'La fecha es obligatoria';
+        if (!formData.monto_total || parseFloat(formData.monto_total) <= 0) {
+            nuevosErrores.monto_total = 'El monto debe ser mayor a 0';
+        }
+        if (!formData.concepto.trim()) nuevosErrores.concepto = 'El concepto es obligatorio';
+        
+        setErrores(nuevosErrores);
+        return Object.keys(nuevosErrores).length === 0;
+    };
+
+    // ============================================================
+    // ENVIAR
+    // ============================================================
+    const ejecutarEnvio = (cerrar: boolean) => {
+        if (!validarFormulario()) return;
+
+        const datosParaBackend = {
+            id_trabajador: formData.id_trabajador,
+            tipo_trabajo: formData.tipo_trabajo,
+            fecha_pago: formData.fecha_pago,
+            monto_total: parseFloat(formData.monto_total),
+            concepto: formData.concepto,
+            estado: formData.estado
+        };
+
+        console.log('📤 Datos a enviar (Pago):', datosParaBackend);
+        onGuardar(datosParaBackend, cerrar);
+        
+        if (!cerrar && !pagoAEditar) {
+            setFormData(estadoInicial);
+            setErrores({});
+        }
+    };
+
+    // ============================================================
+    // RENDER
+    // ============================================================
     return (
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input
-                    className="border p-2 rounded"
-                    type="text"
-                    placeholder="ID Trabajador"
-                    value={form.id_trabajador}
-                    onChange={(e) => setForm({ ...form, id_trabajador: e.target.value })}
-                    required
-                />
-                <input
-                    className="border p-2 rounded"
-                    type="text"
-                    placeholder="Tipo de Trabajo"
-                    value={form.tipo_trabajo}
-                    onChange={(e) => setForm({ ...form, tipo_trabajo: e.target.value })}
-                    required
-                />
-                <input
-                    className="border p-2 rounded"
-                    type="date"
-                    value={form.fecha_pago}
-                    onChange={(e) => setForm({ ...form, fecha_pago: e.target.value })}
-                    required
-                />
-                <input
-                    className="border p-2 rounded"
-                    type="number"
-                    placeholder="Monto Total"
-                    value={form.monto_total}
-                    onChange={(e) => setForm({ ...form, monto_total: Number(e.target.value) })}
-                    required
-                />
+        <form className="grid grid-cols-2 gap-4 animate-in fade-in zoom-in-95 duration-500 p-2">
+            {/* ============================================================ */}
+            {/* COLUMNA IZQUIERDA */}
+            {/* ============================================================ */}
+            <div className="flex flex-col gap-3">
+                {/* ID Trabajador - Select */}
+                <div>
+                    <label className="text-[9px] uppercase ml-4 text-indigo-400 font-black tracking-tighter">
+                        <User size={10} className="inline mr-1" />
+                        Trabajador <span className="text-red-400">*</span>
+                    </label>
+                    <select
+                        name="id_trabajador"
+                        value={formData.id_trabajador}
+                        onChange={manejarCambio}
+                        className={`w-full border-1 rounded-full px-6 py-2 text-[12px] bg-white focus:outline-none focus:ring-2 cursor-pointer transition-all ${
+                            errores.id_trabajador ? 'border-red-400 focus:ring-red-300' : 'border-indigo-200 focus:ring-indigo-300 text-indigo-700 font-bold'
+                        }`}
+                    >
+                        <option value="">SELECCIONAR TRABAJADOR *</option>
+                        {listaTrabajadores.filter(t => t.estado === 'Activo').map(t => (
+                            <option key={t.id_trabajador} value={t.id_trabajador}>
+                                {t.nombre_completo} - {t.tipo_trabajo}
+                            </option>
+                        ))}
+                    </select>
+                    {errores.id_trabajador && (
+                        <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.id_trabajador}</p>
+                    )}
+                </div>
+
+                {/* Tipo de Trabajo (Auto-completado) */}
+                <div>
+                    <label className="text-[9px] uppercase ml-4 text-indigo-400 font-black tracking-tighter">
+                        <Briefcase size={10} className="inline mr-1" />
+                        Tipo de Trabajo
+                    </label>
+                    <input
+                        name="tipo_trabajo"
+                        value={formData.tipo_trabajo}
+                        onChange={manejarCambio}
+                        type="text"
+                        placeholder="Se auto-completa"
+                        className="w-full border-1 border-indigo-100 bg-indigo-50/30 rounded-full px-6 py-2 text-[12px] focus:outline-none text-gray-600"
+                        readOnly
+                    />
+                </div>
+
+                {/* Fecha de Pago */}
+                <div className="flex flex-col gap-1">
+                    <label className="text-[9px] uppercase ml-4 text-indigo-400 font-black tracking-tighter">
+                        <Calendar size={10} className="inline mr-1" />
+                        Fecha de Pago <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                        name="fecha_pago"
+                        value={formData.fecha_pago}
+                        onChange={manejarCambio}
+                        type="date"
+                        className={`border-1 rounded-full px-6 py-2 text-[11px] focus:outline-none focus:ring-2 text-gray-500 transition-all ${
+                            errores.fecha_pago ? 'border-red-400 focus:ring-red-300' : 'border-indigo-100 focus:ring-indigo-300'
+                        }`}
+                    />
+                    {errores.fecha_pago && (
+                        <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.fecha_pago}</p>
+                    )}
+                </div>
             </div>
 
-            <select
-                className="border p-2 rounded"
-                value={form.estado}
-                onChange={(e) => setForm({ ...form, estado: e.target.value as EstadoPago })}
-            >
-                <option value="No pagado">No pagado</option>
-                <option value="Pendiente de firma">Pendiente de firma</option>
-                <option value="Pagado con firma">Pagado con firma</option>
-            </select>
+            {/* ============================================================ */}
+            {/* COLUMNA DERECHA */}
+            {/* ============================================================ */}
+            <div className="flex flex-col gap-3">
+                {/* Monto Total con "$" pegado */}
+                <div>
+                    <label className="text-[9px] uppercase ml-4 text-indigo-400 font-black tracking-tighter">
+                        <DollarSign size={10} className="inline mr-1" />
+                        Total Pagado <span className="text-red-400">*</span>
+                    </label>
+                    <div className="relative">
+                        <input
+                            name="monto_total"
+                            value={formData.monto_total}
+                            onChange={manejarCambioNumerico}
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="0"
+                            className={`w-full border-1 rounded-full pl-4 pr-12 py-2 text-[12px] focus:outline-none focus:ring-2 text-right font-bold transition-all ${
+                                errores.monto_total ? 'border-red-400 focus:ring-red-300' : 'border-indigo-200 focus:ring-indigo-300'
+                            }`}
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-bold text-indigo-400">
+                            $
+                        </span>
+                    </div>
+                    {errores.monto_total && (
+                        <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.monto_total}</p>
+                    )}
+                </div>
 
-            <textarea
-                className="border p-2 rounded"
-                placeholder="Concepto"
-                value={form.concepto}
-                onChange={(e) => setForm({ ...form, concepto: e.target.value })}
-                required
-            />
+                {/* Estado del Pago */}
+                <div>
+                    <label className="text-[9px] uppercase ml-4 text-indigo-400 font-black tracking-tighter">
+                        <CreditCard size={10} className="inline mr-1" />
+                        Estado
+                    </label>
+                    <select
+                        name="estado"
+                        value={formData.estado}
+                        onChange={manejarCambio}
+                        className="w-full border-1 border-indigo-200 rounded-full px-6 py-2 text-[12px] bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 cursor-pointer"
+                    >
+                        <option value="No pagado">⏳ NO PAGADO</option>
+                        <option value="Pendiente de firma">✍️ PENDIENTE DE FIRMA</option>
+                        <option value="Pagado con firma">✅ PAGADO CON FIRMA</option>
+                    </select>
+                </div>
 
-            <div className="flex justify-end gap-2 mt-4">
+                {/* Concepto */}
+                <div>
+                    <label className="text-[9px] uppercase ml-4 text-indigo-400 font-black tracking-tighter">
+                        <FileText size={10} className="inline mr-1" />
+                        Concepto <span className="text-red-400">*</span>
+                    </label>
+                    <textarea
+                        name="concepto"
+                        value={formData.concepto}
+                        onChange={manejarCambio}
+                        placeholder="Describa el concepto del pago..."
+                        rows={2}
+                        className={`border-1 rounded-2xl px-6 py-2 text-[12px] focus:outline-none focus:ring-2 resize-none transition-all ${
+                            errores.concepto ? 'border-red-400 focus:ring-red-300' : 'border-indigo-200 focus:ring-indigo-300'
+                        }`}
+                    />
+                    {errores.concepto && (
+                        <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.concepto}</p>
+                    )}
+                </div>
+            </div>
+
+            {/* ============================================================ */}
+            {/* BOTONES */}
+            {/* ============================================================ */}
+            <div className="col-span-2 flex justify-between gap-4 mt-4">
+                <button
+                    type="button"
+                    onClick={() => ejecutarEnvio(false)}
+                    className="flex-1 bg-white border-1 border-indigo-400 text-indigo-500 px-6 py-3 rounded-l-full rounded-r-lg font-black text-[11px] uppercase italic shadow-sm active:scale-95 hover:bg-indigo-50 transition-all"
+                >
+                    Guardar y Seguir
+                </button>
+                <button
+                    type="button"
+                    onClick={() => ejecutarEnvio(true)}
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-r-full rounded-l-lg font-black text-[11px] uppercase shadow-md active:scale-95 transition-all"
+                >
+                    {pagoAEditar ? 'Actualizar Pago' : 'Guardar y Salir'}
+                </button>
+            </div>
+
+            {/* Botón Cancelar */}
+            <div className="col-span-2 flex justify-center">
                 <button
                     type="button"
                     onClick={onCancelar}
-                    className="bg-gray-500 text-white px-4 py-2 rounded"
+                    className="text-[10px] text-gray-400 uppercase font-bold hover:text-gray-600 transition-colors"
                 >
                     Cancelar
-                </button>
-                <button
-                    type="submit"
-                    className="bg-blue-600 text-white px-4 py-2 rounded"
-                >
-                    {pagoAEditar ? "Actualizar Pago" : "Registrar Pago"}
                 </button>
             </div>
         </form>

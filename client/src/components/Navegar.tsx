@@ -18,7 +18,7 @@ export const Navegar = () => {
                 const token = localStorage.getItem('token');
                 if (!token) return;
                 
-                // 🆕 Obtener rol del localStorage (guardado en el login)
+                // Obtener rol del localStorage (guardado en el login)
                 const usuarioGuardado = localStorage.getItem('usuario');
                 if (usuarioGuardado) {
                     const usuario = JSON.parse(usuarioGuardado);
@@ -33,7 +33,7 @@ export const Navegar = () => {
                     
                     setNombre(datos.nombre || "Usuario");
                     
-                    // Si el backend devuelve rol, lo usamos; si no, ya lo tenemos del localStorage
+                    // Si el backend devuelve rol, lo usamos
                     if (datos.rol) {
                         setRol(datos.rol);
                     }
@@ -42,6 +42,7 @@ export const Navegar = () => {
                     if (datos.foto_perfil) {
                         setAvatar(datos.foto_perfil);
                         localStorage.setItem('userAvatar', datos.foto_perfil);
+                        localStorage.setItem('foto_perfil', datos.foto_perfil); // 🆕 Sincronizar
                     }
                 }
             } catch (error) {
@@ -82,7 +83,15 @@ export const Navegar = () => {
         if (file && file.type.startsWith('image/')) {
             // Mostrar preview inmediato
             const reader = new FileReader();
-            reader.onloadend = () => setAvatar(reader.result as string);
+            reader.onloadend = () => {
+                const base64String = reader.result as string;
+                setAvatar(base64String);
+                
+                // 🆕 Guardar en localStorage y disparar evento de sincronización
+                localStorage.setItem('userAvatar', base64String);
+                localStorage.setItem('foto_perfil', base64String);
+                window.dispatchEvent(new Event('fotoPerfilActualizada'));
+            };
             reader.readAsDataURL(file);
             
             // Subir al backend
@@ -96,7 +105,7 @@ export const Navegar = () => {
                         headers: { 'Content-Type': 'multipart/form-data' }
                     });
                     
-                    console.log('✅ Foto de perfil actualizada');
+                    console.log('✅ Foto de perfil actualizada en el backend');
                 }
             } catch (error) {
                 console.error('Error al subir foto:', error);

@@ -11,37 +11,77 @@ interface FormularioGanadoProps {
 
 export const FormularioGanado = ({ 
     listaGanado, 
-    sugerenciaId, 
+    sugerenciaId,
+    categoriaSeleccionada,
+    setCategoria,
     onGuardar 
 }: FormularioGanadoProps) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // 🆕 Determinar sexo por defecto según categoría
+    const sexoPorDefecto = categoriaSeleccionada === 'TO' ? 'MACHO' : 'HEMBRA';
+
     const estadoInicial = {
-        oficial: "",           // 🆕 Cambiado de idOficial a oficial
-        local: sugerenciaId,   // 🆕 Cambiado de idLocal a local
+        oficial: "",
+        local: sugerenciaId,
         idMadre: "",
         peso: "",
         ingreso: new Date().toISOString().split('T')[0],
         nacimiento: "",
-        sexo: "HEMBRA",
-        raza: "",              // 🆕 Agregado (antes lote)
-        lote: "",              // Se mantiene para ubicación
+        sexo: sexoPorDefecto,
+        raza: "",
+        lote: "",
         salud: "SANO",
-        origen: "Nacimiento",  // 🆕 Agregado
+        origen: "Nacimiento",
         foto: null as string | null
     };
 
     const [formData, setFormData] = useState(estadoInicial);
+    const [errores, setErrores] = useState<Record<string, string>>({});
 
+    // 🆕 Actualizar cuando cambia la categoría o el ID sugerido
     useEffect(() => {
-        setFormData(prev => ({ ...prev, local: sugerenciaId }));
-    }, [sugerenciaId]);
+        setFormData(prev => ({ 
+            ...prev, 
+            local: sugerenciaId,
+            sexo: categoriaSeleccionada === 'TO' ? 'MACHO' : 'HEMBRA'
+        }));
+    }, [sugerenciaId, categoriaSeleccionada]);
 
-    const esCria = formData.local.startsWith("TE") || formData.local.startsWith("NO");
+    // 🆕 Determinar si es cría (ternero o novillo) para mostrar campo MADRE
+    const esCria = categoriaSeleccionada === 'TE' || categoriaSeleccionada === 'NO';
+
+    // 🆕 Determinar si el sexo es editable (solo para NO y TE)
+    const sexoEditable = categoriaSeleccionada === 'NO' || categoriaSeleccionada === 'TE';
+
+    // 🆕 Nombres amigables para cada categoría
+    const nombreCategoria = () => {
+        switch(categoriaSeleccionada) {
+            case 'VA': return 'VACA';
+            case 'TO': return 'TORO';
+            case 'NO': return 'NOVILLO/A';
+            case 'TE': return 'TERNERO/A';
+            default: return 'ANIMAL';
+        }
+    };
+
+    // Validar solo números para campos numéricos
+    const manejarCambioNumerico = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        if (value === '' || /^\d*\.?\d*$/.test(value)) {
+            setFormData(prev => ({ ...prev, [name]: value }));
+            if (value && parseFloat(value) > 0) {
+                setErrores(prev => ({ ...prev, [name]: '' }));
+            }
+        }
+    };
 
     const manejarCambio = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+        if (value) {
+            setErrores(prev => ({ ...prev, [name]: '' }));
+        }
     };
 
     const manejarFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -55,28 +95,59 @@ export const FormularioGanado = ({
         }
     };
 
+    // ============================================================
+    // 🆕 VALIDACIÓN: Fecha ingreso OBLIGATORIA, Nacimiento OPCIONAL
+    // 🆕 + LÓGICA DE FECHAS
+    // ============================================================
+    const validarFormulario = (): boolean => {
+        const nuevosErrores: Record<string, string> = {};
+        
+        if (!formData.local) nuevosErrores.local = 'El ID Local es obligatorio';
+        if (!formData.peso || parseFloat(formData.peso) <= 0) nuevosErrores.peso = 'El peso debe ser mayor a 0';
+        if (!formData.ingreso) nuevosErrores.ingreso = 'La fecha de ingreso es obligatoria';
+        
+        // 🆕 Validar lógica de fechas
+        if (formData.nacimiento && formData.ingreso) {
+            const nacimiento = new Date(formData.nacimiento);
+            const ingreso = new Date(formData.ingreso);
+            
+            if (nacimiento > ingreso) {
+                nuevosErrores.nacimiento = 'El nacimiento no puede ser posterior al ingreso';
+            }
+        }
+        
+        if (formData.nacimiento) {
+            const nacimiento = new Date(formData.nacimiento);
+            const hoy = new Date();
+            hoy.setHours(0, 0, 0, 0);
+            
+            if (nacimiento > hoy) {
+                nuevosErrores.nacimiento = 'La fecha de nacimiento no puede ser futura';
+            }
+        }
+        
+        setErrores(nuevosErrores);
+        return Object.keys(nuevosErrores).length === 0;
+    };
+
     const ejecutarEnvio = (salir: boolean) => {
-        if (!formData.local) {
-            alert("El ID Local es obligatorio.");
+        if (!validarFormulario()) {
             return;
         }
 
-        // 🆕 Transformar datos al formato que espera el backend
         const datosParaBackend = {
-            codigo_local: formData.local,
-            num_ica_chapeta: formData.oficial || null,
+            local: formData.local,
+            oficial: formData.oficial || null,
             sexo: formData.sexo,
             raza: formData.raza || 'Criollo',
-            fecha_nacimiento: formData.nacimiento || formData.ingreso,
-            peso_actual: parseFloat(formData.peso) || 0,
+            nacimiento: formData.nacimiento || null,
+            ingreso: formData.ingreso,
+            peso: formData.peso,
             origen: formData.origen || 'Registro inicial',
-            id_ubicacion: 1, // TODO: Obtener del catálogo de ubicaciones
-            foto_url: formData.foto || null,
-            // Campos adicionales que podemos guardar en otro lado
-            id_madre: formData.idMadre || null,
+            foto: null,
+            idMadre: formData.idMadre || null,
             lote: formData.lote || '',
             salud: formData.salud || 'SANO',
-            fecha_ingreso: formData.ingreso,
         };
 
         console.log('📤 Datos a enviar:', datosParaBackend);
@@ -84,6 +155,7 @@ export const FormularioGanado = ({
         
         if (!salir) {
             setFormData(estadoInicial);
+            setErrores({});
             if (fileInputRef.current) fileInputRef.current.value = "";
         }
     };
@@ -92,34 +164,63 @@ export const FormularioGanado = ({
         <form className="grid grid-cols-2 gap-4 animate-in fade-in zoom-in-95 duration-500">
             {/* Columna Izquierda: Identificación y Fechas */}
             <div className="flex flex-col gap-3">
-                <input 
-                    name="oficial"  // 🆕 Cambiado
-                    value={formData.oficial}
-                    onChange={manejarCambio} 
-                    type="text" 
-                    placeholder="ID OFICIAL (ICA)" 
-                    className="border-1 border-purple-200 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-purple-300 placeholder:text-purple-300 transition-all" 
-                />
-                
-                <input 
-                    name="local"  // 🆕 Cambiado
-                    value={formData.local} 
-                    onChange={manejarCambio} 
-                    type="text" 
-                    placeholder="ID LOCAL (V-01)" 
-                    className="border-1 border-purple-200 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-purple-300 font-bold text-purple-600 bg-purple-50/30" 
-                />
+                {/* Selector de Categoría */}
+                <div>
+                    <label className="text-[9px] uppercase ml-4 text-purple-400 font-black tracking-tighter">
+                        Categoría
+                    </label>
+                    <select
+                        value={categoriaSeleccionada}
+                        onChange={(e) => setCategoria(e.target.value)}
+                        className="w-full border-1 border-purple-200 rounded-full px-6 py-2 text-[12px] bg-white text-purple-600 focus:outline-none font-bold"
+                    >
+                        <option value="VA">🐄 VACA (VA)</option>
+                        <option value="TO">🐂 TORO (TO)</option>
+                        <option value="NO">🐃 NOVILLO/A (NO)</option>
+                        <option value="TE">🐮 TERNERO/A (TE)</option>
+                    </select>
+                </div>
 
+                {/* ID Oficial */}
+                <div>
+                    <input 
+                        name="oficial"
+                        value={formData.oficial}
+                        onChange={manejarCambio} 
+                        type="text" 
+                        placeholder="ID OFICIAL (ICA)" 
+                        className="w-full border-1 border-purple-200 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-purple-300 placeholder:text-purple-300 transition-all" 
+                    />
+                </div>
+                
+                {/* ID Local */}
+                <div>
+                    <input 
+                        name="local"
+                        value={formData.local} 
+                        onChange={manejarCambio} 
+                        type="text" 
+                        placeholder={`ID LOCAL (${categoriaSeleccionada}-01)`}
+                        className={`w-full border-1 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 font-bold text-purple-600 bg-purple-50/30 transition-all ${
+                            errores.local ? 'border-red-400 focus:ring-red-300' : 'border-purple-200 focus:ring-purple-300'
+                        }`}
+                    />
+                    {errores.local && (
+                        <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.local}</p>
+                    )}
+                </div>
+
+                {/* Campo Madre (solo para crías) */}
                 {esCria && (
                     <select 
                         name="idMadre" 
                         value={formData.idMadre}
                         onChange={manejarCambio} 
-                        className="border-2 border-emerald-200 bg-emerald-50 text-emerald-700 rounded-full px-6 py-2 text-[12px] font-bold focus:outline-none animate-in slide-in-from-left-4 duration-300"
+                        className="border-2 border-emerald-200 bg-emerald-50 text-emerald-700 rounded-full px-6 py-2 text-[12px] font-bold focus:outline-none"
                     >
                         <option value="">ASIGNAR MADRE...</option>
                         {listaGanado
-                            .filter(a => a.sexo === "HEMBRA")
+                            .filter(a => a.sexo === "HEMBRA" && a.local?.startsWith('VA'))
                             .map(madre => (
                                 <option key={madre.id} value={madre.local}>
                                     {madre.local} {madre.oficial ? `(${madre.oficial})` : ''}
@@ -129,53 +230,104 @@ export const FormularioGanado = ({
                     </select>
                 )}
 
+                {/* Fecha Ingreso - OBLIGATORIA */}
                 <div className="flex flex-col gap-1 mt-1">
-                    <label className="text-[9px] uppercase ml-4 text-purple-400 font-black tracking-tighter">Fecha Ingreso</label>
+                    <label className="text-[9px] uppercase ml-4 text-purple-400 font-black tracking-tighter">
+                        Fecha Ingreso <span className="text-red-400">*</span>
+                    </label>
                     <input 
                         name="ingreso" 
                         value={formData.ingreso} 
                         onChange={manejarCambio} 
                         type="date" 
-                        className="border-1 border-purple-100 rounded-full px-6 py-2 text-[11px] focus:outline-none focus:ring-2 focus:ring-purple-300 text-gray-500" 
+                        className={`border-1 rounded-full px-6 py-2 text-[11px] focus:outline-none focus:ring-2 text-gray-500 transition-all ${
+                            errores.ingreso ? 'border-red-400 focus:ring-red-300' : 'border-purple-100 focus:ring-purple-300'
+                        }`}
                     />
+                    {errores.ingreso && (
+                        <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.ingreso}</p>
+                    )}
                 </div>
 
+                {/* Fecha Nacimiento - OPCIONAL */}
                 <div className="flex flex-col gap-1">
-                    <label className="text-[9px] uppercase ml-4 text-purple-400 font-black tracking-tighter">Nacimiento</label>
+                    <label className="text-[9px] uppercase ml-4 text-purple-400 font-black tracking-tighter">
+                        Nacimiento (Opcional)
+                    </label>
                     <input 
                         name="nacimiento" 
                         value={formData.nacimiento}
                         onChange={manejarCambio} 
                         type="date" 
-                        className="border-1 border-purple-100 rounded-full px-6 py-2 text-[11px] focus:outline-none focus:ring-2 focus:ring-purple-300 text-gray-500" 
+                        className={`border-1 rounded-full px-6 py-2 text-[11px] focus:outline-none focus:ring-2 text-gray-500 transition-all ${
+                            errores.nacimiento ? 'border-red-400 focus:ring-red-300' : 'border-purple-100 focus:ring-purple-300'
+                        }`}
                     />
+                    {errores.nacimiento && (
+                        <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.nacimiento}</p>
+                    )}
                 </div>
             </div>
 
             {/* Columna Derecha: Estado y Foto */}
             <div className="flex flex-col gap-3">
-                <div className="grid grid-cols-2 gap-2">
-                    <select 
-                        name="sexo" 
-                        value={formData.sexo}
-                        onChange={manejarCambio} 
-                        className="border-1 border-purple-200 rounded-full px-4 py-2 text-[11px] bg-white text-purple-600 focus:outline-none font-black appearance-none text-center"
-                    >
-                        <option value="HEMBRA">HEMBRA</option>
-                        <option value="MACHO">MACHO</option>
-                    </select>
-
-                    <input 
-                        name="peso" 
-                        value={formData.peso}
-                        onChange={manejarCambio} 
-                        type="number" 
-                        placeholder="PESO (KG)" 
-                        className="border-1 border-purple-200 rounded-full px-4 py-2 text-[11px] focus:outline-none text-center font-bold" 
-                    />
+                {/* Info de categoría seleccionada */}
+                <div className="bg-purple-50 rounded-full px-4 py-2 text-center">
+                    <p className="text-[11px] font-bold text-purple-600">
+                        Registrando: {nombreCategoria()} → Sexo: {formData.sexo} {!sexoEditable && '🔒'}
+                    </p>
                 </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                    {/* Select de sexo - BLOQUEADO para VA y TO */}
+                    {sexoEditable ? (
+                        <select 
+                            name="sexo" 
+                            value={formData.sexo}
+                            onChange={manejarCambio} 
+                            className="border-1 border-purple-200 rounded-full px-4 py-2 text-[11px] bg-white text-purple-600 focus:outline-none font-black appearance-none text-center"
+                        >
+                            <option value="HEMBRA">HEMBRA</option>
+                            <option value="MACHO">MACHO</option>
+                        </select>
+                    ) : (
+                        <div className="relative">
+                            <input 
+                                type="text"
+                                value={formData.sexo}
+                                className="w-full border-1 border-purple-200 bg-purple-50 rounded-full px-4 py-2 text-[11px] focus:outline-none text-center font-bold text-purple-600"
+                                readOnly
+                                disabled
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-purple-400">
+                                🔒
+                            </span>
+                        </div>
+                    )}
+
+                    {/* Campo Peso con "kg" pegado */}
+                    <div className="relative">
+                        <input 
+                            name="peso" 
+                            value={formData.peso}
+                            onChange={manejarCambioNumerico} 
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="0"
+                            className={`w-full border-1 rounded-full pl-4 pr-12 py-2 text-[11px] focus:outline-none text-right font-bold transition-all ${
+                                errores.peso ? 'border-red-400 focus:ring-red-300' : 'border-purple-200 focus:ring-purple-300'
+                            }`}
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-bold text-purple-400">
+                            kg
+                        </span>
+                    </div>
+                </div>
+                {errores.peso && (
+                    <p className="text-[9px] text-red-500 -mt-2 ml-4">{errores.peso}</p>
+                )}
                 
-                {/* 🆕 Campo Raza */}
+                {/* Campo Raza */}
                 <input 
                     name="raza" 
                     value={formData.raza}
@@ -194,16 +346,19 @@ export const FormularioGanado = ({
                     className="border-1 border-purple-200 rounded-full px-6 py-2 text-[12px] focus:outline-none placeholder:text-gray-300" 
                 />
                 
-                <input 
+                {/* Estado de Salud - Select */}
+                <select 
                     name="salud" 
                     value={formData.salud}
-                    onChange={manejarCambio} 
-                    type="text" 
-                    placeholder="ESTADO DE SALUD" 
-                    className="border-1 border-purple-200 rounded-full px-6 py-2 text-[12px] focus:outline-none placeholder:text-gray-300 italic" 
-                />
+                    onChange={manejarCambio}
+                    className="border-1 border-purple-200 rounded-full px-6 py-2 text-[12px] bg-white text-purple-600 focus:outline-none"
+                >
+                    <option value="SANO">🟢 SANO</option>
+                    <option value="ENFERMO">🔴 ENFERMO</option>
+                    <option value="EN CUIDADO">🟡 EN CUIDADO</option>
+                </select>
                 
-                {/* 🆕 Campo Origen */}
+                {/* Campo Origen */}
                 <select 
                     name="origen" 
                     value={formData.origen}

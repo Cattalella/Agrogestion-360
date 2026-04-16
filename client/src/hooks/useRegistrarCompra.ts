@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
+import apiClient from "../api/apiClient";
 
-// ─────────────────────────────────────────
-// TIPOS
-// ─────────────────────────────────────────
+// ============================================================
+// 📌 TIPOS
+// ============================================================
 export type CategoriaGeneral = 'insumo' | 'alimento';
 export type EstadoSolicitud = 'Pendiente' | 'Aprobada' | 'Rechazada';
 
@@ -29,8 +30,18 @@ export interface SolicitudCompra {
     motivo_eliminacion?: string;
 }
 
+export interface ComprasStats {
+    tipo1: string;
+    cantidad1: number;
+    tipo2: string;
+    cantidad2: number;
+}
+
 type Vista = 'lista' | 'formulario';
 
+// ============================================================
+// 📌 UTILIDADES
+// ============================================================
 const diasParaVencer = (fechaVencimiento: string): number => {
     const hoy = new Date();
     const vence = new Date(fechaVencimiento);
@@ -46,21 +57,79 @@ export const verificarAlertas = (solicitudes: SolicitudCompra[]): SolicitudCompr
     });
 };
 
-export const useRegistrarCompra = (inicial: SolicitudCompra[] = []) => {
+// ============================================================
+// 📌 HOOK PRINCIPAL
+// ============================================================
+export const useRegistrarCompra = () => {
 
-    const [listaSolicitudes, setListaSolicitudes] = useState<SolicitudCompra[]>(inicial);
+    const [listaSolicitudes, setListaSolicitudes] = useState<SolicitudCompra[]>([]);
+    const [cargando, setCargando] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [vista, setVista] = useState<Vista>('lista');
     const [tipoSeleccionado, setTipoSeleccionado] = useState<CategoriaGeneral>('insumo');
     const [solicitudAEditar, setSolicitudAEditar] = useState<SolicitudCompra | null>(null);
     const [alertasVencimiento, setAlertasVencimiento] = useState<SolicitudCompra[]>([]);
 
+    // ============================================================
+    // CARGAR SOLICITUDES DEL BACKEND
+    // ============================================================
+    const cargarSolicitudes = async () => {
+        setCargando(true);
+        try {
+            const respuesta = await apiClient.get('/inventario/solicitudes');
+            setListaSolicitudes(respuesta.data);
+            console.log('✅ Solicitudes cargadas:', respuesta.data.length);
+        } catch (error) {
+            console.error("❌ Error al cargar solicitudes:", error);
+        } finally {
+            setCargando(false);
+        }
+    };
+
+    // Cargar al iniciar
+    useEffect(() => {
+        cargarSolicitudes();
+    }, []);
+
+    // Actualizar alertas cuando cambia la lista
     useEffect(() => {
         setAlertasVencimiento(verificarAlertas(listaSolicitudes));
     }, [listaSolicitudes]);
 
+    // ============================================================
+    // 🆕 CALCULAR STATS PARA LA CARD
+    // ============================================================
+    const calcularStats = (): ComprasStats => {
+        const solicitudesVisibles = listaSolicitudes.filter(s => !s.eliminada);
+        
+        // Solicitudes este mes
+        const hoy = new Date();
+        const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+        
+        const comprasMes = solicitudesVisibles.filter(s => {
+            const fecha = new Date(s.fecha_creacion);
+            return fecha >= inicioMes && s.estado === 'Aprobada';
+        }).length;
+
+        // Solicitudes pendientes
+        const pendientes = solicitudesVisibles.filter(s => 
+            s.estado === 'Pendiente'
+        ).length;
+
+        return {
+            tipo1: "INSUMOS MES",
+            cantidad1: comprasMes,
+            tipo2: "PENDIENTES",
+            cantidad2: pendientes
+        };
+    };
+
+    // ============================================================
+    // ABRIR / CERRAR MODAL
+    // ============================================================
     const abrirModal = () => {
         setVista('lista');
+        setSolicitudAEditar(null);
         setIsModalOpen(true);
     };
 
@@ -70,81 +139,153 @@ export const useRegistrarCompra = (inicial: SolicitudCompra[] = []) => {
         setVista('lista');
     };
 
-    // ✅ NUEVO: cambiarVista
     const cambiarVista = (nuevaVista: Vista) => {
         setVista(nuevaVista);
     };
 
-    const crearSolicitud = (
-        datos: Omit<SolicitudCompra, 'id' | 'estado' | 'ejecutada' | 'eliminada' | 'fecha_creacion' | 'hora_creacion'>
+    // ============================================================
+    // CREAR SOLICITUD (BACKEND)
+    // ============================================================
+    const crearSolicitud = async (
+        datos: any,
+        cerrar: boolean = true
     ) => {
-        const ahora = new Date();
-        const nueva: SolicitudCompra = {
-            ...datos,
-            id: Date.now(),
-            estado: 'Pendiente',
-            ejecutada: false,
-            eliminada: false,
-            fecha_creacion: ahora.toISOString().split('T')[0],
-            hora_creacion: ahora.toTimeString().slice(0, 5),
-        };
-        setListaSolicitudes(prev => [nueva, ...prev]);
-        setVista('lista');
+        setCargando(true);
+        try {
+            const datosParaBackend = {
+                categoria_general: datos.categoria_general,
+                fecha_compra: datos.fecha_propuesta,
+                cantidad: datos.cantidad,
+                motivo: datos.motivo,
+                fecha_vencimiento: datos.fecha_vencimiento || null,
+                proveedor: datos.proveedor || null,
+                tipo_insumo: datos.tipo_insumo || null,
+                categoria_insumo: datos.categoria_insumo || null,
+                tipo_alimento: datos.tipo_alimento || null,
+                especie_destino: datos.especie_destino || null,
+                unidad_medida: datos.unidad_medida || null,
+            };
+
+            console.log('📤 Enviando a backend (Solicitud Compra):', datosParaBackend);
+            
+            await apiClient.post('/inventario/solicitudes', datosParaBackend);
+            
+            await cargarSolicitudes();
+            
+            if (cerrar) {
+                cerrarModal();
+            } else {
+                setVista('lista');
+            }
+            return true;
+        } catch (error: any) {
+            console.error("❌ Error al crear solicitud:", error);
+            alert(error.response?.data?.mensaje || "Error al crear solicitud");
+            return false;
+        } finally {
+            setCargando(false);
+        }
     };
 
-    const ejecutarCompra = (id: number) => {
+    // ============================================================
+    // EJECUTAR COMPRA (SOLO SI ESTÁ APROBADA)
+    // ============================================================
+    const ejecutarCompra = async (id: number) => {
         const solicitud = listaSolicitudes.find(s => s.id === id);
-        if (!solicitud) return;
+        if (!solicitud) return false;
+        
         if (solicitud.estado !== 'Aprobada') {
             alert("Solo puedes ejecutar una compra si la solicitud fue aprobada por el dueño.");
-            return;
+            return false;
         }
-        setListaSolicitudes(prev =>
-            prev.map(s => s.id === id ? { ...s, ejecutada: true } : s)
-        );
+        
+        try {
+            await apiClient.patch(`/inventario/solicitudes/${id}/ejecutar`);
+            await cargarSolicitudes();
+            return true;
+        } catch (error) {
+            console.error("❌ Error al ejecutar compra:", error);
+            return false;
+        }
     };
 
-    const eliminarSolicitud = (id: number, motivo: string) => {
+    // ============================================================
+    // ELIMINAR SOLICITUD
+    // ============================================================
+    const eliminarSolicitud = async (id: number, motivo: string) => {
         if (!motivo.trim()) {
             alert("Debes ingresar un motivo para eliminar la solicitud.");
-            return;
+            return false;
         }
-        setListaSolicitudes(prev =>
-            prev.map(s => s.id === id
-                ? { ...s, eliminada: true, motivo_eliminacion: motivo }
-                : s
-            )
-        );
+        
+        try {
+            await apiClient.delete(`/inventario/solicitudes/${id}`, {
+                data: { motivo_eliminacion: motivo }
+            });
+            await cargarSolicitudes();
+            return true;
+        } catch (error) {
+            console.error("❌ Error al eliminar solicitud:", error);
+            return false;
+        }
     };
 
-    const cambiarEstado = (id: number, nuevoEstado: EstadoSolicitud) => {
-        setListaSolicitudes(prev =>
-            prev.map(s => s.id === id ? { ...s, estado: nuevoEstado } : s)
-        );
+    // ============================================================
+    // CAMBIAR ESTADO (APROBAR/RECHAZAR) - SOLO DUEÑO
+    // ============================================================
+    const cambiarEstado = async (id: number, nuevoEstado: EstadoSolicitud) => {
+        try {
+            await apiClient.patch(`/inventario/solicitudes/${id}/estado`, {
+                estado: nuevoEstado
+            });
+            
+            setListaSolicitudes(prev =>
+                prev.map(s => s.id === id ? { ...s, estado: nuevoEstado } : s)
+            );
+            return true;
+        } catch (error) {
+            console.error("❌ Error al cambiar estado:", error);
+            return false;
+        }
     };
 
+    // ============================================================
+    // FILTROS
+    // ============================================================
     const solicitudesVisibles = listaSolicitudes.filter(s => !s.eliminada);
     const solicitudesPendientes = solicitudesVisibles.filter(s => s.estado === 'Pendiente');
     const solicitudesAprobadas = solicitudesVisibles.filter(s => s.estado === 'Aprobada');
 
+    // ============================================================
+    // RETORNAR
+    // ============================================================
     return {
         listaSolicitudes,
         solicitudesVisibles,
         solicitudesPendientes,
         solicitudesAprobadas,
         alertasVencimiento,
+        cargando,
+        loading: cargando,  // Alias para compatibilidad
         isModalOpen,
         vista,
         tipoSeleccionado,
         solicitudAEditar,
+        setSolicitudAEditar,
         setVista,
-        cambiarVista,        // ✅ AGREGADO
+        cambiarVista,
         setTipoSeleccionado,
+        
+        // 🆕 Stats para la card
+        stats: calcularStats(),
+        
         abrirModal,
         cerrarModal,
         crearSolicitud,
+        guardarCompra: crearSolicitud,  // Alias
         ejecutarCompra,
         eliminarSolicitud,
         cambiarEstado,
+        recargarLista: cargarSolicitudes,
     };
 };
