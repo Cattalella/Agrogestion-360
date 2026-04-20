@@ -81,7 +81,7 @@ export const Contrasena = () => {
                     <img 
                         src={pajaro} 
                         alt="Colibrí" 
-                        className="w-[25rem] md:w-[35rem] lg:w-[45rem] drop-shadow-[0_0_50px_rgba(255,255,255,0.3)]"
+                        className="w-[25rem] md:w-[35rem] lg:w-[45rem] drop-shadow-[0_0_50px_rgba(255,255,255,0.3)] -ml-50"
                     />
                 </div>
 
