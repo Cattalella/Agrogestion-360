@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Plus, Camera } from "lucide-react";
+import { Plus, Camera, X } from "lucide-react";
 
 interface FormularioGanadoProps {
     listaGanado: any[];
@@ -7,6 +7,8 @@ interface FormularioGanadoProps {
     categoriaSeleccionada: string;
     setCategoria: (valor: string) => void;
     onGuardar: (datos: any, salir: boolean) => void;
+    animalAEditar?: any | null;
+    onCancelarEdicion?: () => void;
 }
 
 export const FormularioGanado = ({ 
@@ -14,11 +16,16 @@ export const FormularioGanado = ({
     sugerenciaId,
     categoriaSeleccionada,
     setCategoria,
-    onGuardar 
+    onGuardar,
+    animalAEditar,
+    onCancelarEdicion
 }: FormularioGanadoProps) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // 🆕 Determinar sexo por defecto según categoría
+    // Determinar si estamos en modo edición
+    const esEdicion = !!animalAEditar;
+
+    // Determinar sexo por defecto según categoría
     const sexoPorDefecto = categoriaSeleccionada === 'TO' ? 'MACHO' : 'HEMBRA';
 
     const estadoInicial = {
@@ -39,22 +46,52 @@ export const FormularioGanado = ({
     const [formData, setFormData] = useState(estadoInicial);
     const [errores, setErrores] = useState<Record<string, string>>({});
 
-    // 🆕 Actualizar cuando cambia la categoría o el ID sugerido
+    // 🆕 Cargar datos cuando se está editando
     useEffect(() => {
-        setFormData(prev => ({ 
-            ...prev, 
-            local: sugerenciaId,
-            sexo: categoriaSeleccionada === 'TO' ? 'MACHO' : 'HEMBRA'
-        }));
-    }, [sugerenciaId, categoriaSeleccionada]);
+        if (animalAEditar) {
+            console.log('✏️ Cargando datos para edición:', animalAEditar);
+            setFormData({
+                oficial: animalAEditar.oficial || "",
+                local: animalAEditar.local || sugerenciaId,
+                idMadre: animalAEditar.id_madre || "",
+                peso: animalAEditar.peso_actual?.toString() || "",
+                ingreso: animalAEditar.fecha_ingreso?.split('T')[0] || new Date().toISOString().split('T')[0],
+                nacimiento: animalAEditar.fecha_nacimiento?.split('T')[0] || "",
+                sexo: animalAEditar.sexo || (categoriaSeleccionada === 'TO' ? 'MACHO' : 'HEMBRA'),
+                raza: animalAEditar.raza || "",
+                lote: animalAEditar.ubicacion || "",
+                salud: animalAEditar.estado || "SANO",
+                origen: animalAEditar.origen || "Registro inicial",
+                foto: null
+            });
+        } else {
+            // Resetear formulario cuando no hay edición
+            setFormData({
+                ...estadoInicial,
+                local: sugerenciaId,
+                sexo: categoriaSeleccionada === 'TO' ? 'MACHO' : 'HEMBRA'
+            });
+        }
+    }, [animalAEditar, sugerenciaId, categoriaSeleccionada]);
 
-    // 🆕 Determinar si es cría (ternero o novillo) para mostrar campo MADRE
+    // Actualizar cuando cambia la categoría o el ID sugerido (solo si no estamos editando)
+    useEffect(() => {
+        if (!esEdicion) {
+            setFormData(prev => ({ 
+                ...prev, 
+                local: sugerenciaId,
+                sexo: categoriaSeleccionada === 'TO' ? 'MACHO' : 'HEMBRA'
+            }));
+        }
+    }, [sugerenciaId, categoriaSeleccionada, esEdicion]);
+
+    // Determinar si es cría (ternero o novillo) para mostrar campo MADRE
     const esCria = categoriaSeleccionada === 'TE' || categoriaSeleccionada === 'NO';
 
-    // 🆕 Determinar si el sexo es editable (solo para NO y TE)
+    // Determinar si el sexo es editable (solo para NO y TE)
     const sexoEditable = categoriaSeleccionada === 'NO' || categoriaSeleccionada === 'TE';
 
-    // 🆕 Nombres amigables para cada categoría
+    // Nombres amigables para cada categoría
     const nombreCategoria = () => {
         switch(categoriaSeleccionada) {
             case 'VA': return 'VACA';
@@ -96,8 +133,7 @@ export const FormularioGanado = ({
     };
 
     // ============================================================
-    // 🆕 VALIDACIÓN: Fecha ingreso OBLIGATORIA, Nacimiento OPCIONAL
-    // 🆕 + LÓGICA DE FECHAS
+    // VALIDACIÓN
     // ============================================================
     const validarFormulario = (): boolean => {
         const nuevosErrores: Record<string, string> = {};
@@ -106,7 +142,7 @@ export const FormularioGanado = ({
         if (!formData.peso || parseFloat(formData.peso) <= 0) nuevosErrores.peso = 'El peso debe ser mayor a 0';
         if (!formData.ingreso) nuevosErrores.ingreso = 'La fecha de ingreso es obligatoria';
         
-        // 🆕 Validar lógica de fechas
+        // Validar lógica de fechas
         if (formData.nacimiento && formData.ingreso) {
             const nacimiento = new Date(formData.nacimiento);
             const ingreso = new Date(formData.ingreso);
@@ -153,10 +189,16 @@ export const FormularioGanado = ({
         console.log('📤 Datos a enviar:', datosParaBackend);
         onGuardar(datosParaBackend, salir);
         
-        if (!salir) {
+        if (!salir && !esEdicion) {
             setFormData(estadoInicial);
             setErrores({});
             if (fileInputRef.current) fileInputRef.current.value = "";
+        }
+    };
+
+    const handleCancelar = () => {
+        if (onCancelarEdicion) {
+            onCancelarEdicion();
         }
     };
 
@@ -173,12 +215,18 @@ export const FormularioGanado = ({
                         value={categoriaSeleccionada}
                         onChange={(e) => setCategoria(e.target.value)}
                         className="w-full border-1 border-purple-200 rounded-full px-6 py-2 text-[12px] bg-white text-purple-600 focus:outline-none font-bold"
+                        disabled={esEdicion}
                     >
                         <option value="VA">🐄 VACA (VA)</option>
                         <option value="TO">🐂 TORO (TO)</option>
                         <option value="NO">🐃 NOVILLO/A (NO)</option>
                         <option value="TE">🐮 TERNERO/A (TE)</option>
                     </select>
+                    {esEdicion && (
+                        <p className="text-[8px] text-gray-400 ml-4 mt-1">
+                            ⚠️ Categoría bloqueada en edición
+                        </p>
+                    )}
                 </div>
 
                 {/* ID Oficial */}
@@ -201,12 +249,20 @@ export const FormularioGanado = ({
                         onChange={manejarCambio} 
                         type="text" 
                         placeholder={`ID LOCAL (${categoriaSeleccionada}-01)`}
-                        className={`w-full border-1 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 font-bold text-purple-600 bg-purple-50/30 transition-all ${
+                        disabled={esEdicion}
+                        className={`w-full border-1 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 font-bold text-purple-600 transition-all ${
+                            esEdicion ? 'bg-gray-100 text-gray-500' : 'bg-purple-50/30'
+                        } ${
                             errores.local ? 'border-red-400 focus:ring-red-300' : 'border-purple-200 focus:ring-purple-300'
                         }`}
                     />
                     {errores.local && (
                         <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.local}</p>
+                    )}
+                    {esEdicion && (
+                        <p className="text-[8px] text-gray-400 ml-4 mt-1">
+                            🔒 ID Local no editable
+                        </p>
                     )}
                 </div>
 
@@ -272,9 +328,9 @@ export const FormularioGanado = ({
             {/* Columna Derecha: Estado y Foto */}
             <div className="flex flex-col gap-3">
                 {/* Info de categoría seleccionada */}
-                <div className="bg-purple-50 rounded-full px-4 py-2 text-center">
-                    <p className="text-[11px] font-bold text-purple-600">
-                        Registrando: {nombreCategoria()} → Sexo: {formData.sexo} {!sexoEditable && '🔒'}
+                <div className={`rounded-full px-4 py-2 text-center ${esEdicion ? 'bg-amber-50' : 'bg-purple-50'}`}>
+                    <p className={`text-[11px] font-bold ${esEdicion ? 'text-amber-600' : 'text-purple-600'}`}>
+                        {esEdicion ? '✏️ EDITANDO:' : 'Registrando:'} {nombreCategoria()} → Sexo: {formData.sexo} {!sexoEditable && '🔒'}
                     </p>
                 </div>
 
@@ -403,20 +459,41 @@ export const FormularioGanado = ({
 
             {/* Botones */}
             <div className="col-span-2 flex justify-between gap-4 mt-2">
-                <button 
-                    type="button" 
-                    onClick={() => ejecutarEnvio(false)}
-                    className="flex-1 bg-white border-1 border-purple-400 text-purple-500 px-6 py-2.5 rounded-full font-black text-[10px] uppercase italic shadow-sm active:scale-95 hover:bg-purple-50 transition-all"
-                >
-                    Guardar y Seguir
-                </button>
-                <button 
-                    type="button" 
-                    onClick={() => ejecutarEnvio(true)}
-                    className="flex-1 bg-purple-600 text-white px-6 py-2.5 rounded-full font-black text-[10px] uppercase shadow-lg shadow-purple-200 active:scale-95 hover:bg-purple-700 transition-all"
-                >
-                    Guardar y Salir
-                </button>
+                {esEdicion ? (
+                    <>
+                        <button 
+                            type="button" 
+                            onClick={handleCancelar}
+                            className="flex-1 bg-gray-200 text-gray-600 px-6 py-2.5 rounded-full font-black text-[10px] uppercase italic shadow-sm active:scale-95 hover:bg-gray-300 transition-all"
+                        >
+                            Cancelar
+                        </button>
+                        <button 
+                            type="button" 
+                            onClick={() => ejecutarEnvio(true)}
+                            className="flex-1 bg-amber-600 text-white px-6 py-2.5 rounded-full font-black text-[10px] uppercase shadow-lg shadow-amber-200 active:scale-95 hover:bg-amber-700 transition-all"
+                        >
+                            ✏️ Actualizar y Salir
+                        </button>
+                    </>
+                ) : (
+                    <>
+                        <button 
+                            type="button" 
+                            onClick={() => ejecutarEnvio(false)}
+                            className="flex-1 bg-white border-1 border-purple-400 text-purple-500 px-6 py-2.5 rounded-full font-black text-[10px] uppercase italic shadow-sm active:scale-95 hover:bg-purple-50 transition-all"
+                        >
+                            Guardar y Seguir
+                        </button>
+                        <button 
+                            type="button" 
+                            onClick={() => ejecutarEnvio(true)}
+                            className="flex-1 bg-purple-600 text-white px-6 py-2.5 rounded-full font-black text-[10px] uppercase shadow-lg shadow-purple-200 active:scale-95 hover:bg-purple-700 transition-all"
+                        >
+                            Guardar y Salir
+                        </button>
+                    </>
+                )}
             </div>
         </form>
     );

@@ -83,7 +83,7 @@ export class GanaderiaService {
     }
 
     // ============================================================
-    // 🆕 MÉTODO AUXILIAR: OBTENER O CREAR ESPECIE
+    // MÉTODO AUXILIAR: OBTENER O CREAR ESPECIE
     // ============================================================
     private async obtenerOCrearEspecie(nombreEspecie: string = 'Bovino') {
         let especie = await this.prisma.especie.findFirst({
@@ -101,7 +101,7 @@ export class GanaderiaService {
     }
 
     // ============================================================
-    // 🆕 MÉTODO AUXILIAR: OBTENER O CREAR ESTADO
+    // MÉTODO AUXILIAR: OBTENER O CREAR ESTADO
     // ============================================================
     private async obtenerOCrearEstado(nombreEstado: string = 'Activo') {
         let estado = await this.prisma.estadoAni.findFirst({
@@ -119,7 +119,7 @@ export class GanaderiaService {
     }
 
     // ============================================================
-    // 🆕 MÉTODO AUXILIAR: OBTENER O CREAR UBICACIÓN
+    // MÉTODO AUXILIAR: OBTENER O CREAR UBICACIÓN
     // ============================================================
     private async obtenerOCrearUbicacion(nombreUbicacion: string = 'Potrero 1') {
         let ubicacion = await this.prisma.ubicacion.findFirst({
@@ -137,18 +137,13 @@ export class GanaderiaService {
     }
 
     // ============================================================
-    // CREAR NUEVO ANIMAL (CON CREACIÓN AUTOMÁTICA DE CATÁLOGOS)
+    // CREAR NUEVO ANIMAL
     // ============================================================
     async crear(datos: CrearAnimalDto) {
-        // Obtener o crear automáticamente los catálogos
         const especie = await this.obtenerOCrearEspecie('Bovino');
         const estado = await this.obtenerOCrearEstado('Activo');
-        
-        // Usar ubicación por defecto (se crea automáticamente si no existe)
-        const nombreUbicacion = 'Potrero 1';
-        const ubicacion = await this.obtenerOCrearUbicacion(nombreUbicacion);
+        const ubicacion = await this.obtenerOCrearUbicacion('Potrero 1');
 
-        // Crear el animal
         const animal = await this.prisma.animal.create({
             data: {
                 num_ica_chapeta: datos.num_ica_chapeta || null,
@@ -171,7 +166,6 @@ export class GanaderiaService {
             }
         });
 
-        // Registrar pesaje inicial si hay peso
         if (datos.peso_actual && datos.peso_actual > 0) {
             await this.prisma.historialPeso.create({
                 data: {
@@ -230,15 +224,53 @@ export class GanaderiaService {
     }
 
     // ============================================================
-    // ELIMINAR ANIMAL
+    // ELIMINAR ANIMAL (CON NOMBRES CORRECTOS DEL SCHEMA)
     // ============================================================
     async eliminar(id: number) {
+        // Verificar si el animal existe
+        const animal = await this.prisma.animal.findUnique({
+            where: { id_animal: id }
+        });
+
+        if (!animal) {
+            throw new NotFoundException('Animal no encontrado');
+        }
+
+        console.log(`🗑️ Eliminando animal: ${animal.codigo_local} (ID: ${id})`);
+
+        // 1. Eliminar registros de HISTORIAL DE PESO (historialPeso)
+        const pesosEliminados = await this.prisma.historialPeso.deleteMany({
+            where: { id_animal: id }
+        });
+        console.log(`   - Eliminados ${pesosEliminados.count} registros de peso`);
+
+        // 2. Eliminar registros de VACUNAS (RegVacuna - con R mayúscula)
+        const vacunasEliminadas = await this.prisma.regVacuna.deleteMany({
+            where: { id_animal: id }
+        });
+        console.log(`   - Eliminados ${vacunasEliminadas.count} registros de vacunas`);
+
+        // 3. Eliminar registros de VENTAS (Venta - con V mayúscula)
+        const ventasEliminadas = await this.prisma.venta.deleteMany({
+            where: { id_animal: id }
+        });
+        console.log(`   - Eliminadas ${ventasEliminadas.count} ventas`);
+
+        // 4. Finalmente eliminar el ANIMAL
         await this.prisma.animal.delete({
             where: { id_animal: id }
         });
 
+        console.log(`✅ Animal eliminado completamente: ${animal.codigo_local}`);
+
         return {
-            mensaje: 'Animal eliminado correctamente'
+            mensaje: 'Animal eliminado correctamente junto con todos sus registros asociados',
+            detalles: {
+                animal: animal.codigo_local,
+                pesos_eliminados: pesosEliminados.count,
+                vacunas_eliminadas: vacunasEliminadas.count,
+                ventas_eliminadas: ventasEliminadas.count,
+            }
         };
     }
 

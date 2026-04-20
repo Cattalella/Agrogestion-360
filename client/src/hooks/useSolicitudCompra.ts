@@ -31,6 +31,12 @@ export interface SolicitudCompra {
 
 type Vista = 'lista' | 'formulario' | 'detalle';
 
+interface ModalConfirmacionState {
+    isOpen: boolean;
+    id: number | null;
+    nombre: string;
+}
+
 // ============================================================
 // 📌 HOOK PRINCIPAL
 // ============================================================
@@ -41,10 +47,16 @@ export const useSolicitudCompra = () => {
     const [tipoSeleccionado, setTipoSeleccionado] = useState<TipoSolicitud>('insumo');
     const [solicitudAEditar, setSolicitudAEditar] = useState<SolicitudCompra | null>(null);
     const [cargando, setCargando] = useState(false);
+    const [bannerVisible, setBannerVisible] = useState(true);
+    
+    // 🆕 Estado para modal de confirmación
+    const [modalConfirmacion, setModalConfirmacion] = useState<ModalConfirmacionState>({
+        isOpen: false,
+        id: null,
+        nombre: ''
+    });
+    const [eliminando, setEliminando] = useState(false);
 
-    // ============================================================
-    // CARGAR SOLICITUDES
-    // ============================================================
     const cargarSolicitudes = async () => {
         setCargando(true);
         try {
@@ -58,24 +70,21 @@ export const useSolicitudCompra = () => {
         }
     };
 
-    // Cargar al iniciar
     useEffect(() => {
         cargarSolicitudes();
     }, []);
 
-    // Refrescar al abrir modal
     useEffect(() => {
         if (isModalOpen) {
             cargarSolicitudes();
+            setBannerVisible(true);
         }
     }, [isModalOpen]);
 
-    // ============================================================
-    // ABRIR / CERRAR MODAL
-    // ============================================================
     const abrirModal = () => {
         setVista('lista');
         setSolicitudAEditar(null);
+        setBannerVisible(true);
         setIsModalOpen(true);
     };
 
@@ -83,13 +92,50 @@ export const useSolicitudCompra = () => {
         setIsModalOpen(false);
         setSolicitudAEditar(null);
         setVista('lista');
+        setBannerVisible(true);
     };
 
     const cambiarVista = (nuevaVista: Vista) => setVista(nuevaVista);
+    const cerrarBanner = () => setBannerVisible(false);
 
-    // ============================================================
-    // CREAR SOLICITUD (CON PARÁMETRO cerrar)
-    // ============================================================
+    // 🆕 Abrir modal de confirmación para eliminar
+    const abrirModalEliminar = (id: number, nombre: string) => {
+        setModalConfirmacion({
+            isOpen: true,
+            id: id,
+            nombre: nombre
+        });
+    };
+
+    const cerrarModalConfirmacion = () => {
+        setModalConfirmacion({
+            isOpen: false,
+            id: null,
+            nombre: ''
+        });
+        setEliminando(false);
+    };
+
+    const confirmarEliminar = async () => {
+        if (!modalConfirmacion.id) return;
+        
+        setEliminando(true);
+        try {
+            await apiClient.delete(`/inventario/solicitudes/${modalConfirmacion.id}`, {
+                data: { motivo_eliminacion: `Eliminada por usuario - ${new Date().toLocaleString()}` }
+            });
+            await cargarSolicitudes();
+            setBannerVisible(true);
+            cerrarModalConfirmacion();
+            console.log('✅ Solicitud eliminada');
+        } catch (error) {
+            console.error('❌ Error al eliminar solicitud:', error);
+            alert('Error al eliminar la solicitud');
+        } finally {
+            setEliminando(false);
+        }
+    };
+
     const crearSolicitud = async (datos: any, cerrar: boolean = true) => {
         setCargando(true);
         try {
@@ -107,11 +153,12 @@ export const useSolicitudCompra = () => {
                 usuario: datos.usuario || 'Admin'
             };
 
-            console.log('📤 Enviando a backend (Solicitud Compra):', payload);
+            console.log('📤 Creando nueva solicitud:', payload);
             
             await apiClient.post('/inventario/solicitudes', payload);
             
             await cargarSolicitudes();
+            setBannerVisible(true);
             
             if (cerrar) {
                 cerrarModal();
@@ -129,79 +176,67 @@ export const useSolicitudCompra = () => {
         }
     };
 
-    // ============================================================
-    // PROCESAR SOLICITUD (APROBAR/RECHAZAR)
-    // ============================================================
-    const procesarSolicitud = async (id: number, estado: EstadoSolicitud, observaciones?: string) => {
+    const actualizarSolicitud = async (id: number, datos: any, cerrar: boolean = true) => {
+        setCargando(true);
         try {
-            await apiClient.patch(`/inventario/solicitudes/${id}/procesar`, { 
-                estado, 
-                observaciones 
-            });
+            const payload = {
+                cantidad: datos.cantidad,
+                motivo: datos.motivo,
+                fecha_compra: datos.fechaPropuesta || datos.fecha_compra,
+                proveedor: datos.proveedor || null,
+                nombre_insumo: datos.tipo === 'insumo' ? datos.tipoInsumo : datos.tipoAlimento,
+                unidad_medida: datos.unidadMedida,
+                categoria: datos.tipo === 'insumo' ? datos.categoriaInsumo : 'alimento',
+                especie_destino: datos.especieDestino
+            };
+
+            console.log('✏️ Editando solicitud:', id, payload);
+            
+            await apiClient.put(`/inventario/solicitudes/${id}`, payload);
+            
             await cargarSolicitudes();
+            setSolicitudAEditar(null);
+            setBannerVisible(true);
+            
+            if (cerrar) {
+                cerrarModal();
+            } else {
+                setVista('lista');
+            }
             return true;
-        } catch (error) {
-            console.error("❌ Error al procesar solicitud:", error);
+        } catch (error: any) {
+            console.error("❌ Error al actualizar solicitud:", error);
+            alert(error.response?.data?.mensaje || "Error al actualizar solicitud");
             return false;
+        } finally {
+            setCargando(false);
         }
     };
 
-    // ============================================================
-    // 🆕 ACTUALIZAR SOLICITUD
-    // ============================================================
-    const actualizarSolicitud = async (id: number, datos: Partial<SolicitudCompra>) => {
-        try {
-            const respuesta = await apiClient.put(`/inventario/solicitudes/${id}`, datos);
-            setSolicitudes(prev => prev.map(s => 
-                s.id_solicitud === id ? { ...s, ...datos } : s
-            ));
-            return respuesta.data;
-        } catch (error) {
-            console.error('❌ Error al actualizar solicitud:', error);
-        }
-    };
-
-    // ============================================================
-    // 🆕 ELIMINAR SOLICITUD
-    // ============================================================
-    const eliminarSolicitud = async (id: number, motivo: string) => {
-        if (!motivo.trim()) {
-            alert("Debes ingresar un motivo para eliminar la solicitud.");
-            return false;
-        }
-        
-        try {
-            await apiClient.delete(`/inventario/solicitudes/${id}`, {
-                data: { motivo_eliminacion: motivo }
-            });
-            await cargarSolicitudes();
-            return true;
-        } catch (error) {
-            console.error('❌ Error al eliminar solicitud:', error);
-            return false;
-        }
-    };
-
-    // ============================================================
-    // FILTROS
-    // ============================================================
     const solicitudesPendientes = solicitudes.filter(s => s.estado_sol === 'Pendiente');
     const solicitudesAprobadas = solicitudes.filter(s => s.estado_sol === 'Aprobada');
+    const solicitudesRechazadas = solicitudes.filter(s => s.estado_sol === 'Rechazada');
 
-    // ============================================================
-    // RETORNAR
-    // ============================================================
     return {
         solicitudes,
         listaSolicitudes: solicitudes,
         solicitudesPendientes,
         solicitudesAprobadas,
+        solicitudesRechazadas,
         isModalOpen,
         vista,
         tipoSeleccionado,
         solicitudAEditar,
         cargando,
         loading: cargando,
+        bannerVisible,
+        
+        // 🆕 Modal de confirmación
+        modalConfirmacion,
+        eliminando,
+        abrirModalEliminar,
+        cerrarModalConfirmacion,
+        confirmarEliminar,
         
         setVista,
         setTipoSeleccionado,
@@ -210,13 +245,10 @@ export const useSolicitudCompra = () => {
         abrirModal,
         cerrarModal,
         cambiarVista,
+        cerrarBanner,
         
         crearSolicitud,
-        guardarSolicitud: crearSolicitud,  // Alias para compatibilidad
-        procesarSolicitud,
-        cambiarEstadoSolicitud: procesarSolicitud,
         actualizarSolicitud,
-        eliminarSolicitud,
         recargarLista: cargarSolicitudes,
     };
 };

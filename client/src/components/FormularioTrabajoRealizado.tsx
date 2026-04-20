@@ -1,47 +1,62 @@
-import { useState, useEffect, useRef } from "react";
-import { Camera, Clock, Wrench } from "lucide-react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { Camera, Clock } from "lucide-react";
 
 interface TrabajoRealizado {
-    id_mantenimiento: string;
-    id_trabajador: string;
+    id_trabajo: number;
+    id_trabajador: number;
     categoria_trabajo: string;
     tipo_actividad: string;
     fecha_inicio: string;
     fecha_fin: string;
-    evidencia_fotografica: string;
-    observaciones: string;
+    duracion_horas: number;
+    evidencia_url: string;
+    observaciones?: string;
+    Trabajador?: { nombre_completo: string };
 }
 
 interface Props {
     trabajoAEditar: TrabajoRealizado | null;
-    listaTrabajadores: any[];  // 🆕 Lista de trabajadores activos
+    listaTrabajadores: any[];
     onGuardar: (datos: any, cerrar: boolean) => void;
     onCancelar: () => void;
 }
 
-export const FormularioTrabajoRealizado = ({ 
-    trabajoAEditar, 
+export const FormularioTrabajoRealizado = ({
+    trabajoAEditar,
     listaTrabajadores,
-    onGuardar, 
-    onCancelar 
+    onGuardar,
+    onCancelar
 }: Props) => {
-    
+
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [preview, setPreview] = useState<string | null>(null);
     const [errores, setErrores] = useState<Record<string, string>>({});
 
     const estadoInicial = {
-        id_mantenimiento: "",
         id_trabajador: "",
         categoria_trabajo: "",
         tipo_actividad: "",
         fecha_inicio: "",
         fecha_fin: "",
-        evidencia_fotografica: "",
+        evidencia_url: "",
         observaciones: "",
     };
 
     const [formData, setFormData] = useState(estadoInicial);
+
+    // ============================================================
+    // DURACIÓN CALCULADA AUTOMÁTICAMENTE — RN.8.1.2
+    // ============================================================
+    const duracionCalculada = useMemo(() => {
+        if (!formData.fecha_inicio || !formData.fecha_fin) return null;
+        const inicio = new Date(formData.fecha_inicio);
+        const fin = new Date(formData.fecha_fin);
+        const diff = fin.getTime() - inicio.getTime();
+        if (diff <= 0) return null;
+        const horas = Math.floor(diff / (1000 * 60 * 60));
+        const minutos = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        return { horas, minutos, total: diff / (1000 * 60 * 60) };
+    }, [formData.fecha_inicio, formData.fecha_fin]);
 
     // ============================================================
     // CARGAR DATOS SI ES EDICIÓN
@@ -49,17 +64,16 @@ export const FormularioTrabajoRealizado = ({
     useEffect(() => {
         if (trabajoAEditar) {
             setFormData({
-                id_mantenimiento: trabajoAEditar.id_mantenimiento || "",
-                id_trabajador: trabajoAEditar.id_trabajador || "",
+                id_trabajador: trabajoAEditar.id_trabajador?.toString() || "",
                 categoria_trabajo: trabajoAEditar.categoria_trabajo || "",
                 tipo_actividad: trabajoAEditar.tipo_actividad || "",
-                fecha_inicio: trabajoAEditar.fecha_inicio || "",
-                fecha_fin: trabajoAEditar.fecha_fin || "",
-                evidencia_fotografica: trabajoAEditar.evidencia_fotografica || "",
+                fecha_inicio: trabajoAEditar.fecha_inicio?.slice(0, 16) || "",
+                fecha_fin: trabajoAEditar.fecha_fin?.slice(0, 16) || "",
+                evidencia_url: trabajoAEditar.evidencia_url || "",
                 observaciones: trabajoAEditar.observaciones || "",
             });
-            if (trabajoAEditar.evidencia_fotografica) {
-                setPreview(trabajoAEditar.evidencia_fotografica);
+            if (trabajoAEditar.evidencia_url) {
+                setPreview(trabajoAEditar.evidencia_url);
             }
         }
     }, [trabajoAEditar]);
@@ -70,9 +84,7 @@ export const FormularioTrabajoRealizado = ({
     const manejarCambio = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
-        if (value) {
-            setErrores(prev => ({ ...prev, [name]: '' }));
-        }
+        if (value) setErrores(prev => ({ ...prev, [name]: '' }));
     };
 
     const manejarArchivo = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -82,7 +94,8 @@ export const FormularioTrabajoRealizado = ({
             reader.onloadend = () => {
                 const base64 = reader.result as string;
                 setPreview(base64);
-                setFormData(prev => ({ ...prev, evidencia_fotografica: base64 }));
+                setFormData(prev => ({ ...prev, evidencia_url: base64 }));
+                setErrores(prev => ({ ...prev, evidencia_url: '' }));
             };
             reader.readAsDataURL(file);
         }
@@ -93,16 +106,14 @@ export const FormularioTrabajoRealizado = ({
     // ============================================================
     const validarFormulario = (): boolean => {
         const nuevosErrores: Record<string, string> = {};
-        
-        if (!formData.id_mantenimiento) nuevosErrores.id_mantenimiento = 'ID de mantenimiento requerido';
+
         if (!formData.id_trabajador) nuevosErrores.id_trabajador = 'Selecciona un trabajador';
         if (!formData.categoria_trabajo) nuevosErrores.categoria_trabajo = 'Categoría requerida';
         if (!formData.tipo_actividad) nuevosErrores.tipo_actividad = 'Tipo de actividad requerido';
         if (!formData.fecha_inicio) nuevosErrores.fecha_inicio = 'Fecha de inicio requerida';
         if (!formData.fecha_fin) nuevosErrores.fecha_fin = 'Fecha de fin requerida';
-        if (!formData.evidencia_fotografica) nuevosErrores.evidencia_fotografica = 'Evidencia fotográfica obligatoria';
-        
-        // Validar que fecha fin sea posterior a fecha inicio
+        if (!formData.evidencia_url) nuevosErrores.evidencia_url = 'Evidencia fotográfica obligatoria';
+
         if (formData.fecha_inicio && formData.fecha_fin) {
             const inicio = new Date(formData.fecha_inicio);
             const fin = new Date(formData.fecha_fin);
@@ -110,7 +121,7 @@ export const FormularioTrabajoRealizado = ({
                 nuevosErrores.fecha_fin = 'La fecha de fin debe ser posterior al inicio';
             }
         }
-        
+
         setErrores(nuevosErrores);
         return Object.keys(nuevosErrores).length === 0;
     };
@@ -122,13 +133,18 @@ export const FormularioTrabajoRealizado = ({
         if (!validarFormulario()) return;
 
         const datosParaBackend = {
-            ...formData,
             id_trabajador: parseInt(formData.id_trabajador),
+            categoria_trabajo: formData.categoria_trabajo,
+            tipo_actividad: formData.tipo_actividad,
+            fecha_inicio: formData.fecha_inicio,
+            fecha_fin: formData.fecha_fin,
+            duracion_horas: duracionCalculada?.total ?? 0,
+            evidencia_url: formData.evidencia_url,
+            observaciones: formData.observaciones || null,
         };
 
-        console.log('📤 Datos a enviar (Trabajo):', datosParaBackend);
         onGuardar(datosParaBackend, cerrar);
-        
+
         if (!cerrar && !trabajoAEditar) {
             setFormData(estadoInicial);
             setPreview(null);
@@ -142,36 +158,24 @@ export const FormularioTrabajoRealizado = ({
     // ============================================================
     return (
         <form className="grid grid-cols-2 gap-4 animate-in fade-in zoom-in-95 duration-500 p-2">
+
             {/* ============================================================ */}
             {/* COLUMNA IZQUIERDA */}
             {/* ============================================================ */}
             <div className="flex flex-col gap-3">
-                {/* ID Mantenimiento */}
-                <div>
-                    <input
-                        name="id_mantenimiento"
-                        value={formData.id_mantenimiento}
-                        onChange={manejarCambio}
-                        type="text"
-                        placeholder="ID MANTENIMIENTO *"
-                        className={`w-full border-1 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 transition-all ${
-                            errores.id_mantenimiento ? 'border-red-400 focus:ring-red-300' : 'border-amber-200 focus:ring-amber-300'
-                        }`}
-                    />
-                    {errores.id_mantenimiento && (
-                        <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.id_mantenimiento}</p>
-                    )}
-                </div>
 
-                {/* ID Trabajador - Select */}
+                {/* Trabajador */}
                 <div>
                     <select
                         name="id_trabajador"
                         value={formData.id_trabajador}
                         onChange={manejarCambio}
+                        disabled={!!trabajoAEditar}
                         className={`w-full border-1 rounded-full px-6 py-2 text-[12px] bg-white focus:outline-none focus:ring-2 cursor-pointer transition-all ${
-                            errores.id_trabajador ? 'border-red-400 focus:ring-red-300' : 'border-amber-200 focus:ring-amber-300 text-amber-700 font-bold'
-                        }`}
+                            errores.id_trabajador
+                                ? 'border-red-400 focus:ring-red-300'
+                                : 'border-amber-200 focus:ring-amber-300 text-amber-700 font-bold'
+                        } ${trabajoAEditar ? 'opacity-60 cursor-not-allowed' : ''}`}
                     >
                         <option value="">SELECCIONAR TRABAJADOR *</option>
                         {listaTrabajadores.filter(t => t.estado === 'Activo').map(t => (
@@ -185,7 +189,7 @@ export const FormularioTrabajoRealizado = ({
                     )}
                 </div>
 
-                {/* Categoría del Trabajo */}
+                {/* Categoría */}
                 <div>
                     <input
                         name="categoria_trabajo"
@@ -218,12 +222,23 @@ export const FormularioTrabajoRealizado = ({
                         <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.tipo_actividad}</p>
                     )}
                 </div>
+
+                {/* Observaciones */}
+                <textarea
+                    name="observaciones"
+                    value={formData.observaciones}
+                    onChange={manejarCambio}
+                    placeholder="OBSERVACIONES"
+                    rows={3}
+                    className="border-1 border-amber-200 rounded-2xl px-6 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-amber-300 resize-none"
+                />
             </div>
 
             {/* ============================================================ */}
             {/* COLUMNA DERECHA */}
             {/* ============================================================ */}
             <div className="flex flex-col gap-3">
+
                 {/* Fecha Inicio */}
                 <div className="flex flex-col gap-1">
                     <label className="text-[9px] uppercase ml-4 text-amber-400 font-black tracking-tighter">
@@ -264,17 +279,19 @@ export const FormularioTrabajoRealizado = ({
                     )}
                 </div>
 
-                {/* Observaciones */}
-                <textarea
-                    name="observaciones"
-                    value={formData.observaciones}
-                    onChange={manejarCambio}
-                    placeholder="OBSERVACIONES"
-                    rows={2}
-                    className="border-1 border-amber-200 rounded-2xl px-6 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-amber-300 resize-none"
-                />
+                {/* Duración calculada automáticamente — RN.8.1.2 */}
+                <div className={`rounded-full px-6 py-2 text-[11px] font-bold flex items-center gap-2 transition-all ${
+                    duracionCalculada
+                        ? 'bg-amber-50 border-1 border-amber-200 text-amber-700'
+                        : 'bg-gray-50 border-1 border-gray-100 text-gray-300'
+                }`}>
+                    <Clock size={11} />
+                    {duracionCalculada
+                        ? `${duracionCalculada.horas}h ${duracionCalculada.minutos}m de duración`
+                        : 'Duración se calcula automáticamente'}
+                </div>
 
-                {/* Evidencia Fotográfica */}
+                {/* Evidencia Fotográfica — RN.8.1.2 obligatoria */}
                 <input
                     type="file"
                     ref={fileInputRef}
@@ -282,16 +299,22 @@ export const FormularioTrabajoRealizado = ({
                     accept="image/*"
                     className="hidden"
                 />
-                
+
                 <div
                     onClick={() => fileInputRef.current?.click()}
-                    className={`group border-1 border-dashed rounded-[1.5rem] p-3 flex flex-col items-center justify-center gap-1 cursor-pointer transition-all min-h-[100px] relative overflow-hidden ${
-                        errores.evidencia_fotografica ? 'border-red-400 bg-red-50' : 'border-amber-200 hover:bg-amber-50 hover:border-amber-400'
+                    className={`group border-1 border-dashed rounded-[1.5rem] p-3 flex flex-col items-center justify-center gap-1 cursor-pointer transition-all min-h-[110px] relative overflow-hidden ${
+                        errores.evidencia_url
+                            ? 'border-red-400 bg-red-50'
+                            : 'border-amber-200 hover:bg-amber-50 hover:border-amber-400'
                     }`}
                 >
                     {preview ? (
                         <>
-                            <img src={preview} className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:scale-110 transition-transform duration-500" alt="Evidencia" />
+                            <img
+                                src={preview}
+                                className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:scale-110 transition-transform duration-500"
+                                alt="Evidencia"
+                            />
                             <div className="absolute inset-0 bg-amber-900/20 flex flex-col items-center justify-center backdrop-blur-[1px]">
                                 <Camera size={18} className="text-white drop-shadow-md" />
                                 <span className="text-[8px] font-black text-white uppercase tracking-widest mt-1">Cambiar</span>
@@ -300,7 +323,7 @@ export const FormularioTrabajoRealizado = ({
                     ) : (
                         <>
                             <p className="text-[9px] uppercase font-black tracking-widest text-amber-600">
-                                {errores.evidencia_fotografica ? 'EVIDENCIA OBLIGATORIA *' : 'EVIDENCIA FOTOGRÁFICA *'}
+                                {errores.evidencia_url ? 'EVIDENCIA OBLIGATORIA *' : 'EVIDENCIA FOTOGRÁFICA *'}
                             </p>
                             <div className="w-8 h-8 border-1 border-amber-200 rounded-full flex items-center justify-center bg-white shadow-sm group-hover:rotate-90 transition-transform">
                                 <Camera size={14} className="text-amber-400" />
@@ -308,15 +331,15 @@ export const FormularioTrabajoRealizado = ({
                         </>
                     )}
                 </div>
-                {errores.evidencia_fotografica && (
-                    <p className="text-[9px] text-red-500 -mt-2 ml-4">{errores.evidencia_fotografica}</p>
+                {errores.evidencia_url && (
+                    <p className="text-[9px] text-red-500 -mt-2 ml-4">{errores.evidencia_url}</p>
                 )}
             </div>
 
             {/* ============================================================ */}
             {/* BOTONES */}
             {/* ============================================================ */}
-            <div className="col-span-2 flex justify-between gap-4 mt-4">
+            <div className="col-span-2 flex justify-between gap-4 mt-2">
                 <button
                     type="button"
                     onClick={() => ejecutarEnvio(false)}
@@ -333,7 +356,6 @@ export const FormularioTrabajoRealizado = ({
                 </button>
             </div>
 
-            {/* Botón Cancelar */}
             <div className="col-span-2 flex justify-center">
                 <button
                     type="button"

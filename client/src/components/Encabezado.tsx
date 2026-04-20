@@ -624,7 +624,7 @@ export const Encabezado = ({ children, estilos, titulo, id, titulos, subtitulo }
                 onClick={() => inputFondoRef.current?.click()}
                 title="Haz clic para cambiar la imagen de fondo"
             >
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-300 z-10 flex items-center justify-end">
+                <div className="absolute inset-0 bg-black/0 transition-all duration-300 z-10 flex items-center justify-end">
                     
                 </div>
                 

@@ -1,14 +1,11 @@
-// src/app.module.ts
+import { AdministradoresModule } from './modulos/administradores/administradores.module';
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { APP_FILTER, APP_PIPE } from '@nestjs/core';
 
-// Módulo de base de datos
 import { PrismaModule } from './prisma/prisma.module';
-
-// Módulos de la aplicación
 import { AutenticacionModule } from './modulos/autenticacion/autenticacion.module';
 import { EncabezadoModule } from './modulos/encabezado/encabezado.module';
 import { RecordatoriosModule } from './modulos/recordatorio/recordatorio.module';
@@ -19,17 +16,10 @@ import { TrabajadoresModule } from './modulos/trabajadores/trabajadores.module';
 import { VentasModule } from './modulos/ventas/ventas.module';
 import { ReportesModule } from './modulos/reportes/reportes.module';
 import { AuditoriaModule } from './modulos/auditoria/auditoria.module';
-<<<<<<< HEAD
-import { VacunacionModule } from './modulos/vacunacion/vacunacion.module';
-=======
 import { AnaliticasModule } from './modulos/analiticas/analiticas.module';
->>>>>>> 1d75247059d160be2411fa5b685aab0591b2bc60
-
-// Componentes compartidos
+import { VacunacionModule } from './modulos/vacunacion/vacunacion.module';
 import { ExcepcionGlobalFiltro } from './compartido/filtros/excepcion-global.filtro';
 import { ValidacionTuberia } from './compartido/tuberias/validacion.tuberia';
-
-// Controladores y servicios base
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -39,13 +29,11 @@ import { AppService } from './app.service';
       rootPath: join(__dirname, '..', 'archivos-subidos'),
       serveRoot: '/archivos-subidos',
     }),
-
     JwtModule.register({
       secret: process.env.JWT_SECRETO || 'agro360_secreto_super_seguro_2024',
       signOptions: { expiresIn: '7d' },
       global: true,
     }),
-
     PrismaModule,
     AutenticacionModule,
     EncabezadoModule,
@@ -57,44 +45,15 @@ import { AppService } from './app.service';
     VentasModule,
     AuditoriaModule,
     ReportesModule,
+    VacunacionModule,
     AnaliticasModule,
+    AdministradoresModule,
   ],
-
-<<<<<<< HEAD
-    // ============================================================
-    // MÓDULOS DE LA APLICACIÓN (ACTIVOS)
-    // ============================================================
-    AutenticacionModule,
-    EncabezadoModule,
-    RecordatoriosModule,
-    GanaderiaModule,
-    PorciculturaModule,
-    InventarioModule,
-    TrabajadoresModule,
-    VentasModule,
-    AuditoriaModule,
-    ReportesModule,
-    VacunacionModule,  // 🆕 AQUÍ VA
-  ],
-  
   controllers: [AppController],
-  
-=======
-  controllers: [
-    AppController,
-  ],
-
->>>>>>> 1d75247059d160be2411fa5b685aab0591b2bc60
   providers: [
     AppService,
-    {
-      provide: APP_FILTER,
-      useClass: ExcepcionGlobalFiltro,
-    },
-    {
-      provide: APP_PIPE,
-      useClass: ValidacionTuberia,
-    },
+    { provide: APP_FILTER, useClass: ExcepcionGlobalFiltro },
+    { provide: APP_PIPE, useClass: ValidacionTuberia },
   ],
 })
 export class AppModule {}

@@ -1,10 +1,11 @@
-import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Put, Delete, Param, ParseIntPipe } from '@nestjs/common';
 import { PorciculturaService } from './porcicultura.service';
-import { CrearCerdoDto } from './dto/crear-cerdo.dto';
 import { AutenticacionGuardia } from '../../compartido/guardias/autenticacion.guardia';
+import { RolesGuardia } from '../../compartido/guardias/roles.guardia';
+import { Roles } from '../../compartido/decoradores/roles.decorador';
 
 @Controller('porcicultura')
-@UseGuards(AutenticacionGuardia)
+@UseGuards(AutenticacionGuardia, RolesGuardia)
 export class PorciculturaController {
     constructor(private readonly porciculturaService: PorciculturaService) {}
 
@@ -14,7 +15,23 @@ export class PorciculturaController {
     }
 
     @Post('cerdos')
-    async registrarCerdo(@Body() datos: CrearCerdoDto) {
+    @Roles('Administrador', 'Dueño')
+    async registrarCerdo(@Body() datos: any) {
         return this.porciculturaService.registrarCerdo(datos);
+    }
+
+    @Put('cerdos/:id')
+    @Roles('Administrador', 'Dueño')
+    async actualizarCerdo(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() datos: any
+    ) {
+        return this.porciculturaService.actualizarCerdo(id, datos);
+    }
+
+    @Delete('cerdos/:id')
+    @Roles('Administrador', 'Dueño')
+    async eliminarCerdo(@Param('id', ParseIntPipe) id: number) {
+        return this.porciculturaService.eliminarCerdo(id);
     }
 }

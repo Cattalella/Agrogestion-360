@@ -45,15 +45,22 @@ export const FormularioSolicitudCompra = ({
     });
 
     // ============================================================
-    // 🆕 CARGAR DATOS SI ES EDICIÓN (CORREGIDO)
+    // 🔄 SINCRONIZAR form.tipo con tipoSeleccionado
+    // ============================================================
+    useEffect(() => {
+        setForm(prev => ({ ...prev, tipo: tipoSeleccionado }));
+    }, [tipoSeleccionado]);
+
+    // ============================================================
+    // 📝 CARGAR DATOS SI ES EDICIÓN
     // ============================================================
     useEffect(() => {
         if (solicitudAEditar) {
             setForm({
                 tipo: solicitudAEditar.tipo,
-                fechaPropuesta: solicitudAEditar.fecha_compra || "",  // ✅ fecha_compra
+                fechaPropuesta: solicitudAEditar.fecha_compra || "",
                 cantidad: solicitudAEditar.cantidad,
-                unidadMedida: solicitudAEditar.unidad_medida,         // ✅ unidad_medida
+                unidadMedida: solicitudAEditar.unidad_medida,
                 motivo: solicitudAEditar.motivo,
                 tipoInsumo: solicitudAEditar.tipoInsumo || "",
                 categoriaInsumo: solicitudAEditar.categoriaInsumo || "",
@@ -68,7 +75,30 @@ export const FormularioSolicitudCompra = ({
     }, [solicitudAEditar, usuarioActual]);
 
     // ============================================================
-    // ENVIAR FORMULARIO
+    // ✅ RESETEAR FORM CUANDO SE ABRE NUEVA SOLICITUD
+    // ============================================================
+    useEffect(() => {
+        if (!solicitudAEditar) {
+            setForm({
+                tipo: tipoSeleccionado,
+                fechaPropuesta: "",
+                cantidad: 0,
+                unidadMedida: "kg",
+                motivo: "",
+                tipoInsumo: "",
+                categoriaInsumo: "",
+                fechaVencimiento: "",
+                tipoAlimento: "",
+                especieDestino: "",
+                proveedor: "",
+                categoriaAlimento: "",
+                usuario: usuarioActual,
+            });
+        }
+    }, [solicitudAEditar, tipoSeleccionado, usuarioActual]);
+
+    // ============================================================
+    // 📤 ENVIAR FORMULARIO
     // ============================================================
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -102,7 +132,6 @@ export const FormularioSolicitudCompra = ({
             }
         }
         
-        // Llamar con cerrar = true (siempre cierra al guardar)
         onGuardar(form, true);
     };
 
@@ -150,30 +179,33 @@ export const FormularioSolicitudCompra = ({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1">
-                    <label className="text-xs font-bold text-gray-600 uppercase">Fecha Propuesta *</label>
+                    <label className="text-xs font-bold text-gray-600 uppercase">
+                        📅 Fecha en que se necesita *
+                    </label>
                     <input 
                         type="date" 
-                        className="border rounded-lg p-2 text-sm" 
+                        className="border rounded-full p-2 text-sm px-4" 
                         value={form.fechaPropuesta} 
                         onChange={(e) => setForm({ ...form, fechaPropuesta: e.target.value })} 
                         required 
                     />
+                    <span className="text-[10px] text-gray-400">¿Cuándo necesitas recibir el producto?</span>
                 </div>
                 <div className="flex flex-col gap-1">
-                    <label className="text-xs font-bold text-gray-600 uppercase">Cantidad *</label>
+                    <label className="text-xs font-bold text-gray-600 uppercase">🔢 Cantidad *</label>
                     <input 
                         type="number" 
                         step="0.01" 
-                        className="border rounded-lg p-2 text-sm" 
+                        className="border rounded-full p-2 text-sm px-4" 
                         value={form.cantidad} 
                         onChange={(e) => setForm({ ...form, cantidad: Number(e.target.value) })} 
                         required 
                     />
                 </div>
                 <div className="flex flex-col gap-1">
-                    <label className="text-xs font-bold text-gray-600 uppercase">Unidad de Medida *</label>
+                    <label className="text-xs font-bold text-gray-600 uppercase">📏 Unidad de Medida *</label>
                     <select 
-                        className="border rounded-lg p-2 text-sm bg-white" 
+                        className="border rounded-full p-2 text-sm bg-white px-4" 
                         value={form.unidadMedida} 
                         onChange={(e) => setForm({ ...form, unidadMedida: e.target.value as UnidadMedida })} 
                         required
@@ -189,100 +221,124 @@ export const FormularioSolicitudCompra = ({
 
             {tipoActual === 'insumo' && (
                 <div className="bg-green-50 rounded-xl p-4 border border-green-200 space-y-4">
-                    <p className="text-xs font-bold text-green-600 uppercase">Datos del Insumo</p>
+                    <p className="text-xs font-bold text-green-600 uppercase">📦 Datos del Insumo</p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <input 
-                            type="text" 
-                            placeholder="Tipo de insumo *" 
-                            className="border rounded-lg p-2 text-sm" 
-                            value={form.tipoInsumo} 
-                            onChange={(e) => setForm({ ...form, tipoInsumo: e.target.value })} 
-                            required 
-                        />
-                        <select 
-                            className="border rounded-lg p-2 text-sm bg-white" 
-                            value={form.categoriaInsumo} 
-                            onChange={(e) => setForm({ ...form, categoriaInsumo: e.target.value as CategoriaInsumo })}
-                        >
-                            <option value="">Categoría</option>
-                            <option value="fertilizante">Fertilizante</option>
-                            <option value="herramienta">Herramienta</option>
-                            <option value="empaque">Empaque</option>
-                            <option value="otro">Otro</option>
-                        </select>
-                        <input 
-                            type="date" 
-                            placeholder="Fecha de vencimiento" 
-                            className="border rounded-lg p-2 text-sm" 
-                            value={form.fechaVencimiento} 
-                            onChange={(e) => setForm({ ...form, fechaVencimiento: e.target.value })} 
-                        />
+                        <div className="flex flex-col gap-1">
+                            <label className="text-xs font-semibold text-gray-700">Nombre del insumo *</label>
+                            <input 
+                                type="text" 
+                                placeholder="Ej: Fertilizante NPK, Herbicida, etc." 
+                                className="border rounded-full p-2 text-sm px-4" 
+                                value={form.tipoInsumo} 
+                                onChange={(e) => setForm({ ...form, tipoInsumo: e.target.value })} 
+                                required 
+                            />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <label className="text-xs font-semibold text-gray-700">Categoría</label>
+                            <select 
+                                className="border rounded-full p-2 text-sm bg-white px-4" 
+                                value={form.categoriaInsumo} 
+                                onChange={(e) => setForm({ ...form, categoriaInsumo: e.target.value as CategoriaInsumo })}
+                            >
+                                <option value="">Seleccionar categoría</option>
+                                <option value="fertilizante">🌱 Fertilizante</option>
+                                <option value="herramienta">🔧 Herramienta</option>
+                                <option value="empaque">📦 Empaque</option>
+                                <option value="otro">📌 Otro</option>
+                            </select>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <label className="text-xs font-semibold text-gray-700">⏰ Fecha de vencimiento (opcional)</label>
+                            <input 
+                                type="date" 
+                                className="border rounded-full p-2 text-sm px-4" 
+                                value={form.fechaVencimiento} 
+                                onChange={(e) => setForm({ ...form, fechaVencimiento: e.target.value })} 
+                            />
+                            <span className="text-[10px] text-gray-400">¿Hasta cuándo es válido este insumo?</span>
+                        </div>
                     </div>
                 </div>
             )}
 
             {tipoActual === 'alimento' && (
                 <div className="bg-blue-50 rounded-xl p-4 border border-blue-200 space-y-4">
-                    <p className="text-xs font-bold text-blue-600 uppercase">Datos del Alimento</p>
+                    <p className="text-xs font-bold text-blue-600 uppercase">🌾 Datos del Alimento</p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <input 
-                            type="text" 
-                            placeholder="Tipo de alimento *" 
-                            className="border rounded-lg p-2 text-sm" 
-                            value={form.tipoAlimento} 
-                            onChange={(e) => setForm({ ...form, tipoAlimento: e.target.value })} 
-                            required 
-                        />
-                        <select 
-                            className="border rounded-lg p-2 text-sm bg-white" 
-                            value={form.especieDestino} 
-                            onChange={(e) => setForm({ ...form, especieDestino: e.target.value as EspecieDestino })} 
-                            required
-                        >
-                            <option value="">Especie destino *</option>
-                            <option value="cerdos">Cerdos</option>
-                            <option value="peces">Peces</option>
-                            <option value="ganado">Ganado</option>
-                            <option value="gallinas">Gallinas</option>
-                        </select>
-                        <input 
-                            type="text" 
-                            placeholder="Proveedor" 
-                            className="border rounded-lg p-2 text-sm" 
-                            value={form.proveedor} 
-                            onChange={(e) => setForm({ ...form, proveedor: e.target.value })} 
-                        />
-                        <input 
-                            type="text" 
-                            placeholder="Categoría" 
-                            className="border rounded-lg p-2 text-sm" 
-                            value={form.categoriaAlimento} 
-                            onChange={(e) => setForm({ ...form, categoriaAlimento: e.target.value })} 
-                        />
-                        <input 
-                            type="date" 
-                            placeholder="Fecha de vencimiento" 
-                            className="border rounded-lg p-2 text-sm" 
-                            value={form.fechaVencimiento} 
-                            onChange={(e) => setForm({ ...form, fechaVencimiento: e.target.value })} 
-                        />
+                        <div className="flex flex-col gap-1">
+                            <label className="text-xs font-semibold text-gray-700">Nombre del alimento *</label>
+                            <input 
+                                type="text" 
+                                placeholder="Ej: Concentrado, Maíz, Sorgo, etc." 
+                                className="border rounded-full p-2 text-sm px-4" 
+                                value={form.tipoAlimento} 
+                                onChange={(e) => setForm({ ...form, tipoAlimento: e.target.value })} 
+                                required 
+                            />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <label className="text-xs font-semibold text-gray-700">🐖 Especie destino *</label>
+                            <select 
+                                className="border rounded-full p-2 text-sm bg-white px-4" 
+                                value={form.especieDestino} 
+                                onChange={(e) => setForm({ ...form, especieDestino: e.target.value as EspecieDestino })} 
+                                required
+                            >
+                                <option value="">Seleccionar especie</option>
+                                <option value="cerdos">🐷 Cerdos</option>
+                                <option value="peces">🐟 Peces</option>
+                                <option value="ganado">🐮 Ganado</option>
+                                <option value="gallinas">🐔 Gallinas</option>
+                            </select>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <label className="text-xs font-semibold text-gray-700">🏭 Proveedor</label>
+                            <input 
+                                type="text" 
+                                placeholder="Nombre de la empresa o proveedor" 
+                                className="border rounded-full p-2 text-sm px-4" 
+                                value={form.proveedor} 
+                                onChange={(e) => setForm({ ...form, proveedor: e.target.value })} 
+                            />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <label className="text-xs font-semibold text-gray-700">📂 Categoría</label>
+                            <input 
+                                type="text" 
+                                placeholder="Ej: Balanceado, Suplemento, Grano" 
+                                className="border rounded-full p-2 text-sm px-4" 
+                                value={form.categoriaAlimento} 
+                                onChange={(e) => setForm({ ...form, categoriaAlimento: e.target.value })} 
+                            />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <label className="text-xs font-semibold text-gray-700">⏰ Fecha de vencimiento (opcional)</label>
+                            <input 
+                                type="date" 
+                                className="border rounded-full p-2 text-sm px-4" 
+                                value={form.fechaVencimiento} 
+                                onChange={(e) => setForm({ ...form, fechaVencimiento: e.target.value })} 
+                            />
+                            <span className="text-[10px] text-gray-400">¿Hasta cuándo es válido este alimento?</span>
+                        </div>
                     </div>
                 </div>
             )}
 
             <div className="flex flex-col gap-1">
-                <label className="text-xs font-bold text-gray-600 uppercase">Motivo de la solicitud *</label>
+                <label className="text-xs font-bold text-gray-600 uppercase">💬 Motivo de la solicitud *</label>
                 <textarea 
-                    className="border rounded-lg p-2 text-sm resize-none" 
+                    className="border rounded-lg p-2 text-sm resize-none px-4" 
                     rows={3} 
-                    placeholder="Describa el motivo de la solicitud..." 
+                    placeholder="Ej: Se requiere para alimentación de cerdos, stock bajo, reposición de inventario, etc." 
                     value={form.motivo} 
                     onChange={(e) => setForm({ ...form, motivo: e.target.value })} 
                     required 
                 />
             </div>
 
-            <div className="text-[10px] text-gray-400 bg-gray-50 rounded-lg p-2 text-center">
+            <div className="text-[10px] text-gray-400 bg-gray-50 rounded-full p-2 text-center">
                 📋 La solicitud se registrará con fecha, hora y usuario: <strong>{usuarioActual}</strong>
                 <br />
                 Estado inicial: <strong className="text-yellow-600">Pendiente</strong> - Solo el dueño puede aprobar/rechazar.
@@ -292,13 +348,13 @@ export const FormularioSolicitudCompra = ({
                 <button 
                     type="button" 
                     onClick={onCancelar} 
-                    className="px-5 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors text-sm"
+                    className="px-5 py-2 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors text-sm"
                 >
                     Cancelar
                 </button>
                 <button 
                     type="submit" 
-                    className="px-5 py-2 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700 transition-colors text-sm"
+                    className="px-5 py-2 rounded-full bg-emerald-600 text-white font-medium hover:bg-emerald-700 transition-colors text-sm"
                 >
                     {solicitudAEditar ? "✏️ Actualizar Solicitud" : "📤 Enviar Solicitud"}
                 </button>

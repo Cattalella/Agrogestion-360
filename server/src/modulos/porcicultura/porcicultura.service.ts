@@ -1,12 +1,14 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
-import { CrearCerdoDto } from './dto/crear-cerdo.dto';
 
 @Injectable()
 export class PorciculturaService {
     constructor(private prisma: PrismaService) {}
 
+    // ============================================================
+    // OBTENER ID DE ESPECIE PORCINO
+    // ============================================================
     private async obtenerIdEspeciePorcino() {
         let especie = await this.prisma.especie.findFirst({
             where: { nombre: { contains: 'Porcino', mode: 'insensitive' } }
@@ -27,6 +29,40 @@ export class PorciculturaService {
         return especie.id_especie;
     }
 
+    // ============================================================
+    // MÉTODOS AUXILIARES CORREGIDOS
+    // ============================================================
+    private async obtenerOCrearEstado(nombreEstado: string = 'Activo') {
+        let estado = await this.prisma.estadoAni.findFirst({
+            where: { nombre: nombreEstado }
+        });
+
+        if (!estado) {
+            estado = await this.prisma.estadoAni.create({
+                data: { nombre: nombreEstado }
+            });
+        }
+
+        return estado;
+    }
+
+    private async obtenerOCrearUbicacion(nombreUbicacion: string = 'Corral 1') {
+        let ubicacion = await this.prisma.ubicacion.findFirst({
+            where: { nombre_ubi: nombreUbicacion }
+        });
+
+        if (!ubicacion) {
+            ubicacion = await this.prisma.ubicacion.create({
+                data: { nombre_ubi: nombreUbicacion }
+            });
+        }
+
+        return ubicacion;
+    }
+
+    // ============================================================
+    // LISTAR CERDOS
+    // ============================================================
     async listarCerdos() {
         const idPorcino = await this.obtenerIdEspeciePorcino();
         return this.prisma.animal.findMany({
@@ -39,7 +75,12 @@ export class PorciculturaService {
         });
     }
 
-    async registrarCerdo(datos: CrearCerdoDto) {
+    // ============================================================
+    // REGISTRAR CERDO
+    // ============================================================
+    async registrarCerdo(datos: any) {
+        console.log('📝 Datos recibidos para registrar:', datos);
+        
         const idPorcino = await this.obtenerIdEspeciePorcino();
 
         const existente = await this.prisma.animal.findUnique({
@@ -57,7 +98,7 @@ export class PorciculturaService {
             sexoChar = 'F';
         }
 
-        return this.prisma.animal.create({
+        const resultado = await this.prisma.animal.create({
             data: {
                 codigo_local: datos.local,
                 num_ica_chapeta: datos.oficial || null,
@@ -72,6 +113,76 @@ export class PorciculturaService {
                 foto_url: datos.foto || null,
                 updatedAt: new Date()
             }
+        });
+
+        console.log('✅ Cerdo registrado:', resultado);
+        return resultado;
+    }
+
+    // ============================================================
+    // ACTUALIZAR CERDO (VERSIÓN SIMPLIFICADA)
+    // ============================================================
+    async actualizarCerdo(id: number, datos: any) {
+        console.log('🔧 Actualizando cerdo ID:', id);
+        console.log('🔧 Datos recibidos:', datos);
+
+        const cerdo = await this.prisma.animal.findUnique({
+            where: { id_animal: id }
+        });
+
+        if (!cerdo) {
+            throw new NotFoundException('Cerdo no encontrado');
+        }
+
+        const dataActualizar: any = {
+            updatedAt: new Date()
+        };
+        
+        if (datos.local !== undefined) dataActualizar.codigo_local = datos.local;
+        if (datos.oficial !== undefined) dataActualizar.num_ica_chapeta = datos.oficial;
+        if (datos.sexo !== undefined) dataActualizar.sexo = datos.sexo === 'HEMBRA' ? 'F' : 'M';
+        if (datos.raza !== undefined) dataActualizar.raza = datos.raza;
+        if (datos.nacimiento !== undefined) dataActualizar.fecha_nacimiento = new Date(datos.nacimiento);
+        if (datos.peso !== undefined) dataActualizar.peso_actual = new Decimal(datos.peso);
+        if (datos.origen !== undefined) dataActualizar.origen = datos.origen;
+        if (datos.establo !== undefined) {
+            const ubicacion = await this.obtenerOCrearUbicacion(datos.establo);
+            dataActualizar.id_ubicacion = ubicacion.id_ubicacion;
+        }
+        if (datos.salud !== undefined) {
+            const estado = await this.obtenerOCrearEstado(datos.salud);
+            dataActualizar.id_estado_ani = estado.id_estado_ani;
+        }
+
+        console.log('📝 Data a actualizar:', dataActualizar);
+
+        const resultado = await this.prisma.animal.update({
+            where: { id_animal: id },
+            data: dataActualizar,
+        });
+
+        console.log('✅ Cerdo actualizado:', resultado);
+        return resultado;
+    }
+
+    // ============================================================
+    // ELIMINAR CERDO
+    // ============================================================
+    async eliminarCerdo(id: number) {
+        const cerdo = await this.prisma.animal.findUnique({
+            where: { id_animal: id }
+        });
+
+        if (!cerdo) {
+            throw new NotFoundException('Cerdo no encontrado');
+        }
+
+        await this.prisma.venta.deleteMany({ where: { id_animal: id } });
+        await this.prisma.regVacuna.deleteMany({ where: { id_animal: id } });
+        await this.prisma.historialPeso.deleteMany({ where: { id_animal: id } });
+
+        return this.prisma.animal.delete({
+            where: { id_animal: id }
         });
     }
 }

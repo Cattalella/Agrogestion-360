@@ -48,6 +48,15 @@ export interface GanadoStats {
 }
 
 // ============================================================
+// 📌 INTERFAZ PARA MODAL DE CONFIRMACIÓN
+// ============================================================
+interface ModalConfirmacionState {
+    isOpen: boolean;
+    id: number | null;
+    nombre: string;
+}
+
+// ============================================================
 // 📌 HOOK PRINCIPAL
 // ============================================================
 export const useGanado = () => {
@@ -58,6 +67,17 @@ export const useGanado = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [vista, setVista] = useState<'lista' | 'formulario'>('lista');
     const [cargando, setCargando] = useState(false);
+    
+    // Estado para edición
+    const [animalAEditar, setAnimalAEditar] = useState<any | null>(null);
+    
+    // 🆕 Estado para modal de confirmación
+    const [modalConfirmacion, setModalConfirmacion] = useState<ModalConfirmacionState>({
+        isOpen: false,
+        id: null,
+        nombre: ''
+    });
+    const [eliminando, setEliminando] = useState(false);
     
     // Catálogos
     const [especies, setEspecies] = useState<CatalogoEspecie[]>([]);
@@ -105,25 +125,21 @@ export const useGanado = () => {
     }, []);
 
     // ============================================================
-    // 🆕 CALCULAR STATS PARA LA CARD (SE ACTUALIZA AUTOMÁTICAMENTE)
+    // CALCULAR STATS PARA LA CARD
     // ============================================================
     const stats = useMemo((): GanadoStats => {
-        // Vacas: Hembras con prefijo VA
         const vacas = listaGanado.filter(a => 
             a.local?.startsWith('VA') && a.sexo === 'HEMBRA'
         ).length;
         
-        // Toros: Machos con prefijo TO
         const toros = listaGanado.filter(a => 
             a.local?.startsWith('TO') && a.sexo === 'MACHO'
         ).length;
         
-        // Novillos/as: Prefijo NO (sin importar sexo)
         const novillos = listaGanado.filter(a => 
             a.local?.startsWith('NO')
         ).length;
         
-        // Terneros/as: Prefijo TE (sin importar sexo)
         const terneros = listaGanado.filter(a => 
             a.local?.startsWith('TE')
         ).length;
@@ -162,6 +178,7 @@ export const useGanado = () => {
     // ABRIR / CERRAR MODAL
     // ============================================================
     const abrirModal = () => {
+        setAnimalAEditar(null);
         cargarAnimales();
         setIsModalOpen(true);
     };
@@ -169,12 +186,70 @@ export const useGanado = () => {
     const cerrarModal = () => {
         setIsModalOpen(false);
         setVista('lista');
+        setAnimalAEditar(null);
     };
 
-    const cambiarVista = (nuevaVista: 'lista' | 'formulario') => setVista(nuevaVista);
+    const cambiarVista = (nuevaVista: 'lista' | 'formulario') => {
+        setVista(nuevaVista);
+        if (nuevaVista === 'lista') {
+            setAnimalAEditar(null);
+        }
+    };
 
     // ============================================================
-    // GUARDAR ANIMAL (BACKEND)
+    // EDICIÓN
+    // ============================================================
+    const abrirEdicion = (animal: any) => {
+        setAnimalAEditar(animal);
+        const categoria = animal.local?.substring(0, 2) || "VA";
+        setCategoriaSeleccionada(categoria);
+        setVista('formulario');
+    };
+
+    const cancelarEdicion = () => {
+        setAnimalAEditar(null);
+        setVista('lista');
+    };
+
+    // ============================================================
+    // 🆕 MODAL DE CONFIRMACIÓN PARA ELIMINAR
+    // ============================================================
+    const abrirModalEliminar = (id: number, nombre: string) => {
+        setModalConfirmacion({
+            isOpen: true,
+            id: id,
+            nombre: nombre
+        });
+    };
+
+    const cerrarModalConfirmacion = () => {
+        setModalConfirmacion({
+            isOpen: false,
+            id: null,
+            nombre: ''
+        });
+        setEliminando(false);
+    };
+
+    const confirmarEliminar = async () => {
+        if (!modalConfirmacion.id) return;
+        
+        setEliminando(true);
+        try {
+            await apiClient.delete(`/ganaderia/${modalConfirmacion.id}`);
+            await cargarAnimales();
+            console.log('✅ Animal eliminado');
+            cerrarModalConfirmacion();
+        } catch (error) {
+            console.error('❌ Error al eliminar:', error);
+            alert('Error al eliminar el animal');
+        } finally {
+            setEliminando(false);
+        }
+    };
+
+    // ============================================================
+    // GUARDAR ANIMAL (CREAR O EDITAR)
     // ============================================================
     const guardarAnimal = async (nuevoAnimal: any, cerrar: boolean) => {
         setCargando(true);
@@ -187,17 +262,21 @@ export const useGanado = () => {
                 fecha_nacimiento: nuevoAnimal.nacimiento || null,
                 peso_actual: parseFloat(nuevoAnimal.peso) || 0,
                 origen: nuevoAnimal.origen || 'Registro inicial',
-                foto_url: null  // 🆕 No enviar foto por ahora (evita error de tamaño)
+                foto_url: null
             };
 
-            console.log('📤 Enviando a backend:', datosParaBackend);
+            if (animalAEditar) {
+                console.log('✏️ Editando animal:', animalAEditar.id, datosParaBackend);
+                await apiClient.put(`/ganaderia/${animalAEditar.id}`, datosParaBackend);
+                console.log('✅ Animal actualizado');
+            } else {
+                console.log('📤 Creando nuevo animal:', datosParaBackend);
+                await apiClient.post('/ganaderia', datosParaBackend);
+                console.log('✅ Animal creado');
+            }
 
-            const respuesta = await apiClient.post('/ganaderia', datosParaBackend);
-            const animalCreado = respuesta.data;
-            console.log('✅ Animal creado:', animalCreado);
-
-            // 🆕 RECARGAR LISTA COMPLETA para actualizar stats
             await cargarAnimales();
+            setAnimalAEditar(null);
 
             if (cerrar) {
                 cerrarModal();
@@ -213,28 +292,15 @@ export const useGanado = () => {
     };
 
     // ============================================================
-    // ACTUALIZAR ANIMAL
+    // ACTUALIZAR ANIMAL (COMPATIBILIDAD)
     // ============================================================
     const actualizarAnimal = async (id: number, datos: Partial<Animal>) => {
         try {
             const respuesta = await apiClient.put(`/ganaderia/${id}`, datos);
-            await cargarAnimales();  // 🆕 Recargar para actualizar stats
+            await cargarAnimales();
             return respuesta.data;
         } catch (error) {
             console.error('❌ Error al actualizar:', error);
-        }
-    };
-
-    // ============================================================
-    // ELIMINAR ANIMAL
-    // ============================================================
-    const eliminarAnimal = async (id: number) => {
-        try {
-            const respuesta = await apiClient.delete(`/ganaderia/${id}`);
-            await cargarAnimales();  // 🆕 Recargar para actualizar stats
-            return respuesta.data;
-        } catch (error) {
-            console.error('❌ Error al eliminar:', error);
         }
     };
 
@@ -249,10 +315,10 @@ export const useGanado = () => {
         ubicaciones,
         estados,
         
-        // Stats (se actualiza automáticamente)
+        // Stats
         stats,
         
-        // Modal
+        // Modal principal
         categoriaSeleccionada,
         setCategoriaSeleccionada,
         sugerenciaId,
@@ -262,10 +328,21 @@ export const useGanado = () => {
         cerrarModal,
         cambiarVista,
         
-        // Acciones
+        // Acciones CRUD
         guardarAnimal,
         actualizarAnimal,
-        eliminarAnimal,
         recargarLista: cargarAnimales,
+        
+        // Edición
+        animalAEditar,
+        abrirEdicion,
+        cancelarEdicion,
+        
+        // 🆕 Modal de confirmación
+        modalConfirmacion,
+        eliminando,
+        abrirModalEliminar,
+        cerrarModalConfirmacion,
+        confirmarEliminar,
     };
 };

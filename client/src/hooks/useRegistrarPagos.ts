@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import apiClient from "../api/apiClient";
 
 // ============================================================
-// 📌 TIPOS — RI. 8.1.1
+// 📌 TIPOS — RI. 8.1.1 / Schema PagoTrabajador
 // ============================================================
 export interface Pago {
     id_pago: number;
@@ -15,6 +15,7 @@ export interface Pago {
     firma_url?: string;
     justificacion_anulacion?: string;
     Trabajador?: { nombre_completo: string };
+    TrabajoRealizado?: { tipo_actividad: string };
 }
 
 export interface PagosStats {
@@ -45,7 +46,6 @@ export const useRegistrarPagos = () => {
         try {
             const response = await apiClient.get('/trabajadores/pagos');
             setPagos(response.data);
-            console.log('✅ Pagos cargados:', response.data.length);
         } catch (error) {
             console.error("❌ Error al cargar pagos:", error);
         } finally {
@@ -54,26 +54,23 @@ export const useRegistrarPagos = () => {
     };
 
     // ============================================================
-    // 🆕 CARGAR TRABAJADORES ACTIVOS
+    // CARGAR TRABAJADORES ACTIVOS
     // ============================================================
     const cargarTrabajadores = async () => {
         try {
             const response = await apiClient.get('/trabajadores');
             const activos = response.data.filter((t: any) => t.estado === 'Activo');
             setTrabajadores(activos);
-            console.log('✅ Trabajadores activos cargados:', activos.length);
         } catch (error) {
             console.error("❌ Error al cargar trabajadores:", error);
         }
     };
 
-    // Cargar al iniciar
     useEffect(() => {
         cargarPagos();
         cargarTrabajadores();
     }, []);
 
-    // Refrescar al abrir modal
     useEffect(() => {
         if (isModalOpen) {
             cargarPagos();
@@ -82,17 +79,15 @@ export const useRegistrarPagos = () => {
     }, [isModalOpen]);
 
     // ============================================================
-    // 🆕 CALCULAR STATS PARA LA CARD
+    // STATS PARA LA CARD
     // ============================================================
     const calcularStats = (): PagosStats => {
-        // Calcular nómina total (suma de todos los pagos NO anulados)
-        const pagosValidos = pagos.filter(p => 
+        const pagosValidos = pagos.filter(p =>
             p.estado_pago !== 'Anulado' && !p.justificacion_anulacion
         );
-        
+
         const totalNomina = pagosValidos.reduce((sum, p) => sum + (p.monto_total || 0), 0);
-        
-        // Formatear como moneda
+
         const totalFormateado = new Intl.NumberFormat('es-CO', {
             style: 'currency',
             currency: 'COP',
@@ -100,8 +95,7 @@ export const useRegistrarPagos = () => {
             maximumFractionDigits: 0
         }).format(totalNomina);
 
-        // Contar pagos pendientes (No pagado + Pendiente de firma)
-        const pendientes = pagos.filter(p => 
+        const pendientes = pagos.filter(p =>
             p.estado_pago === 'No pagado' || p.estado_pago === 'Pendiente de firma'
         ).length;
 
@@ -131,26 +125,54 @@ export const useRegistrarPagos = () => {
     const cambiarVista = (v: Vista) => setVista(v);
 
     // ============================================================
-    // GUARDAR PAGO
+    // ABRIR EDICIÓN
+    // ============================================================
+    const abrirEdicion = (pago: Pago) => {
+        setPagoAEditar(pago);
+        setVista('formulario');
+    };
+
+    // ============================================================
+    // GUARDAR / ACTUALIZAR PAGO
+    // RN.8.1.1: distingue entre crear, actualizar y anular
     // ============================================================
     const guardarPago = async (datos: any, cerrar: boolean = true) => {
         setCargando(true);
         try {
-            const datosParaBackend = {
-                id_trabajador: parseInt(datos.id_trabajador),
-                tipo_trabajo: datos.tipo_trabajo,
-                fecha_pago: datos.fecha_pago,
-                monto_total: datos.monto_total,
-                concepto: datos.concepto,
-                estado: datos.estado || 'No pagado'
-            };
+            // Caso anulación
+            if (datos.accion === 'anular' && datos.id_pago) {
+                await apiClient.patch(`/trabajadores/pagos/${datos.id_pago}/anular`, {
+                    justificacion: datos.justificacion_anulacion
+                });
+                await cargarPagos();
+                cerrarModal();
+                return true;
+            }
 
-            console.log('📤 Enviando a backend (Pago):', datosParaBackend);
-            
-            await apiClient.post('/trabajadores/pagos', datosParaBackend);
-            
+            // Caso edición
+            if (pagoAEditar) {
+                const datosActualizar = {
+                    fecha_pago: datos.fecha_pago,
+                    monto_total: datos.monto_total,
+                    concepto: datos.concepto,
+                    estado_pago: datos.estado_pago,
+                };
+                await apiClient.put(`/trabajadores/pagos/${pagoAEditar.id_pago}`, datosActualizar);
+            } else {
+                // Caso creación
+                const datosParaBackend = {
+                    id_trabajador: parseInt(datos.id_trabajador),
+                    tipo_trabajo: datos.tipo_trabajo,
+                    fecha_pago: datos.fecha_pago,
+                    monto_total: datos.monto_total,
+                    concepto: datos.concepto,
+                    estado_pago: datos.estado_pago || 'No pagado',
+                };
+                await apiClient.post('/trabajadores/pagos', datosParaBackend);
+            }
+
             await cargarPagos();
-            
+
             if (cerrar) {
                 cerrarModal();
             } else {
@@ -158,8 +180,8 @@ export const useRegistrarPagos = () => {
             }
             return true;
         } catch (error: any) {
-            console.error("❌ Error al registrar pago:", error);
-            alert(error.response?.data?.mensaje || "Error al registrar pago");
+            console.error("❌ Error al guardar pago:", error);
+            alert(error.response?.data?.mensaje || "Error al guardar pago");
             return false;
         } finally {
             setCargando(false);
@@ -167,29 +189,13 @@ export const useRegistrarPagos = () => {
     };
 
     // ============================================================
-    // 🆕 ACTUALIZAR PAGO
-    // ============================================================
-    const actualizarPago = async (id: number, datos: Partial<Pago>) => {
-        try {
-            const respuesta = await apiClient.put(`/trabajadores/pagos/${id}`, datos);
-            setPagos(prev => prev.map(p => 
-                p.id_pago === id ? { ...p, ...datos } : p
-            ));
-            return respuesta.data;
-        } catch (error) {
-            console.error('❌ Error al actualizar pago:', error);
-        }
-    };
-
-    // ============================================================
-    // ANULAR PAGO
+    // ANULAR PAGO — RN.8.1.1: no se elimina, se anula con justificación
     // ============================================================
     const anularPago = async (id: number, justificacion: string) => {
         if (!justificacion.trim()) {
             alert("Debes ingresar una justificación para anular el pago.");
             return false;
         }
-        
         try {
             await apiClient.patch(`/trabajadores/pagos/${id}/anular`, { justificacion });
             await cargarPagos();
@@ -201,43 +207,26 @@ export const useRegistrarPagos = () => {
     };
 
     // ============================================================
-    // 🆕 ELIMINAR PAGO (solo si no está contabilizado)
-    // ============================================================
-    const eliminarPago = async (id: number) => {
-        try {
-            const respuesta = await apiClient.delete(`/trabajadores/pagos/${id}`);
-            setPagos(prev => prev.filter(p => p.id_pago !== id));
-            return respuesta.data;
-        } catch (error) {
-            console.error('❌ Error al eliminar pago:', error);
-        }
-    };
-
-    // ============================================================
     // RETORNAR
     // ============================================================
     return {
         listaPagos: pagos,
         pagos,
-        trabajadores,  // 🆕 Para el selector del formulario
+        trabajadores,
         cargando,
-        loading: cargando,  // Alias para compatibilidad
+        loading: cargando,
         isModalOpen,
         vista,
         pagoAEditar,
         setPagoAEditar,
         setVista,
         cambiarVista,
-        
-        // 🆕 Stats para la card
         stats: calcularStats(),
-        
         abrirModal,
         cerrarModal,
+        abrirEdicion,
         guardarPago,
-        actualizarPago,
         anularPago,
-        eliminarPago,
         recargarLista: cargarPagos,
     };
 };

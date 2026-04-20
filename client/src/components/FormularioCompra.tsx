@@ -1,38 +1,54 @@
 import { useState } from "react";
-import { Package, Calendar, User, FileText, AlertCircle, Truck } from "lucide-react";
+import { Package, Calendar, User, FileText, AlertCircle, Truck, Hash, DollarSign, Building, CheckCircle, Search } from "lucide-react";
 
 type CategoriaGeneral = 'insumo' | 'alimento';
+
+interface SolicitudAprobada {
+    id_solicitud: number;
+    tipo: 'insumo' | 'alimento';
+    nombre_producto: string;
+    cantidad: number;
+    unidad_medida: string;
+    proveedor_sugerido?: string;
+    motivo: string;
+}
 
 interface Props {
     tipoSeleccionado: CategoriaGeneral;
     setTipoSeleccionado: (tipo: CategoriaGeneral) => void;
     onGuardar: (datos: any, cerrar: boolean) => void;
     onCancelar: () => void;
+    solicitudesAprobadas?: SolicitudAprobada[]; // Lista de solicitudes aprobadas por el dueño
 }
 
 export const FormularioCompra = ({ 
     tipoSeleccionado, 
     setTipoSeleccionado, 
     onGuardar, 
-    onCancelar 
+    onCancelar,
+    solicitudesAprobadas = []
 }: Props) => {
     
     const estadoInicial = {
-        categoria_general: tipoSeleccionado,
-        fecha_propuesta: new Date().toISOString().split('T')[0],
-        cantidad: "",
-        motivo: "",
-        usuario: "",
+        // Selección de solicitud aprobada
+        id_solicitud: "",
+        solicitudSeleccionada: null as SolicitudAprobada | null,
+        
+        // Datos reales de compra (para LoteInv)
+        fecha_compra_real: new Date().toISOString().split('T')[0],
+        numero_lote: "",
+        cantidad_real: "",
+        precio_unitario: "",
+        precio_total: "",
+        factura: "",
         fecha_vencimiento: "",
-        // Insumo
-        categoria_insumo: "" as any,
-        tipo_insumo: "",
-        // Alimento
-        especie_destino: "" as any,
-        tipo_alimento: "",
+        proveedor_real: "",
+        observaciones: "",
+        
+        // Datos del producto (se autocompletan al seleccionar solicitud)
+        categoria_general: tipoSeleccionado,
+        nombre_producto: "",
         unidad_medida: "",
-        proveedor: "",
-        categoria_alimento: "",
     };
 
     const [formData, setFormData] = useState(estadoInicial);
@@ -47,6 +63,16 @@ export const FormularioCompra = ({
         if (value) {
             setErrores(prev => ({ ...prev, [name]: '' }));
         }
+        
+        // Calcular precio total automáticamente
+        if (name === 'cantidad_real' || name === 'precio_unitario') {
+            const cantidad = name === 'cantidad_real' ? parseFloat(value) : parseFloat(formData.cantidad_real);
+            const precioUnit = name === 'precio_unitario' ? parseFloat(value) : parseFloat(formData.precio_unitario);
+            if (!isNaN(cantidad) && !isNaN(precioUnit)) {
+                const total = cantidad * precioUnit;
+                setFormData(prev => ({ ...prev, precio_total: total.toFixed(2) }));
+            }
+        }
     };
 
     const manejarCambioNumerico = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -56,6 +82,32 @@ export const FormularioCompra = ({
             if (value && parseFloat(value) > 0) {
                 setErrores(prev => ({ ...prev, [name]: '' }));
             }
+            
+            // Recalcular precio total
+            if (name === 'cantidad_real' || name === 'precio_unitario') {
+                const cantidad = name === 'cantidad_real' ? parseFloat(value) : parseFloat(formData.cantidad_real);
+                const precioUnit = name === 'precio_unitario' ? parseFloat(value) : parseFloat(formData.precio_unitario);
+                if (!isNaN(cantidad) && !isNaN(precioUnit)) {
+                    const total = cantidad * precioUnit;
+                    setFormData(prev => ({ ...prev, precio_total: total.toFixed(2) }));
+                }
+            }
+        }
+    };
+
+    // Seleccionar solicitud aprobada
+    const seleccionarSolicitud = (id_solicitud: string) => {
+        const solicitud = solicitudesAprobadas.find(s => s.id_solicitud.toString() === id_solicitud);
+        if (solicitud) {
+            setFormData(prev => ({
+                ...prev,
+                id_solicitud,
+                solicitudSeleccionada: solicitud,
+                nombre_producto: solicitud.nombre_producto,
+                unidad_medida: solicitud.unidad_medida,
+                cantidad_real: solicitud.cantidad.toString(),
+                proveedor_real: solicitud.proveedor_sugerido || "",
+            }));
         }
     };
 
@@ -65,20 +117,16 @@ export const FormularioCompra = ({
     const validarFormulario = (): boolean => {
         const nuevosErrores: Record<string, string> = {};
         
-        if (!formData.fecha_propuesta) nuevosErrores.fecha_propuesta = 'La fecha es obligatoria';
-        if (!formData.cantidad || parseFloat(formData.cantidad) <= 0) {
-            nuevosErrores.cantidad = 'La cantidad debe ser mayor a 0';
+        if (!formData.id_solicitud) nuevosErrores.id_solicitud = 'Debes seleccionar una solicitud aprobada';
+        if (!formData.fecha_compra_real) nuevosErrores.fecha_compra_real = 'La fecha de compra es obligatoria';
+        if (!formData.numero_lote.trim()) nuevosErrores.numero_lote = 'El número de lote es obligatorio';
+        if (!formData.cantidad_real || parseFloat(formData.cantidad_real) <= 0) {
+            nuevosErrores.cantidad_real = 'La cantidad real debe ser mayor a 0';
         }
-        if (!formData.usuario.trim()) nuevosErrores.usuario = 'El solicitante es obligatorio';
-        if (!formData.motivo.trim()) nuevosErrores.motivo = 'El motivo es obligatorio';
-        
-        if (tipoSeleccionado === 'insumo') {
-            if (!formData.categoria_insumo) nuevosErrores.categoria_insumo = 'Selecciona una categoría';
-            if (!formData.tipo_insumo.trim()) nuevosErrores.tipo_insumo = 'El tipo de insumo es obligatorio';
-        } else {
-            if (!formData.especie_destino) nuevosErrores.especie_destino = 'Selecciona una especie';
-            if (!formData.unidad_medida.trim()) nuevosErrores.unidad_medida = 'La unidad de medida es obligatoria';
+        if (!formData.precio_unitario || parseFloat(formData.precio_unitario) <= 0) {
+            nuevosErrores.precio_unitario = 'El precio unitario es obligatorio';
         }
+        if (!formData.proveedor_real.trim()) nuevosErrores.proveedor_real = 'El proveedor es obligatorio';
         
         setErrores(nuevosErrores);
         return Object.keys(nuevosErrores).length === 0;
@@ -91,12 +139,22 @@ export const FormularioCompra = ({
         if (!validarFormulario()) return;
 
         const datosParaBackend = {
-            ...formData,
-            categoria_general: tipoSeleccionado,
-            cantidad: parseFloat(formData.cantidad),
+            id_solicitud: parseInt(formData.id_solicitud),
+            fecha_compra_real: formData.fecha_compra_real,
+            numero_lote: formData.numero_lote,
+            cantidad_real: parseFloat(formData.cantidad_real),
+            precio_unitario: parseFloat(formData.precio_unitario),
+            precio_total: parseFloat(formData.precio_total || '0'),
+            factura: formData.factura,
+            fecha_vencimiento: formData.fecha_vencimiento || null,
+            proveedor_real: formData.proveedor_real,
+            observaciones: formData.observaciones,
+            tipo: tipoSeleccionado,
+            nombre_producto: formData.nombre_producto,
+            unidad_medida: formData.unidad_medida,
         };
 
-        console.log('📤 Datos a enviar (Compra):', datosParaBackend);
+        console.log('📦 Datos a enviar (Registro de Compra Real):', datosParaBackend);
         onGuardar(datosParaBackend, cerrar);
         
         if (!cerrar) {
@@ -113,17 +171,17 @@ export const FormularioCompra = ({
             {/* ============================================================ */}
             {/* SELECTOR DE TIPO (INSUMO / ALIMENTO) */}
             {/* ============================================================ */}
-            <div className="flex justify-center gap-6 p-3 bg-gray-50 rounded-full">
+            <div className="flex justify-center gap-6 p-3 bg-orange-50 rounded-full border border-orange-200">
                 <label className="flex items-center gap-2 cursor-pointer">
                     <input
                         type="radio"
                         name="tipo"
                         checked={tipoSeleccionado === 'insumo'}
                         onChange={() => setTipoSeleccionado('insumo')}
-                        className="w-4 h-4 accent-teal-600"
+                        className="w-4 h-4 accent-orange-600"
                     />
                     <span className={`text-[12px] font-bold uppercase tracking-wider transition-all ${
-                        tipoSeleccionado === 'insumo' ? 'text-teal-700' : 'text-gray-500'
+                        tipoSeleccionado === 'insumo' ? 'text-orange-700' : 'text-gray-500'
                     }`}>
                         🛒 INSUMO
                     </span>
@@ -134,10 +192,10 @@ export const FormularioCompra = ({
                         name="tipo"
                         checked={tipoSeleccionado === 'alimento'}
                         onChange={() => setTipoSeleccionado('alimento')}
-                        className="w-4 h-4 accent-blue-600"
+                        className="w-4 h-4 accent-orange-600"
                     />
                     <span className={`text-[12px] font-bold uppercase tracking-wider transition-all ${
-                        tipoSeleccionado === 'alimento' ? 'text-blue-700' : 'text-gray-500'
+                        tipoSeleccionado === 'alimento' ? 'text-orange-700' : 'text-gray-500'
                     }`}>
                         🌾 ALIMENTO
                     </span>
@@ -145,209 +203,226 @@ export const FormularioCompra = ({
             </div>
 
             {/* ============================================================ */}
-            {/* CAMPOS COMUNES */}
+            {/* SELECCIONAR SOLICITUD APROBADA */}
             {/* ============================================================ */}
-            <div className="grid grid-cols-2 gap-3">
-                {/* Fecha Propuesta */}
-                <div className="flex flex-col gap-1">
-                    <label className="text-[9px] uppercase ml-4 text-teal-500 font-black tracking-tighter">
-                        <Calendar size={10} className="inline mr-1" />
-                        Fecha Propuesta <span className="text-red-400">*</span>
-                    </label>
-                    <input
-                        name="fecha_propuesta"
-                        value={formData.fecha_propuesta}
-                        onChange={manejarCambio}
-                        type="date"
-                        className={`border-1 rounded-full px-6 py-2 text-[11px] focus:outline-none focus:ring-2 text-gray-500 transition-all ${
-                            errores.fecha_propuesta ? 'border-red-400 focus:ring-red-300' : 'border-teal-100 focus:ring-teal-300'
-                        }`}
-                    />
-                    {errores.fecha_propuesta && (
-                        <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.fecha_propuesta}</p>
-                    )}
-                </div>
+            <div className="bg-orange-50/50 p-4 rounded-2xl border border-orange-200">
+                <p className="text-[10px] uppercase font-black text-orange-600 tracking-wider mb-3 flex items-center gap-2">
+                    <CheckCircle size={12} />
+                    SOLICITUD APROBADA A EJECUTAR
+                </p>
+                
+                <select
+                    name="id_solicitud"
+                    value={formData.id_solicitud}
+                    onChange={(e) => seleccionarSolicitud(e.target.value)}
+                    className={`w-full border-1 rounded-full px-6 py-3 text-[12px] bg-white focus:outline-none focus:ring-2 cursor-pointer transition-all ${
+                        errores.id_solicitud ? 'border-red-400 focus:ring-red-300' : 'border-orange-200 focus:ring-orange-300'
+                    }`}
+                >
+                    <option value="">-- Seleccionar solicitud aprobada --</option>
+                    {solicitudesAprobadas.map((solicitud) => (
+                        <option key={solicitud.id_solicitud} value={solicitud.id_solicitud}>
+                            #{solicitud.id_solicitud} - {solicitud.nombre_producto} ({solicitud.cantidad} {solicitud.unidad_medida})
+                        </option>
+                    ))}
+                </select>
+                {errores.id_solicitud && (
+                    <p className="text-[9px] text-red-500 ml-4 mt-1">{errores.id_solicitud}</p>
+                )}
+                
+                {formData.solicitudSeleccionada && (
+                    <div className="mt-3 p-3 bg-white rounded-full text-[10px] text-gray-600 flex items-center justify-between">
+                        <span>📋 Motivo: {formData.solicitudSeleccionada.motivo}</span>
+                    </div>
+                )}
+            </div>
 
-                {/* Cantidad */}
-                <div className="flex flex-col gap-1">
-                    <label className="text-[9px] uppercase ml-4 text-teal-500 font-black tracking-tighter">
-                        <Package size={10} className="inline mr-1" />
-                        Cantidad <span className="text-red-400">*</span>
-                    </label>
-                    <input
-                        name="cantidad"
-                        value={formData.cantidad}
-                        onChange={manejarCambioNumerico}
-                        type="text"
-                        inputMode="decimal"
-                        placeholder="0"
-                        className={`border-1 rounded-full px-6 py-2 text-[11px] focus:outline-none focus:ring-2 text-right font-bold transition-all ${
-                            errores.cantidad ? 'border-red-400 focus:ring-red-300' : 'border-teal-200 focus:ring-teal-300'
-                        }`}
-                    />
-                    {errores.cantidad && (
-                        <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.cantidad}</p>
-                    )}
+            {/* ============================================================ */}
+            {/* DATOS REALES DE COMPRA */}
+            {/* ============================================================ */}
+            <div className="bg-orange-50/30 p-4 rounded-2xl border border-orange-100">
+                <p className="text-[10px] uppercase font-black text-orange-600 tracking-wider mb-3 flex items-center gap-2">
+                    <Truck size={12} />
+                    DATOS REALES DE LA COMPRA
+                </p>
+                
+                <div className="grid grid-cols-2 gap-3">
+                    {/* Fecha Compra Real */}
+                    <div className="flex flex-col gap-1">
+                        <label className="text-[9px] uppercase ml-4 text-orange-500 font-black tracking-tighter">
+                            <Calendar size={10} className="inline mr-1" />
+                            Fecha de Compra <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                            name="fecha_compra_real"
+                            value={formData.fecha_compra_real}
+                            onChange={manejarCambio}
+                            type="date"
+                            className={`border-1 rounded-full px-6 py-2 text-[11px] focus:outline-none focus:ring-2 text-gray-500 transition-all ${
+                                errores.fecha_compra_real ? 'border-red-400 focus:ring-red-300' : 'border-orange-200 focus:ring-orange-300'
+                            }`}
+                        />
+                        {errores.fecha_compra_real && (
+                            <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.fecha_compra_real}</p>
+                        )}
+                    </div>
+
+                    {/* Número de Lote */}
+                    <div className="flex flex-col gap-1">
+                        <label className="text-[9px] uppercase ml-4 text-orange-500 font-black tracking-tighter">
+                            <Hash size={10} className="inline mr-1" />
+                            Número de Lote <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                            name="numero_lote"
+                            value={formData.numero_lote}
+                            onChange={manejarCambio}
+                            type="text"
+                            placeholder="Ej: LOT-2024-001"
+                            className={`border-1 rounded-full px-6 py-2 text-[11px] focus:outline-none focus:ring-2 transition-all ${
+                                errores.numero_lote ? 'border-red-400 focus:ring-red-300' : 'border-orange-200 focus:ring-orange-300'
+                            }`}
+                        />
+                        {errores.numero_lote && (
+                            <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.numero_lote}</p>
+                        )}
+                    </div>
+
+                    {/* Cantidad Real */}
+                    <div className="flex flex-col gap-1">
+                        <label className="text-[9px] uppercase ml-4 text-orange-500 font-black tracking-tighter">
+                            <Package size={10} className="inline mr-1" />
+                            Cantidad Real <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                            name="cantidad_real"
+                            value={formData.cantidad_real}
+                            onChange={manejarCambioNumerico}
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="0"
+                            className={`border-1 rounded-full px-6 py-2 text-[11px] focus:outline-none focus:ring-2 text-right font-bold transition-all ${
+                                errores.cantidad_real ? 'border-red-400 focus:ring-red-300' : 'border-orange-200 focus:ring-orange-300'
+                            }`}
+                        />
+                        {errores.cantidad_real && (
+                            <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.cantidad_real}</p>
+                        )}
+                        {formData.unidad_medida && (
+                            <span className="text-[8px] text-gray-400 ml-4">Unidad: {formData.unidad_medida}</span>
+                        )}
+                    </div>
+
+                    {/* Precio Unitario */}
+                    <div className="flex flex-col gap-1">
+                        <label className="text-[9px] uppercase ml-4 text-orange-500 font-black tracking-tighter">
+                            <DollarSign size={10} className="inline mr-1" />
+                            Precio Unitario <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                            name="precio_unitario"
+                            value={formData.precio_unitario}
+                            onChange={manejarCambioNumerico}
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="$0.00"
+                            className={`border-1 rounded-full px-6 py-2 text-[11px] focus:outline-none focus:ring-2 text-right font-bold transition-all ${
+                                errores.precio_unitario ? 'border-red-400 focus:ring-red-300' : 'border-orange-200 focus:ring-orange-300'
+                            }`}
+                        />
+                        {errores.precio_unitario && (
+                            <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.precio_unitario}</p>
+                        )}
+                    </div>
+
+                    {/* Precio Total (automático) */}
+                    <div className="flex flex-col gap-1">
+                        <label className="text-[9px] uppercase ml-4 text-orange-500 font-black tracking-tighter">
+                            <DollarSign size={10} className="inline mr-1" />
+                            Precio Total
+                        </label>
+                        <input
+                            name="precio_total"
+                            value={formData.precio_total}
+                            readOnly
+                            type="text"
+                            placeholder="$0.00"
+                            className="border-1 border-orange-200 rounded-full px-6 py-2 text-[11px] bg-orange-50 text-right font-bold text-orange-700"
+                        />
+                    </div>
+
+                    {/* Número de Factura */}
+                    <div className="flex flex-col gap-1">
+                        <label className="text-[9px] uppercase ml-4 text-orange-500 font-black tracking-tighter">
+                            <FileText size={10} className="inline mr-1" />
+                            Número de Factura
+                        </label>
+                        <input
+                            name="factura"
+                            value={formData.factura}
+                            onChange={manejarCambio}
+                            type="text"
+                            placeholder="Ej: FAC-001"
+                            className="border-1 border-orange-200 rounded-full px-6 py-2 text-[11px] focus:outline-none focus:ring-2 focus:ring-orange-300"
+                        />
+                    </div>
                 </div>
             </div>
 
             {/* ============================================================ */}
-            {/* CAMPOS ESPECÍFICOS SEGÚN TIPO */}
-            {/* ============================================================ */}
-            {tipoSeleccionado === 'insumo' ? (
-                <div className="bg-teal-50/50 p-4 rounded-2xl space-y-3 border border-teal-200">
-                    <p className="text-[10px] uppercase font-black text-teal-600 tracking-wider">
-                        🛒 DETALLES DEL INSUMO
-                    </p>
-                    
-                    <select
-                        name="categoria_insumo"
-                        value={formData.categoria_insumo}
-                        onChange={manejarCambio}
-                        className={`w-full border-1 rounded-full px-6 py-2 text-[12px] bg-white focus:outline-none focus:ring-2 cursor-pointer transition-all ${
-                            errores.categoria_insumo ? 'border-red-400 focus:ring-red-300' : 'border-teal-200 focus:ring-teal-300'
-                        }`}
-                    >
-                        <option value="">CATEGORÍA DE INSUMO *</option>
-                        <option value="fertilizante">🌱 FERTILIZANTE</option>
-                        <option value="herramienta">🔧 HERRAMIENTA</option>
-                        <option value="empaque">📦 EMPAQUE</option>
-                    </select>
-                    {errores.categoria_insumo && (
-                        <p className="text-[9px] text-red-500 ml-4">{errores.categoria_insumo}</p>
-                    )}
-
-                    <input
-                        name="tipo_insumo"
-                        value={formData.tipo_insumo}
-                        onChange={manejarCambio}
-                        type="text"
-                        placeholder="TIPO DE INSUMO (Ej: Urea) *"
-                        className={`w-full border-1 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 transition-all ${
-                            errores.tipo_insumo ? 'border-red-400 focus:ring-red-300' : 'border-teal-200 focus:ring-teal-300'
-                        }`}
-                    />
-                    {errores.tipo_insumo && (
-                        <p className="text-[9px] text-red-500 ml-4">{errores.tipo_insumo}</p>
-                    )}
-                </div>
-            ) : (
-                <div className="bg-blue-50/50 p-4 rounded-2xl space-y-3 border border-blue-200">
-                    <p className="text-[10px] uppercase font-black text-blue-600 tracking-wider">
-                        🌾 DETALLES DEL ALIMENTO
-                    </p>
-                    
-                    <select
-                        name="especie_destino"
-                        value={formData.especie_destino}
-                        onChange={manejarCambio}
-                        className={`w-full border-1 rounded-full px-6 py-2 text-[12px] bg-white focus:outline-none focus:ring-2 cursor-pointer transition-all ${
-                            errores.especie_destino ? 'border-red-400 focus:ring-red-300' : 'border-blue-200 focus:ring-blue-300'
-                        }`}
-                    >
-                        <option value="">ESPECIE DESTINO *</option>
-                        <option value="cerdos">🐖 CERDOS</option>
-                        <option value="peces">🐟 PECES</option>
-                        <option value="ganado">🐄 GANADO</option>
-                        <option value="gallinas">🐔 GALLINAS</option>
-                    </select>
-                    {errores.especie_destino && (
-                        <p className="text-[9px] text-red-500 ml-4">{errores.especie_destino}</p>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-2">
-                        <input
-                            name="tipo_alimento"
-                            value={formData.tipo_alimento}
-                            onChange={manejarCambio}
-                            type="text"
-                            placeholder="TIPO ALIMENTO"
-                            className="border-1 border-blue-200 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-blue-300"
-                        />
-                        <input
-                            name="unidad_medida"
-                            value={formData.unidad_medida}
-                            onChange={manejarCambio}
-                            type="text"
-                            placeholder="UNIDAD (Ej: Bulto 40kg) *"
-                            className={`border-1 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 transition-all ${
-                                errores.unidad_medida ? 'border-red-400 focus:ring-red-300' : 'border-blue-200 focus:ring-blue-300'
-                            }`}
-                        />
-                    </div>
-                    {errores.unidad_medida && (
-                        <p className="text-[9px] text-red-500 ml-4">{errores.unidad_medida}</p>
-                    )}
-
-                    <input
-                        name="proveedor"
-                        value={formData.proveedor}
-                        onChange={manejarCambio}
-                        type="text"
-                        placeholder="PROVEEDOR SUGERIDO"
-                        className="w-full border-1 border-blue-200 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-blue-300"
-                    />
-                </div>
-            )}
-
-            {/* ============================================================ */}
-            {/* CAMPOS ADICIONALES */}
+            {/* FECHA VENCIMIENTO Y PROVEEDOR */}
             {/* ============================================================ */}
             <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1">
-                    <label className="text-[9px] uppercase ml-4 text-teal-500 font-black tracking-tighter">
+                    <label className="text-[9px] uppercase ml-4 text-orange-500 font-black tracking-tighter">
                         <AlertCircle size={10} className="inline mr-1" />
-                        Fecha Vencimiento
+                        Fecha de Vencimiento
                     </label>
                     <input
                         name="fecha_vencimiento"
                         value={formData.fecha_vencimiento}
                         onChange={manejarCambio}
                         type="date"
-                        className="border-1 border-teal-100 rounded-full px-6 py-2 text-[11px] focus:outline-none focus:ring-2 focus:ring-teal-300 text-gray-500"
+                        className="border-1 border-orange-200 rounded-full px-6 py-2 text-[11px] focus:outline-none focus:ring-2 focus:ring-orange-300 text-gray-500"
                     />
+                    <span className="text-[8px] text-gray-400 ml-4">Opcional - solo si aplica</span>
                 </div>
 
                 <div className="flex flex-col gap-1">
-                    <label className="text-[9px] uppercase ml-4 text-teal-500 font-black tracking-tighter">
-                        <User size={10} className="inline mr-1" />
-                        Solicitante <span className="text-red-400">*</span>
+                    <label className="text-[9px] uppercase ml-4 text-orange-500 font-black tracking-tighter">
+                        <Building size={10} className="inline mr-1" />
+                        Proveedor Real <span className="text-red-400">*</span>
                     </label>
                     <input
-                        name="usuario"
-                        value={formData.usuario}
+                        name="proveedor_real"
+                        value={formData.proveedor_real}
                         onChange={manejarCambio}
                         type="text"
-                        placeholder="Nombre del solicitante"
-                        className={`border-1 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 transition-all ${
-                            errores.usuario ? 'border-red-400 focus:ring-red-300' : 'border-teal-200 focus:ring-teal-300'
+                        placeholder="Nombre del proveedor"
+                        className={`border-1 rounded-full px-6 py-2 text-[11px] focus:outline-none focus:ring-2 transition-all ${
+                            errores.proveedor_real ? 'border-red-400 focus:ring-red-300' : 'border-orange-200 focus:ring-orange-300'
                         }`}
                     />
-                    {errores.usuario && (
-                        <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.usuario}</p>
+                    {errores.proveedor_real && (
+                        <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.proveedor_real}</p>
                     )}
                 </div>
             </div>
 
-            {/* Motivo */}
+            {/* Observaciones */}
             <div>
-                <label className="text-[9px] uppercase ml-4 text-teal-500 font-black tracking-tighter">
+                <label className="text-[9px] uppercase ml-4 text-orange-500 font-black tracking-tighter">
                     <FileText size={10} className="inline mr-1" />
-                    Motivo de la Solicitud <span className="text-red-400">*</span>
+                    Observaciones de la Compra
                 </label>
                 <textarea
-                    name="motivo"
-                    value={formData.motivo}
+                    name="observaciones"
+                    value={formData.observaciones}
                     onChange={manejarCambio}
-                    placeholder="Describa el motivo de la compra..."
+                    placeholder="Información adicional sobre la compra, condiciones, garantía, etc."
                     rows={2}
-                    className={`w-full border-1 rounded-2xl px-6 py-2 text-[12px] focus:outline-none focus:ring-2 resize-none transition-all ${
-                        errores.motivo ? 'border-red-400 focus:ring-red-300' : 'border-teal-200 focus:ring-teal-300'
-                    }`}
+                    className="w-full border-1 border-orange-200 rounded-2xl px-6 py-2 text-[11px] focus:outline-none focus:ring-2 focus:ring-orange-300 resize-none"
                 />
-                {errores.motivo && (
-                    <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.motivo}</p>
-                )}
             </div>
 
             {/* ============================================================ */}
@@ -357,16 +432,16 @@ export const FormularioCompra = ({
                 <button
                     type="button"
                     onClick={() => ejecutarEnvio(false)}
-                    className="flex-1 bg-white border-1 border-teal-400 text-teal-500 px-6 py-3 rounded-l-full rounded-r-lg font-black text-[11px] uppercase italic shadow-sm active:scale-95 hover:bg-teal-50 transition-all"
+                    className="flex-1 bg-white border-1 border-orange-400 text-orange-500 px-6 py-3 rounded-l-full rounded-r-lg font-black text-[11px] uppercase italic shadow-sm active:scale-95 hover:bg-orange-50 transition-all"
                 >
                     Guardar y Seguir
                 </button>
                 <button
                     type="button"
                     onClick={() => ejecutarEnvio(true)}
-                    className="flex-1 bg-teal-600 hover:bg-teal-700 text-white px-6 py-3 rounded-r-full rounded-l-lg font-black text-[11px] uppercase shadow-md active:scale-95 transition-all"
+                    className="flex-1 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-r-full rounded-l-lg font-black text-[11px] uppercase shadow-md active:scale-95 transition-all"
                 >
-                    Registrar Solicitud
+                    Registrar Compra
                 </button>
             </div>
 

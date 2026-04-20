@@ -33,7 +33,7 @@ model Persona {
   id_tipo_doc     Int
   id_estado       Int
   nombre_completo String              @db.VarChar(150)
-  num_documento   String              @db.VarChar(20)  // 🆕 Ya NO es @unique
+  num_documento   String              @db.VarChar(20)
   email           String              @unique @db.VarChar(100)
   telefono        String?             @db.VarChar(20)
   nombre_usuario  String?             @unique @db.VarChar(50)
@@ -52,10 +52,10 @@ model Persona {
   recordatorios   Recordatorio[]
   tokens          RecuperacionClave[]
   vacunaciones    RegVacuna[]
+  vacunacionesAdmin RegVacuna[]         @relation("AdminVacunas")
   solicitudes     Solicitud[]         @relation("solicitante")
   aprobaciones    Solicitud[]         @relation("aprobador")
   
-  // 🆕 LLAVE COMPUESTA ÚNICA
   @@unique([id_tipo_doc, num_documento])
 }
 
@@ -133,9 +133,14 @@ model RegVacuna {
   dosis            String?    @db.VarChar(50)
   lote_vacuna      String?    @db.VarChar(50)
   observaciones    String?
-  animal           Animal     @relation(fields: [id_animal], references: [id_animal])
-  responsable      Persona    @relation(fields: [id_responsable], references: [id_persona])
-  vacuna           CatVacunas @relation(fields: [id_vacuna], references: [id_vacuna])
+  proximo_refuerzo DateTime?
+  id_admin         Int        @default(1)
+  veterinario      String?    @db.VarChar(100)
+  
+  animal      Animal     @relation(fields: [id_animal], references: [id_animal])
+  vacuna      CatVacunas @relation(fields: [id_vacuna], references: [id_vacuna])
+  responsable Persona    @relation(fields: [id_responsable], references: [id_persona])
+  admin       Persona    @relation("AdminVacunas", fields: [id_admin], references: [id_persona])
 }
 
 model CatInsumos {
@@ -184,7 +189,6 @@ model LoteInv {
   updatedAt    DateTime
   insumo       CatInsumos @relation(fields: [id_insumo], references: [id_insumo])
 }
-
 
 model Recordatorio {
   id             String    @id @default(uuid())

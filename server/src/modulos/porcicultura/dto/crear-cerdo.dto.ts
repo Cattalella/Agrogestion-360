@@ -1,35 +1,39 @@
-import { IsString, IsOptional, IsNumber, IsDateString, Min, IsIn } from 'class-validator';
+import { IsOptional, IsString, IsNumber, IsDateString } from 'class-validator';
 
 export class CrearCerdoDto {
-    @IsString({ message: 'El ID Local es obligatorio' })
+    @IsString()
     local: string;
 
     @IsOptional()
     @IsString()
     oficial?: string;
 
-    @IsString({ message: 'El sexo es obligatorio' })
-    @IsIn(['HEMBRA', 'MACHO', 'F', 'M'], { message: 'Sexo debe ser HEMBRA, MACHO, F o M' })
-    sexo: string;
+    @IsOptional()
+    @IsString()
+    sexo?: string;
 
     @IsOptional()
     @IsString()
     raza?: string;
 
     @IsOptional()
-    @IsDateString({}, { message: 'Fecha de nacimiento inválida' })
+    @IsDateString()
     nacimiento?: string;
 
-    @IsDateString({}, { message: 'Fecha de ingreso inválida' })
+    @IsDateString()
     ingreso: string;
 
-    @IsNumber({}, { message: 'El peso debe ser un número' })
-    @Min(0, { message: 'El peso no puede ser negativo' })
-    peso: number;
+    @IsOptional()
+    @IsNumber()
+    peso?: number;
 
     @IsOptional()
     @IsString()
     origen?: string;
+
+    @IsOptional()
+    @IsString()
+    foto?: string;
 
     @IsOptional()
     @IsString()
@@ -42,8 +46,4 @@ export class CrearCerdoDto {
     @IsOptional()
     @IsString()
     salud?: string;
-
-    @IsOptional()
-    @IsString()
-    foto?: string;
 }

@@ -1,16 +1,21 @@
 import { useState, useEffect } from "react";
-import { Syringe } from "lucide-react";
 
 interface FormularioVacunaProps {
     listaAnimales: any[];
     onGuardar: (datos: any, cerrar: boolean) => void;
+    vacunaAEditar?: any | null;
+    onCancelarEdicion?: () => void;
 }
 
-export const FormularioVacuna = ({ listaAnimales, onGuardar }: FormularioVacunaProps) => {
+export const FormularioVacuna = ({ 
+    listaAnimales, 
+    onGuardar,
+    vacunaAEditar,
+    onCancelarEdicion
+}: FormularioVacunaProps) => {
     
-    // ============================================================
-    // ESTADO INICIAL
-    // ============================================================
+    const esEdicion = !!vacunaAEditar;
+
     const estadoInicial = {
         tipo_animal: "",
         id_animal: "",
@@ -20,7 +25,7 @@ export const FormularioVacuna = ({ listaAnimales, onGuardar }: FormularioVacunaP
         via_aplicacion: "INTRAMUSCULAR",
         lote_vacuna: "",
         proximo_refuerzo: "",
-        responsable: "",
+        veterinario: "",
         observaciones: ""
     };
 
@@ -28,31 +33,70 @@ export const FormularioVacuna = ({ listaAnimales, onGuardar }: FormularioVacunaP
     const [errores, setErrores] = useState<Record<string, string>>({});
     const [animalesFiltrados, setAnimalesFiltrados] = useState<any[]>([]);
 
-    // ============================================================
-    // FILTRAR ANIMALES ACTIVOS POR TIPO SELECCIONADO
-    // ============================================================
     useEffect(() => {
-        if (formData.tipo_animal) {
-            const filtrados = listaAnimales.filter(a => {
-                const esBovino = a.especie === 'Bovino' || a.especie?.nombre === 'Bovino' || a.tipo_animal === 'BOVINO';
-                const esPorcino = a.especie === 'Porcino' || a.especie?.nombre === 'Porcino' || a.tipo_animal === 'PORCINO';
-                const estaActivo = a.estado === 'Activo' || a.estado?.nombre === 'Activo' || a.EstadoAni?.nombre === 'Activo';
-                
-                if (formData.tipo_animal === 'BOVINO') {
-                    return esBovino && estaActivo;
-                } else {
-                    return esPorcino && estaActivo;
-                }
+        if (vacunaAEditar) {
+            console.log('✏️ Cargando vacuna para edición:', vacunaAEditar);
+            setFormData({
+                tipo_animal: vacunaAEditar.tipo_animal || "",
+                id_animal: vacunaAEditar.id_animal?.toString() || "",
+                tipo_vacuna: vacunaAEditar.tipo_vacuna || "",
+                fecha_aplicacion: vacunaAEditar.fecha_aplicacion?.split('T')[0] || new Date().toISOString().split('T')[0],
+                dosis: vacunaAEditar.dosis || "",
+                via_aplicacion: vacunaAEditar.via_aplicacion || "INTRAMUSCULAR",
+                lote_vacuna: vacunaAEditar.lote_vacuna || "",
+                proximo_refuerzo: vacunaAEditar.proximo_refuerzo?.split('T')[0] || "",
+                veterinario: vacunaAEditar.veterinario || "",
+                observaciones: vacunaAEditar.observaciones || ""
             });
-            setAnimalesFiltrados(filtrados);
+        } else {
+            setFormData(estadoInicial);
+            setAnimalesFiltrados([]);
+        }
+    }, [vacunaAEditar]);
+
+    // Función para determinar si un animal es GANADO por su código local
+    const esGanadoPorCodigo = (codigoLocal: string) => {
+        return codigoLocal?.startsWith('VA') || 
+               codigoLocal?.startsWith('TO') || 
+               codigoLocal?.startsWith('NO') || 
+               codigoLocal?.startsWith('TE');
+    };
+
+    // Función para determinar si un animal es CERDO por su código local
+    const esCerdoPorCodigo = (codigoLocal: string) => {
+        return codigoLocal?.startsWith('C') || 
+               codigoLocal?.startsWith('V') || 
+               codigoLocal?.startsWith('L') || 
+               codigoLocal?.startsWith('E');
+    };
+
+    // Filtrar animales por tipo seleccionado usando el código local
+    useEffect(() => {
+        if (formData.tipo_animal === "GANADO") {
+            const ganado = listaAnimales.filter(a => {
+                const codigoLocal = a.codigo_local || a.local || '';
+                const esGanado = esGanadoPorCodigo(codigoLocal);
+                const estaActivo = a.estado === 'Activo' || 
+                                  a.estado?.nombre === 'Activo' || 
+                                  a.EstadoAni?.nombre === 'Activo';
+                return esGanado && estaActivo;
+            });
+            setAnimalesFiltrados(ganado);
+        } else if (formData.tipo_animal === "CERDO") {
+            const cerdos = listaAnimales.filter(a => {
+                const codigoLocal = a.codigo_local || a.local || '';
+                const esCerdo = esCerdoPorCodigo(codigoLocal);
+                const estaActivo = a.estado === 'Activo' || 
+                                  a.estado?.nombre === 'Activo' || 
+                                  a.EstadoAni?.nombre === 'Activo';
+                return esCerdo && estaActivo;
+            });
+            setAnimalesFiltrados(cerdos);
         } else {
             setAnimalesFiltrados([]);
         }
     }, [formData.tipo_animal, listaAnimales]);
 
-    // ============================================================
-    // MANEJADORES DE CAMBIOS
-    // ============================================================
     const manejarCambio = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
@@ -61,6 +105,7 @@ export const FormularioVacuna = ({ listaAnimales, onGuardar }: FormularioVacunaP
         }
         if (name === 'tipo_animal') {
             setFormData(prev => ({ ...prev, id_animal: '' }));
+            setAnimalesFiltrados([]);
         }
     };
 
@@ -71,9 +116,6 @@ export const FormularioVacuna = ({ listaAnimales, onGuardar }: FormularioVacunaP
         }
     };
 
-    // ============================================================
-    // VALIDACIÓN
-    // ============================================================
     const validarFormulario = (): boolean => {
         const nuevosErrores: Record<string, string> = {};
         
@@ -82,7 +124,10 @@ export const FormularioVacuna = ({ listaAnimales, onGuardar }: FormularioVacunaP
         if (!formData.tipo_vacuna) nuevosErrores.tipo_vacuna = 'El tipo de vacuna es obligatorio';
         if (!formData.fecha_aplicacion) nuevosErrores.fecha_aplicacion = 'La fecha es obligatoria';
         
-        // 🆕 Validar que la fecha de aplicación no sea futura
+        if (formData.dosis && parseFloat(formData.dosis) <= 0) {
+            nuevosErrores.dosis = 'La dosis debe ser mayor a 0';
+        }
+        
         if (formData.fecha_aplicacion) {
             const fechaApp = new Date(formData.fecha_aplicacion);
             const hoy = new Date();
@@ -92,7 +137,6 @@ export const FormularioVacuna = ({ listaAnimales, onGuardar }: FormularioVacunaP
             }
         }
         
-        // 🆕 Validar que el refuerzo sea posterior a la aplicación
         if (formData.fecha_aplicacion && formData.proximo_refuerzo) {
             const fechaApp = new Date(formData.fecha_aplicacion);
             const fechaRef = new Date(formData.proximo_refuerzo);
@@ -105,14 +149,10 @@ export const FormularioVacuna = ({ listaAnimales, onGuardar }: FormularioVacunaP
         return Object.keys(nuevosErrores).length === 0;
     };
 
-    // ============================================================
-    // ENVIAR FORMULARIO
-    // ============================================================
     const ejecutarEnvio = (cerrar: boolean) => {
         if (!validarFormulario()) return;
 
         const datosParaBackend = {
-            tipo_animal: formData.tipo_animal,
             id_animal: parseInt(formData.id_animal),
             tipo_vacuna: formData.tipo_vacuna,
             fecha_aplicacion: formData.fecha_aplicacion,
@@ -120,29 +160,28 @@ export const FormularioVacuna = ({ listaAnimales, onGuardar }: FormularioVacunaP
             via_aplicacion: formData.via_aplicacion,
             lote_vacuna: formData.lote_vacuna || null,
             proximo_refuerzo: formData.proximo_refuerzo || null,
-            responsable: formData.responsable || 'Administrador',
+            veterinario: formData.veterinario || null,
             observaciones: formData.observaciones || null
         };
 
         console.log('📤 Datos a enviar (Vacuna):', datosParaBackend);
         onGuardar(datosParaBackend, cerrar);
         
-        if (!cerrar) {
+        if (!cerrar && !esEdicion) {
             setFormData(estadoInicial);
+            setAnimalesFiltrados([]);
             setErrores({});
         }
     };
 
-    // ============================================================
-    // RENDER
-    // ============================================================
+    const handleCancelar = () => {
+        if (onCancelarEdicion) onCancelarEdicion();
+    };
+
     return (
         <form className="grid grid-cols-2 gap-4 animate-in fade-in zoom-in-95 duration-500 p-2">
-            {/* ============================================================ */}
             {/* COLUMNA IZQUIERDA */}
-            {/* ============================================================ */}
             <div className="flex flex-col gap-3">
-                {/* Tipo de Vacuna */}
                 <div>
                     <input
                         name="tipo_vacuna"
@@ -159,7 +198,6 @@ export const FormularioVacuna = ({ listaAnimales, onGuardar }: FormularioVacunaP
                     )}
                 </div>
 
-                {/* Dosis con "ml" pegado */}
                 <div className="relative">
                     <input
                         name="dosis"
@@ -167,15 +205,15 @@ export const FormularioVacuna = ({ listaAnimales, onGuardar }: FormularioVacunaP
                         onChange={manejarCambioNumerico}
                         type="text"
                         inputMode="decimal"
-                        placeholder="DOSIS APLICADA"
+                        placeholder="DOSIS APLICADA (opcional)"
                         className="w-full border-1 border-cyan-200 rounded-full pl-4 pr-14 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-cyan-300 text-right font-bold"
                     />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-bold text-cyan-400">
-                        ml
-                    </span>
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-bold text-cyan-400">ml</span>
+                    {errores.dosis && (
+                        <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.dosis}</p>
+                    )}
                 </div>
 
-                {/* Tipo de Animal */}
                 <div>
                     <select
                         name="tipo_animal"
@@ -186,15 +224,14 @@ export const FormularioVacuna = ({ listaAnimales, onGuardar }: FormularioVacunaP
                         }`}
                     >
                         <option value="">TIPO DE ANIMAL *</option>
-                        <option value="BOVINO">🐄 BOVINO</option>
-                        <option value="PORCINO">🐖 PORCINO</option>
+                        <option value="GANADO">🐄 GANADO</option>
+                        <option value="CERDO">🐖 CERDOS</option>
                     </select>
                     {errores.tipo_animal && (
                         <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.tipo_animal}</p>
                     )}
                 </div>
 
-                {/* 🆕 ID del Animal - Selector Enriquecido */}
                 <div>
                     <select
                         name="id_animal"
@@ -203,7 +240,7 @@ export const FormularioVacuna = ({ listaAnimales, onGuardar }: FormularioVacunaP
                         disabled={!formData.tipo_animal || animalesFiltrados.length === 0}
                         className={`w-full border-1 rounded-full px-6 py-2 text-[12px] bg-white focus:outline-none focus:ring-2 cursor-pointer transition-all ${
                             errores.id_animal ? 'border-red-400 focus:ring-red-300' : 'border-cyan-200 focus:ring-cyan-300 text-cyan-700 font-bold'
-                        } ${!formData.tipo_animal ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        } ${(!formData.tipo_animal) ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                         <option value="">SELECCIONAR ANIMAL *</option>
                         {animalesFiltrados.map(animal => {
@@ -211,9 +248,11 @@ export const FormularioVacuna = ({ listaAnimales, onGuardar }: FormularioVacunaP
                             const raza = animal.raza || 'Sin raza';
                             const sexo = animal.sexo === 'F' ? 'HEMBRA' : animal.sexo === 'M' ? 'MACHO' : animal.sexo || '—';
                             const peso = animal.peso_actual ? `${animal.peso_actual}kg` : '—';
+                            // Clave única combinando id y código local para evitar duplicados
+                            const uniqueKey = `${animal.id_animal || animal.id}-${animal.codigo_local || animal.local || animal.id}`;
                             
                             return (
-                                <option key={animal.id_animal || animal.id} value={animal.id_animal || animal.id}>
+                                <option key={uniqueKey} value={animal.id_animal || animal.id}>
                                     {idLocal} | {raza} | {sexo} | {peso}
                                 </option>
                             );
@@ -222,14 +261,16 @@ export const FormularioVacuna = ({ listaAnimales, onGuardar }: FormularioVacunaP
                     {errores.id_animal && (
                         <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.id_animal}</p>
                     )}
+                    {formData.tipo_animal && animalesFiltrados.length === 0 && !esEdicion && (
+                        <p className="text-[9px] text-amber-500 ml-4 mt-0.5">
+                            ⚠️ No hay animales {formData.tipo_animal === 'GANADO' ? 'GANADO' : 'CERDOS'} activos disponibles
+                        </p>
+                    )}
                 </div>
             </div>
 
-            {/* ============================================================ */}
             {/* COLUMNA DERECHA */}
-            {/* ============================================================ */}
             <div className="flex flex-col gap-3">
-                {/* Fecha de Aplicación */}
                 <div className="flex flex-col gap-1">
                     <label className="text-[9px] uppercase ml-4 text-cyan-400 font-black tracking-tighter">
                         Fecha Aplicación <span className="text-red-400">*</span>
@@ -248,7 +289,6 @@ export const FormularioVacuna = ({ listaAnimales, onGuardar }: FormularioVacunaP
                     )}
                 </div>
 
-                {/* Vía de Aplicación */}
                 <select
                     name="via_aplicacion"
                     value={formData.via_aplicacion}
@@ -260,7 +300,6 @@ export const FormularioVacuna = ({ listaAnimales, onGuardar }: FormularioVacunaP
                     <option value="ORAL">💊 ORAL</option>
                 </select>
 
-                {/* Próximo Refuerzo */}
                 <div className="flex flex-col gap-1">
                     <label className="text-[9px] uppercase ml-4 text-cyan-400 font-black tracking-tighter">
                         Próximo Refuerzo
@@ -279,7 +318,6 @@ export const FormularioVacuna = ({ listaAnimales, onGuardar }: FormularioVacunaP
                     )}
                 </div>
 
-                {/* Lote de Vacuna */}
                 <input
                     name="lote_vacuna"
                     value={formData.lote_vacuna}
@@ -289,35 +327,53 @@ export const FormularioVacuna = ({ listaAnimales, onGuardar }: FormularioVacunaP
                     className="border-1 border-cyan-200 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-cyan-300"
                 />
 
-                {/* Responsable */}
                 <input
-                    name="responsable"
-                    value={formData.responsable}
+                    name="veterinario"
+                    value={formData.veterinario}
                     onChange={manejarCambio}
                     type="text"
-                    placeholder="RESPONSABLE"
+                    placeholder="VETERINARIO (nombre)"
                     className="border-1 border-cyan-200 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-cyan-300"
                 />
             </div>
 
-            {/* ============================================================ */}
             {/* BOTONES */}
-            {/* ============================================================ */}
             <div className="col-span-2 flex justify-between mt-6 gap-4">
-                <button 
-                    type="button"
-                    onClick={() => ejecutarEnvio(false)}
-                    className="flex-1 bg-white border-1 border-cyan-400 text-cyan-500 px-6 py-3 rounded-l-full rounded-r-lg font-black text-[11px] uppercase italic shadow-sm active:scale-95 hover:bg-cyan-50 transition-all"
-                >
-                    Guardar y Seguir
-                </button>
-                <button 
-                    type="button"
-                    onClick={() => ejecutarEnvio(true)}
-                    className="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-3 rounded-r-full rounded-l-lg font-black text-[11px] uppercase shadow-md active:scale-95 transition-all"
-                >
-                    Guardar y Salir
-                </button>
+                {esEdicion ? (
+                    <>
+                        <button 
+                            type="button"
+                            onClick={handleCancelar}
+                            className="flex-1 bg-gray-200 text-gray-600 px-6 py-3 rounded-full font-black text-[11px] uppercase italic shadow-sm active:scale-95 hover:bg-gray-300 transition-all"
+                        >
+                            Cancelar
+                        </button>
+                        <button 
+                            type="button"
+                            onClick={() => ejecutarEnvio(true)}
+                            className="flex-1 bg-amber-600 hover:bg-amber-700 text-white px-6 py-3 rounded-full font-black text-[11px] uppercase shadow-md active:scale-95 transition-all"
+                        >
+                            ✏️ Actualizar Vacuna
+                        </button>
+                    </>
+                ) : (
+                    <>
+                        <button 
+                            type="button"
+                            onClick={() => ejecutarEnvio(false)}
+                            className="flex-1 bg-white border-1 border-cyan-400 text-cyan-500 px-6 py-3 rounded-full font-black text-[11px] uppercase italic shadow-sm active:scale-95 hover:bg-cyan-50 transition-all"
+                        >
+                            Guardar y Seguir
+                        </button>
+                        <button 
+                            type="button"
+                            onClick={() => ejecutarEnvio(true)}
+                            className="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-3 rounded-full font-black text-[11px] uppercase shadow-md active:scale-95 transition-all"
+                        >
+                            Guardar y Salir
+                        </button>
+                    </>
+                )}
             </div>
         </form>
     );

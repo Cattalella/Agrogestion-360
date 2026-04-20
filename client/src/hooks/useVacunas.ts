@@ -1,21 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import apiClient from '../api/apiClient';
 
-// ============================================================
-// 📌 INTERFACES
-// ============================================================
 interface Vacuna {
-    id: number;
+    id_reg_vac: number;
     id_animal: number;
-    animal: string;
     tipo_vacuna: string;
     fecha_aplicacion: string;
     dosis?: string;
-    via_aplicacion?: string;
     lote_vacuna?: string;
     proximo_refuerzo?: string;
-    responsable?: string;
+    veterinario?: string;
+    admin_id?: number;
     observaciones?: string;
+    animal?: {
+        codigo_local: string;
+    };
 }
 
 export interface VacunasStats {
@@ -25,27 +24,47 @@ export interface VacunasStats {
     cantidad2: number;
 }
 
-// ============================================================
-// 📌 HOOK PRINCIPAL
-// ============================================================
+interface ModalConfirmacionState {
+    isOpen: boolean;
+    id: number | null;
+    nombre: string;
+}
+
 export const useVacunas = () => {
     const [listaVacunas, setListaVacunas] = useState<Vacuna[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [vista, setVista] = useState<'lista' | 'formulario'>('lista');
     const [cargando, setCargando] = useState(false);
-    
-    // 🆕 Lista de animales disponibles para vacunar
     const [animalesDisponibles, setAnimalesDisponibles] = useState<any[]>([]);
+    
+    const [vacunaAEditar, setVacunaAEditar] = useState<any | null>(null);
+    const [modalConfirmacion, setModalConfirmacion] = useState<ModalConfirmacionState>({
+        isOpen: false,
+        id: null,
+        nombre: ''
+    });
+    const [eliminando, setEliminando] = useState(false);
 
-    // ============================================================
-    // CARGAR VACUNAS
-    // ============================================================
     const cargarVacunas = async () => {
         setCargando(true);
         try {
             const respuesta = await apiClient.get('/vacunacion');
-            setListaVacunas(respuesta.data);
-            console.log('✅ Vacunas cargadas:', respuesta.data.length);
+            const vacunasTransformadas = respuesta.data.map((v: any) => ({
+                id_reg_vac: v.id_reg_vac,
+                id_animal: v.id_animal,
+                tipo_vacuna: v.tipo_vacuna,
+                fecha_aplicacion: v.fecha_aplicacion,
+                dosis: v.dosis,
+                lote_vacuna: v.lote_vacuna,
+                proximo_refuerzo: v.proximo_refuerzo,
+                veterinario: v.veterinario,
+                admin_id: v.admin_id,
+                admin_nombre: v.admin_nombre || 'No registrado',
+                observaciones: v.observaciones,
+                animal: v.animal
+            }));
+            setListaVacunas(vacunasTransformadas);
+            console.log('✅ Vacunas cargadas:', vacunasTransformadas.length);
         } catch (error) {
             console.error('❌ Error al cargar vacunas:', error);
         } finally {
@@ -53,28 +72,33 @@ export const useVacunas = () => {
         }
     };
 
-    // ============================================================
-    // 🆕 CARGAR ANIMALES DISPONIBLES PARA VACUNAR
-    // ============================================================
     const cargarAnimalesDisponibles = async () => {
         try {
-            // Obtener animales bovinos
-            const bovinos = await apiClient.get('/ganaderia');
-            // Obtener animales porcinos
-            const porcinos = await apiClient.get('/porcicultura/cerdos');
+            const ganado = await apiClient.get('/ganaderia');
+            const cerdos = await apiClient.get('/porcicultura/cerdos');
+            
+            console.log('📊 GANADO del backend:', ganado.data);
+            console.log('📊 CERDOS del backend:', cerdos.data);
             
             const todos = [
-                ...(bovinos.data || []).map((a: any) => ({ 
+                ...(ganado.data || []).map((a: any) => ({ 
                     ...a, 
-                    tipo_animal: 'BOVINO',
+                    tipo: 'GANADO',
                     id: a.id_animal || a.id 
                 })),
-                ...(porcinos.data || []).map((a: any) => ({ 
+                ...(cerdos.data || []).map((a: any) => ({ 
                     ...a, 
-                    tipo_animal: 'PORCINO',
+                    tipo: 'CERDO',
                     id: a.id_animal || a.id 
                 }))
             ];
+            
+            console.log('📊 TODOS los animales después de mapear:', todos.map(a => ({ 
+                id: a.id, 
+                local: a.codigo_local || a.local, 
+                tipo: a.tipo,
+                especie: a.especie
+            })));
             
             setAnimalesDisponibles(todos);
             console.log('✅ Animales disponibles para vacunar:', todos.length);
@@ -83,13 +107,11 @@ export const useVacunas = () => {
         }
     };
 
-    // Cargar al iniciar
     useEffect(() => {
         cargarVacunas();
         cargarAnimalesDisponibles();
     }, []);
 
-    // Refrescar al abrir modal
     useEffect(() => {
         if (isModalOpen) {
             cargarVacunas();
@@ -97,38 +119,30 @@ export const useVacunas = () => {
         }
     }, [isModalOpen]);
 
-    // ============================================================
-    // 🆕 CALCULAR STATS PARA LA CARD (CORREGIDO)
-    // ============================================================
-    const calcularStats = (): VacunasStats => {
-        // Contar vacunas por tipo de animal
+    const stats = useMemo((): VacunasStats => {
+        // Contar vacunas por tipo de animal usando el código local
         const ganadosVacunados = listaVacunas.filter(v => {
-            // Buscar el animal en la lista de disponibles
-            const animal = animalesDisponibles.find(a => 
-                (a.id_animal || a.id) === v.id_animal
-            );
+            const animal = animalesDisponibles.find(a => a.id === v.id_animal);
+            const codigoLocal = animal?.codigo_local || animal?.local || '';
             
-            // Verificar si es bovino
-            const esBovino = animal?.tipo_animal === 'BOVINO' || 
-                             animal?.especie === 'Bovino' ||
-                             animal?.especie?.nombre === 'Bovino';
-            
-            return esBovino;
+            // GANADO: prefijos VA, TO, NO, TE
+            const esGanado = codigoLocal.startsWith('VA') || 
+                            codigoLocal.startsWith('TO') || 
+                            codigoLocal.startsWith('NO') || 
+                            codigoLocal.startsWith('TE');
+            return esGanado;
         }).length;
         
         const cerdosVacunados = listaVacunas.filter(v => {
-            // Buscar el animal en la lista de disponibles
-            const animal = animalesDisponibles.find(a => 
-                (a.id_animal || a.id) === v.id_animal
-            );
+            const animal = animalesDisponibles.find(a => a.id === v.id_animal);
+            const codigoLocal = animal?.codigo_local || animal?.local || '';
             
-            // Verificar si es porcino
-            const esPorcino = animal?.tipo_animal === 'PORCINO' || 
-                              animal?.especie === 'Porcino' ||
-                              animal?.especie?.nombre === 'Porcino' ||
-                              animal?.especie?.nombre === 'Cerdo';
-            
-            return esPorcino;
+            // CERDO: prefijos C, V, L, E
+            const esCerdo = codigoLocal.startsWith('C') || 
+                           codigoLocal.startsWith('V') || 
+                           codigoLocal.startsWith('L') || 
+                           codigoLocal.startsWith('E');
+            return esCerdo;
         }).length;
 
         console.log('📊 Stats calculados:', { ganadosVacunados, cerdosVacunados });
@@ -139,12 +153,10 @@ export const useVacunas = () => {
             tipo2: "CERDOS VACUNADOS",
             cantidad2: cerdosVacunados
         };
-    };
+    }, [listaVacunas, animalesDisponibles]);
 
-    // ============================================================
-    // ABRIR / CERRAR MODAL
-    // ============================================================
     const abrirModal = () => {
+        setVacunaAEditar(null);
         setVista('lista');
         setIsModalOpen(true);
     };
@@ -152,33 +164,78 @@ export const useVacunas = () => {
     const cerrarModal = () => {
         setIsModalOpen(false);
         setVista('lista');
+        setVacunaAEditar(null);
     };
 
-    const cambiarVista = (nuevaVista: 'lista' | 'formulario') => setVista(nuevaVista);
+    const cambiarVista = (nuevaVista: 'lista' | 'formulario') => {
+        setVista(nuevaVista);
+        if (nuevaVista === 'lista') {
+            setVacunaAEditar(null);
+        }
+    };
 
-    // ============================================================
-    // GUARDAR VACUNA (BACKEND)
-    // ============================================================
+    const abrirEdicion = (vacuna: any) => {
+        console.log('✏️ Abriendo edición para vacuna:', vacuna);
+        setVacunaAEditar(vacuna);
+        setVista('formulario');
+    };
+
+    const cancelarEdicion = () => {
+        setVacunaAEditar(null);
+        setVista('lista');
+    };
+
+    const abrirModalEliminar = (id: number, nombre: string) => {
+        setModalConfirmacion({ isOpen: true, id, nombre });
+    };
+
+    const cerrarModalConfirmacion = () => {
+        setModalConfirmacion({ isOpen: false, id: null, nombre: '' });
+        setEliminando(false);
+    };
+
+    const confirmarEliminar = async () => {
+        if (!modalConfirmacion.id) return;
+        setEliminando(true);
+        try {
+            await apiClient.delete(`/vacunacion/${modalConfirmacion.id}`);
+            await cargarVacunas();
+            cerrarModalConfirmacion();
+        } catch (error) {
+            console.error('❌ Error al eliminar:', error);
+            alert('Error al eliminar la vacuna');
+        } finally {
+            setEliminando(false);
+        }
+    };
+
     const guardarVacuna = async (datos: any, cerrar: boolean = true) => {
         setCargando(true);
         try {
             const datosParaBackend = {
-                id_animal: parseInt(datos.id_animal),
+                id_animal: datos.id_animal,
                 tipo_vacuna: datos.tipo_vacuna,
                 fecha_aplicacion: datos.fecha_aplicacion,
                 dosis: datos.dosis || null,
                 via_aplicacion: datos.via_aplicacion || 'INTRAMUSCULAR',
                 lote_vacuna: datos.lote_vacuna || null,
                 proximo_refuerzo: datos.proximo_refuerzo || null,
-                responsable: datos.responsable || 'Administrador',
+                veterinario: datos.veterinario || null,
                 observaciones: datos.observaciones || null
             };
 
-            console.log('📤 Enviando a backend (Vacuna):', datosParaBackend);
-            
-            await apiClient.post('/vacunacion', datosParaBackend);
+            if (vacunaAEditar) {
+                console.log('✏️ Editando vacuna:', vacunaAEditar.id_reg_vac, datosParaBackend);
+                await apiClient.put(`/vacunacion/${vacunaAEditar.id_reg_vac}`, datosParaBackend);
+                console.log('✅ Vacuna actualizada');
+            } else {
+                console.log('📤 Creando nueva vacuna:', datosParaBackend);
+                await apiClient.post('/vacunacion', datosParaBackend);
+                console.log('✅ Vacuna creada');
+            }
             
             await cargarVacunas();
+            setVacunaAEditar(null);
             
             if (cerrar) {
                 cerrarModal();
@@ -195,53 +252,36 @@ export const useVacunas = () => {
         }
     };
 
-    // ============================================================
-    // 🆕 ACTUALIZAR VACUNA
-    // ============================================================
     const actualizarVacuna = async (id: number, datos: Partial<Vacuna>) => {
         try {
             const respuesta = await apiClient.put(`/vacunacion/${id}`, datos);
-            setListaVacunas(prev => prev.map(v => 
-                v.id === id ? { ...v, ...datos } : v
-            ));
+            await cargarVacunas();
             return respuesta.data;
         } catch (error) {
-            console.error('❌ Error al actualizar vacuna:', error);
+            console.error('❌ Error al actualizar:', error);
         }
     };
 
-    // ============================================================
-    // 🆕 ELIMINAR VACUNA
-    // ============================================================
-    const eliminarVacuna = async (id: number) => {
-        try {
-            const respuesta = await apiClient.delete(`/vacunacion/${id}`);
-            setListaVacunas(prev => prev.filter(v => v.id !== id));
-            return respuesta.data;
-        } catch (error) {
-            console.error('❌ Error al eliminar vacuna:', error);
-        }
-    };
-
-    // ============================================================
-    // RETORNAR
-    // ============================================================
     return {
         listaVacunas,
         animalesDisponibles,
         isModalOpen,
         vista,
         cargando,
-        
-        // Stats para la card
-        stats: calcularStats(),
-        
+        stats,
         abrirModal,
         cerrarModal,
         cambiarVista,
         guardarVacuna,
         actualizarVacuna,
-        eliminarVacuna,
         recargarLista: cargarVacunas,
+        vacunaAEditar,
+        abrirEdicion,
+        cancelarEdicion,
+        modalConfirmacion,
+        eliminando,
+        abrirModalEliminar,
+        cerrarModalConfirmacion,
+        confirmarEliminar,
     };
 };

@@ -1,24 +1,18 @@
-import { useState, useEffect } from "react";
-import apiClient from "../api/apiClient";
+import { useState, useEffect, useMemo } from 'react';
+import apiClient from '../api/apiClient';
 
-// ============================================================
-// 📌 INTERFACES
-// ============================================================
-export interface Cerdo {
-    id_animal: number;
-    codigo_local: string;
-    num_ica_chapeta?: string;
-    id_especie: number;
-    id_estado_ani: number;
-    id_ubicacion: number;
+interface Cerdo {
+    id: number;
+    oficial: string;
+    local: string;
     sexo: string;
-    raza: string;
-    fecha_nacimiento: string;
-    peso_actual: number;
-    origen: string;
+    estado: string;
+    raza?: string;
+    fecha_nacimiento?: string;
+    peso_actual?: number;
+    origen?: string;
+    ubicacion?: string;
     foto_url?: string;
-    EstadoAni?: { nombre: string };
-    Ubicacion?: { nombre_ubi: string };
 }
 
 export interface CerdosStats {
@@ -32,206 +26,233 @@ export interface CerdosStats {
     cantidad4: number;
 }
 
-type Vista = 'lista' | 'formulario';
+interface ModalConfirmacionState {
+    isOpen: boolean;
+    id: number | null;
+    nombre: string;
+}
 
-// ============================================================
-// 📌 HOOK PRINCIPAL
-// ============================================================
 export const useCerdos = () => {
-    const [cerdos, setCerdos] = useState<Cerdo[]>([]);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [vista, setVista] = useState<Vista>('lista');
-    const [cargando, setCargando] = useState(false);
-
-    const [categoriaCerdo, setCategoriaCerdo] = useState("C");
+    const [listaCerdos, setListaCerdos] = useState<Cerdo[]>([]);
+    const [categoriaSeleccionada, setCategoriaSeleccionada] = useState("C");
     const [sugerenciaId, setSugerenciaId] = useState("");
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [vista, setVista] = useState<'lista' | 'formulario'>('lista');
+    const [cargando, setCargando] = useState(false);
+    const [cerdoAEditar, setCerdoAEditar] = useState<any | null>(null);
+    const [modalConfirmacion, setModalConfirmacion] = useState<ModalConfirmacionState>({
+        isOpen: false,
+        id: null,
+        nombre: ''
+    });
+    const [eliminando, setEliminando] = useState(false);
 
-    // ============================================================
-    // CARGAR CERDOS
-    // ============================================================
     const cargarCerdos = async () => {
         setCargando(true);
         try {
             const respuesta = await apiClient.get('/porcicultura/cerdos');
-            setCerdos(respuesta.data);
-            console.log('✅ Cerdos cargados:', respuesta.data.length);
+            console.log('📊 Datos crudos:', respuesta.data);
+            
+            const cerdosTransformados = respuesta.data.map((c: any) => ({
+                id: c.id_animal || c.id,
+                local: c.codigo_local || c.local,
+                oficial: c.num_ica_chapeta || c.oficial,
+                sexo: c.sexo === 'M' ? 'MACHO' : (c.sexo === 'F' ? 'HEMBRA' : c.sexo),
+                estado: c.estado?.nombre || c.estado || 'Activo',
+                raza: c.raza,
+                fecha_nacimiento: c.fecha_nacimiento,
+                peso_actual: c.peso_actual,
+                origen: c.origen,
+                ubicacion: c.ubicacion?.nombre_ubi,
+                foto_url: c.foto_url
+            }));
+            
+            console.log('📊 Cerdos transformados:', cerdosTransformados);
+            setListaCerdos(cerdosTransformados);
         } catch (error) {
-            console.error("❌ Error al cargar cerdos:", error);
+            console.error('❌ Error al cargar cerdos:', error);
         } finally {
             setCargando(false);
         }
     };
 
-    // Cargar al iniciar
     useEffect(() => {
         cargarCerdos();
     }, []);
 
-    // Refrescar al abrir modal
-    useEffect(() => {
-        if (isModalOpen) cargarCerdos();
-    }, [isModalOpen]);
-
-    // ============================================================
-    // 🆕 CALCULAR STATS PARA LA CARD
-    // ============================================================
-    const calcularStats = (): CerdosStats => {
-        // Verracos (machos adultos con prefijo V)
-        const verracos = cerdos.filter(c => 
-            c.codigo_local?.startsWith('V')
+    const stats = useMemo((): CerdosStats => {
+        const cerdas = listaCerdos.filter(c => 
+            c.local?.startsWith('C') && c.sexo === 'HEMBRA'
         ).length;
-        
-        // Cerdas de cría (hembras adultas con prefijo C)
-        const cerdasCria = cerdos.filter(c => 
-            c.codigo_local?.startsWith('C')
+        const verracos = listaCerdos.filter(c => 
+            c.local?.startsWith('V') && c.sexo === 'MACHO'
         ).length;
-        
-        // Lechones (bebés con prefijo L)
-        const lechones = cerdos.filter(c => 
-            c.codigo_local?.startsWith('L')
+        const lechones = listaCerdos.filter(c => 
+            c.local?.startsWith('L')
         ).length;
-        
-        // Cerdos de ceba (engorde con prefijo E)
-        const cerdosCeba = cerdos.filter(c => 
-            c.codigo_local?.startsWith('E')
+        const ceba = listaCerdos.filter(c => 
+            c.local?.startsWith('E')
         ).length;
 
         return {
-            tipo1: "VERRACOS",
-            cantidad1: verracos,
-            tipo2: "CERDAS DE CRÍA",
-            cantidad2: cerdasCria,
+            tipo1: "CERDAS",
+            cantidad1: cerdas,
+            tipo2: "VERRACOS",
+            cantidad2: verracos,
             tipo3: "LECHONES",
             cantidad3: lechones,
-            tipo4: "CERDOS DE CEBA",
-            cantidad4: cerdosCeba
+            tipo4: "CEBA",
+            cantidad4: ceba
         };
-    };
+    }, [listaCerdos]);
 
-    // ============================================================
-    // GENERAR SUGERENCIA DE ID LOCAL
-    // ============================================================
     useEffect(() => {
-        const registrosMismoTipo = cerdos.filter(c => 
-            c.codigo_local?.startsWith(categoriaCerdo)
+        const registrosMismoTipo = listaCerdos.filter(c => 
+            c.local?.startsWith(categoriaSeleccionada)
         );
-        
         const ultimoNumero = registrosMismoTipo.reduce((max, curr) => {
-            const partes = curr.codigo_local?.split('-') || [];
+            const partes = curr.local?.split('-') || [];
             const num = partes.length > 1 ? parseInt(partes[1]) : 0;
             return !isNaN(num) && num > max ? num : max;
         }, 0);
-        
-        setSugerenciaId(`${categoriaCerdo}-${String(ultimoNumero + 1).padStart(2, '0')}`);
-    }, [categoriaCerdo, cerdos]);
+        const nuevoId = `${categoriaSeleccionada}-${String(ultimoNumero + 1).padStart(2, '0')}`;
+        setSugerenciaId(nuevoId);
+    }, [categoriaSeleccionada, listaCerdos]);
 
-    // ============================================================
-    // ABRIR / CERRAR MODAL
-    // ============================================================
     const abrirModal = () => {
-        setVista('lista');
+        setCerdoAEditar(null);
+        setCategoriaSeleccionada("C");
+        cargarCerdos();
         setIsModalOpen(true);
     };
-
+    
     const cerrarModal = () => {
         setIsModalOpen(false);
         setVista('lista');
+        setCerdoAEditar(null);
     };
 
-    const cambiarVista = (v: Vista) => setVista(v);
+    const cambiarVista = (nuevaVista: 'lista' | 'formulario') => {
+        setVista(nuevaVista);
+        if (nuevaVista === 'lista') {
+            setCerdoAEditar(null);
+        }
+    };
 
-    // ============================================================
-    // GUARDAR CERDO
-    // ============================================================
-    const guardarCerdo = async (datos: any, cerrar: boolean = true) => {
+    const abrirEdicion = (cerdo: any) => {
+        console.log('✏️ Abriendo edición para:', cerdo);
+        setCerdoAEditar(cerdo);
+        const categoria = cerdo.local?.substring(0, 1) || "C";
+        setCategoriaSeleccionada(categoria);
+        setVista('formulario');
+    };
+
+    const cancelarEdicion = () => {
+        setCerdoAEditar(null);
+        setVista('lista');
+    };
+
+    const abrirModalEliminar = (id: number, nombre: string) => {
+        setModalConfirmacion({ isOpen: true, id, nombre });
+    };
+
+    const cerrarModalConfirmacion = () => {
+        setModalConfirmacion({ isOpen: false, id: null, nombre: '' });
+        setEliminando(false);
+    };
+
+    const confirmarEliminar = async () => {
+        if (!modalConfirmacion.id) return;
+        setEliminando(true);
+        try {
+            await apiClient.delete(`/porcicultura/cerdos/${modalConfirmacion.id}`);
+            await cargarCerdos();
+            cerrarModalConfirmacion();
+        } catch (error) {
+            console.error('❌ Error al eliminar:', error);
+            alert('Error al eliminar el cerdo');
+        } finally {
+            setEliminando(false);
+        }
+    };
+
+    const guardarCerdo = async (nuevoCerdo: any, cerrar: boolean) => {
         setCargando(true);
         try {
+            console.log('📤 Datos recibidos en guardarCerdo:', nuevoCerdo);
+            
             const datosParaBackend = {
-                local: datos.local || sugerenciaId,
-                oficial: datos.oficial || null,
-                sexo: datos.sexo || 'HEMBRA',
-                raza: datos.raza || 'Criollo',
-                nacimiento: datos.nacimiento || null,
-                ingreso: datos.ingreso || new Date().toISOString().split('T')[0],
-                peso: parseFloat(datos.peso) || 0,
-                origen: datos.origen || 'Registro inicial',
-                id_madre: datos.id_madre || null,
-                establo: datos.establo || '',
-                salud: datos.salud || 'SANO',
-                foto: datos.foto || null
+                local: nuevoCerdo.local || sugerenciaId,
+                oficial: nuevoCerdo.oficial || null,
+                sexo: nuevoCerdo.sexo || (categoriaSeleccionada === 'V' ? 'MACHO' : 'HEMBRA'),
+                raza: nuevoCerdo.raza || 'Criollo',
+                nacimiento: nuevoCerdo.nacimiento || null,
+                ingreso: nuevoCerdo.ingreso || new Date().toISOString().split('T')[0],
+                peso: parseFloat(nuevoCerdo.peso) || 0,
+                origen: nuevoCerdo.origen || 'Registro inicial',
+                foto: null,
+                establo: nuevoCerdo.establo || '',
+                salud: nuevoCerdo.salud || 'SANO'
             };
 
-            console.log('📤 Enviando a backend (Cerdo):', datosParaBackend);
-            
-            const respuesta = await apiClient.post('/porcicultura/cerdos', datosParaBackend);
-            console.log('✅ Cerdo creado:', respuesta.data);
-            
+            console.log('📤 Datos a enviar al backend:', datosParaBackend);
+
+            if (cerdoAEditar) {
+                await apiClient.put(`/porcicultura/cerdos/${cerdoAEditar.id}`, datosParaBackend);
+                console.log('✅ Cerdo actualizado');
+            } else {
+                await apiClient.post('/porcicultura/cerdos', datosParaBackend);
+                console.log('✅ Cerdo creado');
+            }
+
             await cargarCerdos();
-            
+            setCerdoAEditar(null);
+
             if (cerrar) {
                 cerrarModal();
             } else {
                 setVista('lista');
             }
-            return true;
         } catch (error: any) {
-            console.error("❌ Error al guardar cerdo:", error);
+            console.error('❌ Error al guardar:', error);
             alert(error.response?.data?.mensaje || 'Error al guardar el cerdo');
-            return false;
         } finally {
             setCargando(false);
         }
     };
 
-    // ============================================================
-    // 🆕 ACTUALIZAR CERDO
-    // ============================================================
     const actualizarCerdo = async (id: number, datos: Partial<Cerdo>) => {
         try {
             const respuesta = await apiClient.put(`/porcicultura/cerdos/${id}`, datos);
-            setCerdos(prev => prev.map(c => 
-                c.id_animal === id ? { ...c, ...datos } : c
-            ));
+            await cargarCerdos();
             return respuesta.data;
         } catch (error) {
-            console.error('❌ Error al actualizar cerdo:', error);
+            console.error('❌ Error al actualizar:', error);
         }
     };
 
-    // ============================================================
-    // 🆕 ELIMINAR CERDO
-    // ============================================================
-    const eliminarCerdo = async (id: number) => {
-        try {
-            const respuesta = await apiClient.delete(`/porcicultura/cerdos/${id}`);
-            setCerdos(prev => prev.filter(c => c.id_animal !== id));
-            return respuesta.data;
-        } catch (error) {
-            console.error('❌ Error al eliminar cerdo:', error);
-        }
-    };
-
-    // ============================================================
-    // RETORNAR
-    // ============================================================
     return {
-        listaCerdos: cerdos,
+        listaCerdos,
         cargando,
+        stats,
+        categoriaSeleccionada,
+        setCategoriaSeleccionada,
+        sugerenciaId,
         isModalOpen,
         vista,
-        sugerenciaId,
-        categoriaCerdo,
-        setCategoriaCerdo,
-        
-        // 🆕 Stats para la card
-        stats: calcularStats(),
-        
         abrirModal,
         cerrarModal,
         cambiarVista,
         guardarCerdo,
         actualizarCerdo,
-        eliminarCerdo,
         recargarLista: cargarCerdos,
+        cerdoAEditar,
+        abrirEdicion,
+        cancelarEdicion,
+        modalConfirmacion,
+        eliminando,
+        abrirModalEliminar,
+        cerrarModalConfirmacion,
+        confirmarEliminar,
     };
 };

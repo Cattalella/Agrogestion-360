@@ -102,7 +102,6 @@ export const useRegistrarCompra = () => {
     const calcularStats = (): ComprasStats => {
         const solicitudesVisibles = listaSolicitudes.filter(s => !s.eliminada);
         
-        // Solicitudes este mes
         const hoy = new Date();
         const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
         
@@ -111,7 +110,6 @@ export const useRegistrarCompra = () => {
             return fecha >= inicioMes && s.estado === 'Aprobada';
         }).length;
 
-        // Solicitudes pendientes
         const pendientes = solicitudesVisibles.filter(s => 
             s.estado === 'Pendiente'
         ).length;
@@ -144,7 +142,7 @@ export const useRegistrarCompra = () => {
     };
 
     // ============================================================
-    // CREAR SOLICITUD (BACKEND)
+    // CREAR SOLICITUD (BACKEND) - SOLO PARA PEDIR
     // ============================================================
     const crearSolicitud = async (
         datos: any,
@@ -154,16 +152,17 @@ export const useRegistrarCompra = () => {
         try {
             const datosParaBackend = {
                 categoria_general: datos.categoria_general,
-                fecha_compra: datos.fecha_propuesta,
+                fecha_compra: datos.fechaPropuesta || datos.fecha_propuesta,
                 cantidad: datos.cantidad,
                 motivo: datos.motivo,
-                fecha_vencimiento: datos.fecha_vencimiento || null,
+                fecha_vencimiento: datos.fechaVencimiento || datos.fecha_vencimiento || null,
                 proveedor: datos.proveedor || null,
-                tipo_insumo: datos.tipo_insumo || null,
-                categoria_insumo: datos.categoria_insumo || null,
-                tipo_alimento: datos.tipo_alimento || null,
-                especie_destino: datos.especie_destino || null,
-                unidad_medida: datos.unidad_medida || null,
+                tipo_insumo: datos.tipoInsumo || datos.tipo_insumo || null,
+                categoria_insumo: datos.categoriaInsumo || datos.categoria_insumo || null,
+                tipo_alimento: datos.tipoAlimento || datos.tipo_alimento || null,
+                especie_destino: datos.especieDestino || datos.especie_destino || null,
+                unidad_medida: datos.unidadMedida || datos.unidad_medida || null,
+                usuario: datos.usuario || "Admin",
             };
 
             console.log('📤 Enviando a backend (Solicitud Compra):', datosParaBackend);
@@ -188,7 +187,47 @@ export const useRegistrarCompra = () => {
     };
 
     // ============================================================
-    // EJECUTAR COMPRA (SOLO SI ESTÁ APROBADA)
+    // 🆕 EJECUTAR COMPRA REAL (con todos los datos del formulario)
+    // ============================================================
+    const ejecutarCompraReal = async (datosCompra: any) => {
+        setCargando(true);
+        try {
+            // Transformar datos del FormularioCompra al formato que espera el backend
+            const datosParaBackend = {
+                id_solicitud: datosCompra.id_solicitud,
+                fecha_compra_real: datosCompra.fecha_compra_real,
+                numero_lote: datosCompra.numero_lote,
+                cantidad_real: datosCompra.cantidad_real,
+                precio_unitario: datosCompra.precio_unitario,
+                precio_total: datosCompra.precio_total,
+                factura: datosCompra.factura,
+                fecha_vencimiento: datosCompra.fecha_vencimiento,
+                proveedor_real: datosCompra.proveedor_real,
+                observaciones: datosCompra.observaciones,
+                tipo: datosCompra.tipo,
+                nombre_producto: datosCompra.nombre_producto,
+                unidad_medida: datosCompra.unidad_medida,
+            };
+
+            console.log('📦 Ejecutando compra real:', datosParaBackend);
+            
+            // Endpoint para registrar la compra real y crear el lote
+            const response = await apiClient.post('/inventario/compras/ejecutar', datosParaBackend);
+            
+            await cargarSolicitudes();
+            
+            return response.data;
+        } catch (error: any) {
+            console.error("❌ Error al ejecutar compra real:", error);
+            alert(error.response?.data?.mensaje || "Error al registrar la compra");
+            throw error;
+        } finally {
+            setCargando(false);
+        }
+    };
+
+    // ============================================================
+    // EJECUTAR COMPRA (SOLO ID - versión simple)
     // ============================================================
     const ejecutarCompra = async (id: number) => {
         const solicitud = listaSolicitudes.find(s => s.id === id);
@@ -266,7 +305,7 @@ export const useRegistrarCompra = () => {
         solicitudesAprobadas,
         alertasVencimiento,
         cargando,
-        loading: cargando,  // Alias para compatibilidad
+        loading: cargando,
         isModalOpen,
         vista,
         tipoSeleccionado,
@@ -276,14 +315,14 @@ export const useRegistrarCompra = () => {
         cambiarVista,
         setTipoSeleccionado,
         
-        // 🆕 Stats para la card
         stats: calcularStats(),
         
         abrirModal,
         cerrarModal,
         crearSolicitud,
-        guardarCompra: crearSolicitud,  // Alias
+        guardarCompra: crearSolicitud,
         ejecutarCompra,
+        ejecutarCompraReal,  // 🆕 Nueva función para registrar compra real
         eliminarSolicitud,
         cambiarEstado,
         recargarLista: cargarSolicitudes,

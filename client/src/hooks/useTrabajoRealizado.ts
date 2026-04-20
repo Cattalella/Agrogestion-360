@@ -2,18 +2,18 @@ import { useState, useEffect } from "react";
 import apiClient from "../api/apiClient";
 
 // ============================================================
-// 📌 INTERFACES
+// 📌 INTERFACES — alineadas con schema TrabajoRealizado
 // ============================================================
 export interface TrabajoRealizado {
     id_trabajo: number;
     id_trabajador: number;
-    id_animal?: number;
-    id_insumo?: number;
+    categoria_trabajo: string;
+    tipo_actividad: string;
     fecha_inicio: string;
-    fecha_fin?: string;
-    descripcion: string;
-    monto_pago?: number;
-    estado_trabajo: string;
+    fecha_fin: string;
+    duracion_horas: number;
+    evidencia_url: string;
+    observaciones?: string;
     Trabajador?: { nombre_completo: string };
 }
 
@@ -34,8 +34,7 @@ export const useTrabajoRealizado = () => {
     const [cargando, setCargando] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [vista, setVista] = useState<Vista>('lista');
-    
-    // 🆕 Lista de trabajadores para el selector
+    const [trabajoAEditar, setTrabajoAEditar] = useState<TrabajoRealizado | null>(null);
     const [trabajadores, setTrabajadores] = useState<any[]>([]);
 
     // ============================================================
@@ -46,7 +45,6 @@ export const useTrabajoRealizado = () => {
         try {
             const response = await apiClient.get('/trabajadores/trabajos');
             setTrabajos(response.data);
-            console.log('✅ Trabajos cargados:', response.data.length);
         } catch (error) {
             console.error("❌ Error al cargar trabajos:", error);
         } finally {
@@ -55,26 +53,23 @@ export const useTrabajoRealizado = () => {
     };
 
     // ============================================================
-    // 🆕 CARGAR TRABAJADORES ACTIVOS
+    // CARGAR TRABAJADORES ACTIVOS
     // ============================================================
     const cargarTrabajadores = async () => {
         try {
             const response = await apiClient.get('/trabajadores');
             const activos = response.data.filter((t: any) => t.estado === 'Activo');
             setTrabajadores(activos);
-            console.log('✅ Trabajadores activos cargados:', activos.length);
         } catch (error) {
             console.error("❌ Error al cargar trabajadores:", error);
         }
     };
 
-    // Cargar al iniciar
     useEffect(() => {
         cargarTrabajos();
         cargarTrabajadores();
     }, []);
 
-    // Refrescar al abrir modal
     useEffect(() => {
         if (isModalOpen) {
             cargarTrabajos();
@@ -83,29 +78,19 @@ export const useTrabajoRealizado = () => {
     }, [isModalOpen]);
 
     // ============================================================
-    // 🆕 CALCULAR STATS PARA LA CARD
+    // STATS — usa duracion_horas del schema
     // ============================================================
     const calcularStats = (): TrabajoStats => {
-        // Calcular horas totales
         const horasTotales = trabajos.reduce((total, t) => {
-            if (t.fecha_inicio && t.fecha_fin) {
-                const inicio = new Date(t.fecha_inicio);
-                const fin = new Date(t.fecha_fin);
-                const horas = (fin.getTime() - inicio.getTime()) / (1000 * 60 * 60);
-                return total + (horas > 0 ? horas : 0);
-            }
-            return total;
+            return total + (Number(t.duracion_horas) || 0);
         }, 0);
 
-        // Contar tareas completadas
-        const tareasCompletadas = trabajos.filter(t => 
-            t.estado_trabajo === 'Completado' || t.estado_trabajo === 'Finalizado'
-        ).length;
+        const tareasCompletadas = trabajos.length;
 
         return {
             tipo1: "HORAS TOTALES",
             cantidad1: Math.round(horasTotales),
-            tipo2: "TAREAS COMPLETAS",
+            tipo2: "TRABAJOS REGISTRADOS",
             cantidad2: tareasCompletadas
         };
     };
@@ -115,39 +100,48 @@ export const useTrabajoRealizado = () => {
     // ============================================================
     const abrirModal = () => {
         setVista('lista');
+        setTrabajoAEditar(null);
         setIsModalOpen(true);
     };
 
     const cerrarModal = () => {
         setIsModalOpen(false);
+        setTrabajoAEditar(null);
         setVista('lista');
     };
 
     const cambiarVista = (v: Vista) => setVista(v);
 
+    const abrirEdicion = (trabajo: TrabajoRealizado) => {
+        setTrabajoAEditar(trabajo);
+        setVista('formulario');
+    };
+
     // ============================================================
-    // REGISTRAR TRABAJO
+    // REGISTRAR / ACTUALIZAR TRABAJO
     // ============================================================
     const registrarTrabajo = async (datos: any, cerrar: boolean = true) => {
         setCargando(true);
         try {
             const datosParaBackend = {
-                id_mantenimiento: datos.id_mantenimiento,
                 id_trabajador: parseInt(datos.id_trabajador),
                 categoria_trabajo: datos.categoria_trabajo,
                 tipo_actividad: datos.tipo_actividad,
                 fecha_inicio: datos.fecha_inicio,
                 fecha_fin: datos.fecha_fin,
-                evidencia_fotografica: datos.evidencia_fotografica,
-                observaciones: datos.observaciones || null
+                duracion_horas: datos.duracion_horas,
+                evidencia_url: datos.evidencia_url,
+                observaciones: datos.observaciones || null,
             };
 
-            console.log('📤 Enviando a backend (Trabajo):', datosParaBackend);
-            
-            await apiClient.post('/trabajadores/trabajos', datosParaBackend);
-            
+            if (trabajoAEditar) {
+                await apiClient.put(`/trabajadores/trabajos/${trabajoAEditar.id_trabajo}`, datosParaBackend);
+            } else {
+                await apiClient.post('/trabajadores/trabajos', datosParaBackend);
+            }
+
             await cargarTrabajos();
-            
+
             if (cerrar) {
                 cerrarModal();
             } else {
@@ -164,30 +158,16 @@ export const useTrabajoRealizado = () => {
     };
 
     // ============================================================
-    // 🆕 ACTUALIZAR TRABAJO
-    // ============================================================
-    const actualizarTrabajo = async (id: number, datos: Partial<TrabajoRealizado>) => {
-        try {
-            const respuesta = await apiClient.put(`/trabajadores/trabajos/${id}`, datos);
-            setTrabajos(prev => prev.map(t => 
-                t.id_trabajo === id ? { ...t, ...datos } : t
-            ));
-            return respuesta.data;
-        } catch (error) {
-            console.error('❌ Error al actualizar trabajo:', error);
-        }
-    };
-
-    // ============================================================
-    // 🆕 ELIMINAR TRABAJO
+    // ELIMINAR TRABAJO — RN.8.1.2: debe estar justificado
     // ============================================================
     const eliminarTrabajo = async (id: number) => {
         try {
-            const respuesta = await apiClient.delete(`/trabajadores/trabajos/${id}`);
+            await apiClient.delete(`/trabajadores/trabajos/${id}`);
             setTrabajos(prev => prev.filter(t => t.id_trabajo !== id));
-            return respuesta.data;
+            return true;
         } catch (error) {
             console.error('❌ Error al eliminar trabajo:', error);
+            return false;
         }
     };
 
@@ -197,22 +177,20 @@ export const useTrabajoRealizado = () => {
     return {
         trabajos,
         listaTrabajos: trabajos,
-        trabajadores,  // 🆕 Para el selector del formulario
+        trabajadores,
         cargando,
-        loading: cargando,  // Alias para compatibilidad
+        loading: cargando,
         isModalOpen,
         vista,
+        trabajoAEditar,
         setVista,
         cambiarVista,
-        
-        // 🆕 Stats para la card
         stats: calcularStats(),
-        
         abrirModal,
         cerrarModal,
+        abrirEdicion,
         registrarTrabajo,
-        guardarTrabajo: registrarTrabajo,  // Alias
-        actualizarTrabajo,
+        guardarTrabajo: registrarTrabajo,
         eliminarTrabajo,
         recargarLista: cargarTrabajos,
     };

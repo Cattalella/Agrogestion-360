@@ -21,7 +21,6 @@ export class TrabajadoresService {
   }
 
   async crearTrabajador(datos: any) {
-    // Validar que no exista un trabajador con el mismo documento
     const existente = await this.prisma.trabajador.findFirst({
       where: {
         tipo_documento: datos.tipo_documento,
@@ -86,7 +85,6 @@ export class TrabajadoresService {
       throw new NotFoundException('Trabajador no encontrado');
     }
 
-    // RM.8.1.3: Borrado lógico para mantener historial
     return this.prisma.trabajador.update({
       where: { id_trabajador: id },
       data: {
@@ -112,7 +110,6 @@ export class TrabajadoresService {
   }
 
   async registrarTrabajo(datos: any) {
-    // Validar que el trabajador esté activo
     const trabajador = await this.prisma.trabajador.findUnique({
       where: { id_trabajador: parseInt(datos.id_trabajador) }
     });
@@ -121,12 +118,21 @@ export class TrabajadoresService {
       throw new BadRequestException('Solo trabajadores activos pueden registrar trabajo');
     }
 
-    // Calcular duración si no viene explícita (en horas)
+    // RN.8.1.2: Evidencia fotográfica obligatoria
+    if (!datos.evidencia_url) {
+      throw new BadRequestException('La evidencia fotográfica es obligatoria');
+    }
+
+    // RN.8.1.2: Duración calculada automáticamente si no viene
     let duracion = datos.duracion_horas;
     if (!duracion && datos.fecha_inicio && datos.fecha_fin) {
       const inicio = new Date(datos.fecha_inicio);
       const fin = new Date(datos.fecha_fin);
       duracion = (fin.getTime() - inicio.getTime()) / (1000 * 60 * 60);
+    }
+
+    if (duracion <= 0) {
+      throw new BadRequestException('La fecha de fin debe ser posterior a la fecha de inicio');
     }
 
     return this.prisma.trabajoRealizado.create({
@@ -136,11 +142,73 @@ export class TrabajadoresService {
         tipo_actividad: datos.tipo_actividad,
         fecha_inicio: new Date(datos.fecha_inicio),
         fecha_fin: new Date(datos.fecha_fin),
-        duracion_horas: new Decimal(duracion || 0),
-        evidencia_url: datos.evidencia_url || datos.evidencia_fotografica || '',
+        duracion_horas: new Decimal(duracion),
+        evidencia_url: datos.evidencia_url,
         observaciones: datos.observaciones || null,
         updatedAt: new Date()
+      },
+      include: {
+        Trabajador: { select: { nombre_completo: true } }
       }
+    });
+  }
+
+  async actualizarTrabajo(id: number, datos: any) {
+    const trabajo = await this.prisma.trabajoRealizado.findUnique({
+      where: { id_trabajo: id }
+    });
+
+    if (!trabajo) {
+      throw new NotFoundException('Trabajo no encontrado');
+    }
+
+    // Recalcular duración si cambian las fechas
+    let duracion = datos.duracion_horas;
+    if (!duracion && datos.fecha_inicio && datos.fecha_fin) {
+      const inicio = new Date(datos.fecha_inicio);
+      const fin = new Date(datos.fecha_fin);
+      duracion = (fin.getTime() - inicio.getTime()) / (1000 * 60 * 60);
+    }
+
+    return this.prisma.trabajoRealizado.update({
+      where: { id_trabajo: id },
+      data: {
+        categoria_trabajo: datos.categoria_trabajo ?? undefined,
+        tipo_actividad: datos.tipo_actividad ?? undefined,
+        fecha_inicio: datos.fecha_inicio ? new Date(datos.fecha_inicio) : undefined,
+        fecha_fin: datos.fecha_fin ? new Date(datos.fecha_fin) : undefined,
+        duracion_horas: duracion ? new Decimal(duracion) : undefined,
+        evidencia_url: datos.evidencia_url ?? undefined,
+        observaciones: datos.observaciones ?? undefined,
+        updatedAt: new Date()
+      },
+      include: {
+        Trabajador: { select: { nombre_completo: true } }
+      }
+    });
+  }
+
+  // RN.8.1.2: Eliminación debe estar justificada y registrada
+  async eliminarTrabajo(id: number, justificacion?: string) {
+    const trabajo = await this.prisma.trabajoRealizado.findUnique({
+      where: { id_trabajo: id }
+    });
+
+    if (!trabajo) {
+      throw new NotFoundException('Trabajo no encontrado');
+    }
+
+    await this.auditoria.registrar({
+      id_usuario: 5,
+      accion: 'ELIMINACION_TRABAJO',
+      descripcion: `Trabajo #${id} eliminado. ${justificacion ? `Justificación: ${justificacion}` : 'Sin justificación'}`,
+      entidad: 'TrabajoRealizado',
+      id_entidad: id,
+      rol: 'Administrador'
+    });
+
+    return this.prisma.trabajoRealizado.delete({
+      where: { id_trabajo: id }
     });
   }
 
@@ -163,7 +231,6 @@ export class TrabajadoresService {
   }
 
   async registrarPago(datos: any) {
-    // Validar que el trabajador exista y esté activo
     const trabajador = await this.prisma.trabajador.findUnique({
       where: { id_trabajador: parseInt(datos.id_trabajador) }
     });
@@ -183,7 +250,7 @@ export class TrabajadoresService {
         fecha_pago: new Date(datos.fecha_pago),
         monto_total: new Decimal(datos.monto_total),
         concepto: datos.concepto,
-        estado_pago: datos.estado || 'No pagado',  // 🆕 CORREGIDO
+        estado_pago: datos.estado_pago || 'No pagado',
         firma_url: datos.firma_url || null,
         updatedAt: new Date()
       },
@@ -194,9 +261,8 @@ export class TrabajadoresService {
       }
     });
 
-    // Registrar en auditoría
     await this.auditoria.registrar({
-      id_usuario: datos.id_usuario_actual || 5, // ID del admin
+      id_usuario: datos.id_usuario_actual || 5,
       accion: 'REGISTRO_PAGO',
       descripcion: `Pago registrado para ${trabajador.nombre_completo} por $${datos.monto_total}`,
       entidad: 'PagoTrabajador',
@@ -224,7 +290,58 @@ export class TrabajadoresService {
     return pago;
   }
 
+  // ============================================================
+  // 📌 ACTUALIZAR PAGO — RN.8.1.1: solo si NO está anulado
+  // ============================================================
+  async actualizarPago(id: number, datos: any) {
+    const pago = await this.prisma.pagoTrabajador.findUnique({
+      where: { id_pago: id }
+    });
+
+    if (!pago) {
+      throw new NotFoundException('Pago no encontrado');
+    }
+
+    // RN.8.1.1: No se puede editar un pago anulado
+    if (pago.estado_pago === 'Anulado' || pago.justificacion_anulacion) {
+      throw new BadRequestException('No se puede editar un pago anulado');
+    }
+
+    const pagoActualizado = await this.prisma.pagoTrabajador.update({
+      where: { id_pago: id },
+      data: {
+        fecha_pago: datos.fecha_pago ? new Date(datos.fecha_pago) : undefined,
+        monto_total: datos.monto_total ? new Decimal(datos.monto_total) : undefined,
+        concepto: datos.concepto ?? undefined,
+        estado_pago: datos.estado_pago ?? undefined,
+        firma_url: datos.firma_url ?? undefined,
+        updatedAt: new Date()
+      },
+      include: {
+        Trabajador: { select: { nombre_completo: true } }
+      }
+    });
+
+    await this.auditoria.registrar({
+      id_usuario: datos.id_usuario_actual || 5,
+      accion: 'ACTUALIZACION_PAGO',
+      descripcion: `Pago #${id} actualizado`,
+      entidad: 'PagoTrabajador',
+      id_entidad: id,
+      rol: 'Administrador'
+    });
+
+    return pagoActualizado;
+  }
+
+  // ============================================================
+  // 📌 ANULAR PAGO — RN.8.1.1: conserva historial, requiere justificación
+  // ============================================================
   async anularPago(id: number, justificacion: string) {
+    if (!justificacion?.trim()) {
+      throw new BadRequestException('La justificación es obligatoria para anular un pago');
+    }
+
     const pago = await this.prisma.pagoTrabajador.findUnique({
       where: { id_pago: id }
     });
@@ -246,9 +363,8 @@ export class TrabajadoresService {
       }
     });
 
-    // Registrar en auditoría
     await this.auditoria.registrar({
-      id_usuario: 5, // ID del admin
+      id_usuario: 5,
       accion: 'ANULACION_PAGO',
       descripcion: `Pago #${id} anulado. Justificación: ${justificacion}`,
       entidad: 'PagoTrabajador',
@@ -259,26 +375,16 @@ export class TrabajadoresService {
     return pagoAnulado;
   }
 
-  // ============================================================
-  // 📌 OBTENER PAGOS PENDIENTES DE FIRMA
-  // ============================================================
   async obtenerPagosPendientes() {
     return this.prisma.pagoTrabajador.findMany({
-      where: {
-        estado_pago: 'Pendiente de firma'
-      },
+      where: { estado_pago: 'Pendiente de firma' },
       include: {
-        Trabajador: {
-          select: { nombre_completo: true }
-        }
+        Trabajador: { select: { nombre_completo: true } }
       },
       orderBy: { fecha_pago: 'asc' }
     });
   }
 
-  // ============================================================
-  // 📌 CONFIRMAR PAGO CON FIRMA
-  // ============================================================
   async confirmarPagoConFirma(id: number, firma_url: string) {
     const pago = await this.prisma.pagoTrabajador.findUnique({
       where: { id_pago: id }
@@ -296,5 +402,73 @@ export class TrabajadoresService {
         updatedAt: new Date()
       }
     });
+  }
+
+  // ============================================================
+  // 📌 DASHBOARD — SUPERVISIÓN (Hero2)
+  // ============================================================
+
+  async contarTrabajadoresActivos(): Promise<number> {
+    return this.prisma.trabajador.count({
+      where: { estado: 'Activo' }
+    });
+  }
+
+  async listarTrabajadoresActivos() {
+    return this.prisma.trabajador.findMany({
+      where: { estado: 'Activo' },
+      select: { nombre_completo: true },
+      orderBy: { nombre_completo: 'asc' }
+    });
+  }
+
+  async resumenPagos() {
+    const pagos = await this.prisma.pagoTrabajador.findMany({
+      select: { monto_total: true }
+    });
+
+    const totalPagado = pagos.reduce((sum, p) => sum + Number(p.monto_total), 0);
+    const totalPagos = pagos.length;
+
+    return { totalPagado, totalPagos };
+  }
+
+  async contarInsumosCriticos(): Promise<number> {
+    const insumos = await this.prisma.catInsumos.findMany({
+      include: {
+        lotes: { select: { cant_actual: true } }
+      }
+    });
+
+    return insumos.filter((insumo) => {
+      const stockActual = insumo.lotes.reduce(
+        (sum, lote) => sum + Number(lote.cant_actual), 0
+      );
+      return stockActual <= Number(insumo.stock_minimo);
+    }).length;
+  }
+
+  async listarInsumosCriticos() {
+    const insumos = await this.prisma.catInsumos.findMany({
+      include: {
+        lotes: { select: { cant_actual: true } }
+      }
+    });
+
+    return insumos
+      .filter((insumo) => {
+        const stockActual = insumo.lotes.reduce(
+          (sum, lote) => sum + Number(lote.cant_actual), 0
+        );
+        return stockActual <= Number(insumo.stock_minimo);
+      })
+      .map((insumo) => ({
+        nombre: insumo.nombre_insumo,
+        unidad: insumo.unidad_medida,
+        stock_minimo: Number(insumo.stock_minimo),
+        stock_actual: insumo.lotes.reduce(
+          (sum, lote) => sum + Number(lote.cant_actual), 0
+        )
+      }));
   }
 }

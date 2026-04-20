@@ -6,7 +6,9 @@ interface FormularioCerdoProps {
     sugerenciaId: string;
     categoriaSeleccionada: string;
     setCategoria: (valor: string) => void;
-    onGuardar: (datos: any, cerrar: boolean) => void;
+    onGuardar: (datos: any, salir: boolean) => void;
+    cerdoAEditar?: any | null;
+    onCancelarEdicion?: () => void;
 }
 
 export const FormularioCerdo = ({ 
@@ -14,29 +16,32 @@ export const FormularioCerdo = ({
     sugerenciaId, 
     categoriaSeleccionada, 
     setCategoria, 
-    onGuardar 
+    onGuardar,
+    cerdoAEditar,
+    onCancelarEdicion
 }: FormularioCerdoProps) => {
 
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const esEdicion = !!cerdoAEditar;
 
-    // 🆕 Determinar sexo por defecto según categoría
+    // Determinar sexo por defecto según categoría
     const sexoPorDefecto = () => {
         switch(categoriaSeleccionada) {
             case 'C': return 'HEMBRA';      // CERDA
             case 'V': return 'MACHO';       // VERRACO
-            case 'L': return 'HEMBRA';      // LECHÓN (por defecto)
-            case 'E': return 'MACHO';       // CEBA (por defecto)
+            case 'L': return 'HEMBRA';      // LECHÓN
+            case 'E': return 'MACHO';       // CEBA
             default: return 'HEMBRA';
         }
     };
 
-    // 🆕 Determinar si el sexo es editable
+    // Determinar si el sexo es editable (solo para LECHÓN y CEBA)
     const sexoEditable = categoriaSeleccionada === 'L' || categoriaSeleccionada === 'E';
 
-    // 🆕 Determinar si es lechón para mostrar campo MADRE
+    // Determinar si es lechón para mostrar campo MADRE
     const esLechon = categoriaSeleccionada === 'L';
 
-    // 🆕 Nombres amigables para cada categoría
+    // Nombres amigables para cada categoría
     const nombreCategoria = () => {
         switch(categoriaSeleccionada) {
             case 'C': return 'CERDA';
@@ -47,41 +52,63 @@ export const FormularioCerdo = ({
         }
     };
 
-    // ============================================================
-    // ESTADO INICIAL
-    // ============================================================
     const estadoInicial = {
         oficial: "",
         local: sugerenciaId,
-        sexo: sexoPorDefecto(),
+        idMadre: "",
         peso: "",
         ingreso: new Date().toISOString().split('T')[0],
         nacimiento: "",
+        sexo: sexoPorDefecto(),
         raza: "",
         establo: "",
-        estado_salud: "SANO",
+        salud: "SANO",
         origen: "Nacimiento",
-        id_madre: "",
         foto: null as string | null
     };
 
     const [formData, setFormData] = useState(estadoInicial);
     const [errores, setErrores] = useState<Record<string, string>>({});
 
-    // ============================================================
-    // ACTUALIZAR ID LOCAL Y SEXO CUANDO CAMBIA CATEGORÍA
-    // ============================================================
+    // Cargar datos cuando se está editando
     useEffect(() => {
-        setFormData(prev => ({ 
-            ...prev, 
-            local: sugerenciaId,
-            sexo: sexoPorDefecto()
-        }));
-    }, [sugerenciaId, categoriaSeleccionada]);
+        if (cerdoAEditar) {
+            console.log('✏️ Cargando datos para edición:', cerdoAEditar);
+            setFormData({
+                oficial: cerdoAEditar.oficial || "",
+                local: cerdoAEditar.local || sugerenciaId,
+                idMadre: cerdoAEditar.id_madre || "",
+                peso: cerdoAEditar.peso_actual?.toString() || "",
+                ingreso: cerdoAEditar.ingreso?.split('T')[0] || new Date().toISOString().split('T')[0],
+                nacimiento: cerdoAEditar.fecha_nacimiento?.split('T')[0] || "",
+                sexo: cerdoAEditar.sexo || sexoPorDefecto(),
+                raza: cerdoAEditar.raza || "",
+                establo: cerdoAEditar.ubicacion || "",
+                salud: cerdoAEditar.estado || "SANO",
+                origen: cerdoAEditar.origen || "Registro inicial",
+                foto: null
+            });
+        } else {
+            setFormData({
+                ...estadoInicial,
+                local: sugerenciaId,
+                sexo: sexoPorDefecto()
+            });
+        }
+    }, [cerdoAEditar, sugerenciaId, categoriaSeleccionada]);
 
-    // ============================================================
-    // MANEJADORES DE CAMBIOS
-    // ============================================================
+    // Actualizar cuando cambia la categoría (solo si no estamos editando)
+    useEffect(() => {
+        if (!esEdicion) {
+            setFormData(prev => ({ 
+                ...prev, 
+                local: sugerenciaId,
+                sexo: sexoPorDefecto()
+            }));
+        }
+    }, [sugerenciaId, categoriaSeleccionada, esEdicion]);
+
+    // Validar solo números para campos numéricos
     const manejarCambioNumerico = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
         if (value === '' || /^\d*\.?\d*$/.test(value)) {
@@ -112,8 +139,7 @@ export const FormularioCerdo = ({
     };
 
     // ============================================================
-    // 🆕 VALIDACIÓN: Fecha ingreso OBLIGATORIA, Nacimiento OPCIONAL
-    // 🆕 + LÓGICA DE FECHAS
+    // VALIDACIÓN
     // ============================================================
     const validarFormulario = (): boolean => {
         const nuevosErrores: Record<string, string> = {};
@@ -122,11 +148,9 @@ export const FormularioCerdo = ({
         if (!formData.peso || parseFloat(formData.peso) <= 0) nuevosErrores.peso = 'El peso debe ser mayor a 0';
         if (!formData.ingreso) nuevosErrores.ingreso = 'La fecha de ingreso es obligatoria';
         
-        // 🆕 Validar lógica de fechas
         if (formData.nacimiento && formData.ingreso) {
             const nacimiento = new Date(formData.nacimiento);
             const ingreso = new Date(formData.ingreso);
-            
             if (nacimiento > ingreso) {
                 nuevosErrores.nacimiento = 'El nacimiento no puede ser posterior al ingreso';
             }
@@ -136,7 +160,6 @@ export const FormularioCerdo = ({
             const nacimiento = new Date(formData.nacimiento);
             const hoy = new Date();
             hoy.setHours(0, 0, 0, 0);
-            
             if (nacimiento > hoy) {
                 nuevosErrores.nacimiento = 'La fecha de nacimiento no puede ser futura';
             }
@@ -146,13 +169,8 @@ export const FormularioCerdo = ({
         return Object.keys(nuevosErrores).length === 0;
     };
 
-    // ============================================================
-    // ENVIAR FORMULARIO
-    // ============================================================
-    const ejecutarEnvio = (cerrar: boolean) => {
-        if (!validarFormulario()) {
-            return;
-        }
+    const ejecutarEnvio = (salir: boolean) => {
+        if (!validarFormulario()) return;
 
         const datosParaBackend = {
             local: formData.local,
@@ -163,32 +181,31 @@ export const FormularioCerdo = ({
             ingreso: formData.ingreso,
             peso: formData.peso,
             origen: formData.origen || 'Registro inicial',
-            foto: formData.foto || null,
-            id_madre: formData.id_madre || null,
+            foto: null,
+            idMadre: formData.idMadre || null,
             establo: formData.establo || '',
-            salud: formData.estado_salud || 'SANO',
+            salud: formData.salud || 'SANO',
         };
 
-        console.log('📤 Datos a enviar (Cerdo):', datosParaBackend);
-        onGuardar(datosParaBackend, cerrar);
+        console.log('📤 Datos a enviar:', datosParaBackend);
+        onGuardar(datosParaBackend, salir);
         
-        if (!cerrar) {
+        if (!salir && !esEdicion) {
             setFormData(estadoInicial);
             setErrores({});
             if (fileInputRef.current) fileInputRef.current.value = "";
         }
     };
 
-    // ============================================================
-    // RENDER
-    // ============================================================
+    const handleCancelar = () => {
+        if (onCancelarEdicion) onCancelarEdicion();
+    };
+
     return (
         <form className="grid grid-cols-2 gap-4 animate-in fade-in zoom-in-95 duration-500">
-            {/* ============================================================ */}
-            {/* COLUMNA IZQUIERDA: IDENTIFICACIÓN Y FECHAS */}
-            {/* ============================================================ */}
+            {/* Columna Izquierda: Identificación y Fechas */}
             <div className="flex flex-col gap-3">
-                {/* 🆕 Selector de Categoría */}
+                {/* Selector de Categoría */}
                 <div>
                     <label className="text-[9px] uppercase ml-4 text-emerald-400 font-black tracking-tighter">
                         Categoría
@@ -197,23 +214,31 @@ export const FormularioCerdo = ({
                         value={categoriaSeleccionada}
                         onChange={(e) => setCategoria(e.target.value)}
                         className="w-full border-1 border-emerald-200 rounded-full px-6 py-2 text-[12px] bg-white text-emerald-600 focus:outline-none font-bold"
+                        disabled={esEdicion}
                     >
                         <option value="C">🐷 CERDA (C)</option>
                         <option value="V">🐗 VERRACO (V)</option>
                         <option value="L">🐽 LECHÓN/A (L)</option>
                         <option value="E">🍖 CERDO/A DE CEBA (E)</option>
                     </select>
+                    {esEdicion && (
+                        <p className="text-[8px] text-gray-400 ml-4 mt-1">
+                            ⚠️ Categoría bloqueada en edición
+                        </p>
+                    )}
                 </div>
 
                 {/* ID Oficial */}
-                <input 
-                    name="oficial"
-                    value={formData.oficial}
-                    onChange={manejarCambio} 
-                    type="text" 
-                    placeholder="ID OFICIAL (ICA)" 
-                    className="border-1 border-emerald-200 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-emerald-300 placeholder:text-emerald-300 transition-all" 
-                />
+                <div>
+                    <input 
+                        name="oficial"
+                        value={formData.oficial}
+                        onChange={manejarCambio} 
+                        type="text" 
+                        placeholder="ID OFICIAL (ICA)" 
+                        className="w-full border-1 border-emerald-200 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-emerald-300 placeholder:text-emerald-300 transition-all" 
+                    />
+                </div>
                 
                 {/* ID Local */}
                 <div>
@@ -223,21 +248,28 @@ export const FormularioCerdo = ({
                         onChange={manejarCambio} 
                         type="text" 
                         placeholder={`ID LOCAL (${categoriaSeleccionada}-01)`}
-                        className={`w-full border-1 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 font-bold text-emerald-600 bg-emerald-50/30 transition-all ${
+                        disabled={esEdicion}
+                        className={`w-full border-1 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 font-bold text-emerald-600 transition-all ${
+                            esEdicion ? 'bg-gray-100 text-gray-500' : 'bg-emerald-50/30'
+                        } ${
                             errores.local ? 'border-red-400 focus:ring-red-300' : 'border-emerald-200 focus:ring-emerald-300'
                         }`}
                     />
-                    <span className="text-[8px] text-emerald-400 uppercase font-black ml-4">Sugerido</span>
                     {errores.local && (
                         <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.local}</p>
                     )}
+                    {esEdicion && (
+                        <p className="text-[8px] text-gray-400 ml-4 mt-1">
+                            🔒 ID Local no editable
+                        </p>
+                    )}
                 </div>
 
-                {/* 🆕 Campo Madre (solo para lechones) */}
+                {/* Campo Madre (solo para lechones) */}
                 {esLechon && (
                     <select 
-                        name="id_madre" 
-                        value={formData.id_madre}
+                        name="idMadre" 
+                        value={formData.idMadre}
                         onChange={manejarCambio} 
                         className="border-2 border-amber-200 bg-amber-50 text-amber-700 rounded-full px-6 py-2 text-[12px] font-bold focus:outline-none"
                     >
@@ -292,19 +324,17 @@ export const FormularioCerdo = ({
                 </div>
             </div>
 
-            {/* ============================================================ */}
-            {/* COLUMNA DERECHA: ESTADO Y FOTO */}
-            {/* ============================================================ */}
+            {/* Columna Derecha: Estado y Foto */}
             <div className="flex flex-col gap-3">
-                {/* 🆕 Info de categoría seleccionada */}
-                <div className="bg-emerald-50 rounded-full px-4 py-2 text-center">
-                    <p className="text-[11px] font-bold text-emerald-600">
-                        Registrando: {nombreCategoria()} → Sexo: {formData.sexo} {!sexoEditable && '🔒'}
+                {/* Info de categoría seleccionada */}
+                <div className={`rounded-full px-4 py-2 text-center ${esEdicion ? 'bg-amber-50' : 'bg-emerald-50'}`}>
+                    <p className={`text-[11px] font-bold ${esEdicion ? 'text-amber-600' : 'text-emerald-600'}`}>
+                        {esEdicion ? '✏️ EDITANDO:' : 'Registrando:'} {nombreCategoria()} → Sexo: {formData.sexo} {!sexoEditable && '🔒'}
                     </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
-                    {/* 🆕 Select de sexo - BLOQUEADO para CERDA y VERRACO */}
+                    {/* Select de sexo - BLOQUEADO para CERDA y VERRACO */}
                     {sexoEditable ? (
                         <select 
                             name="sexo" 
@@ -362,7 +392,7 @@ export const FormularioCerdo = ({
                     className="border-1 border-emerald-200 rounded-full px-6 py-2 text-[12px] focus:outline-none placeholder:text-gray-300" 
                 />
                 
-                {/* Establo */}
+                {/* Establo / Corral */}
                 <input 
                     name="establo" 
                     value={formData.establo}
@@ -372,10 +402,10 @@ export const FormularioCerdo = ({
                     className="border-1 border-emerald-200 rounded-full px-6 py-2 text-[12px] focus:outline-none placeholder:text-gray-300" 
                 />
                 
-                {/* 🆕 Estado de Salud - Select */}
+                {/* Estado de Salud - Select */}
                 <select 
-                    name="estado_salud" 
-                    value={formData.estado_salud}
+                    name="salud" 
+                    value={formData.salud}
                     onChange={manejarCambio}
                     className="border-1 border-emerald-200 rounded-full px-6 py-2 text-[12px] bg-white text-emerald-600 focus:outline-none"
                 >
@@ -427,24 +457,43 @@ export const FormularioCerdo = ({
                 </div>
             </div>
 
-            {/* ============================================================ */}
-            {/* BOTONES */}
-            {/* ============================================================ */}
+            {/* Botones */}
             <div className="col-span-2 flex justify-between gap-4 mt-2">
-                <button 
-                    type="button" 
-                    onClick={() => ejecutarEnvio(false)}
-                    className="flex-1 bg-white border-1 border-emerald-400 text-emerald-500 px-6 py-2.5 rounded-full font-black text-[10px] uppercase italic shadow-sm active:scale-95 hover:bg-emerald-50 transition-all"
-                >
-                    Guardar y Seguir
-                </button>
-                <button 
-                    type="button" 
-                    onClick={() => ejecutarEnvio(true)}
-                    className="flex-1 bg-emerald-600 text-white px-6 py-2.5 rounded-full font-black text-[10px] uppercase shadow-lg shadow-emerald-200 active:scale-95 hover:bg-emerald-700 transition-all"
-                >
-                    Guardar y Salir
-                </button>
+                {esEdicion ? (
+                    <>
+                        <button 
+                            type="button" 
+                            onClick={handleCancelar}
+                            className="flex-1 bg-gray-200 text-gray-600 px-6 py-2.5 rounded-full font-black text-[10px] uppercase italic shadow-sm active:scale-95 hover:bg-gray-300 transition-all"
+                        >
+                            Cancelar
+                        </button>
+                        <button 
+                            type="button" 
+                            onClick={() => ejecutarEnvio(true)}
+                            className="flex-1 bg-amber-600 text-white px-6 py-2.5 rounded-full font-black text-[10px] uppercase shadow-lg shadow-amber-200 active:scale-95 hover:bg-amber-700 transition-all"
+                        >
+                            ✏️ Actualizar y Salir
+                        </button>
+                    </>
+                ) : (
+                    <>
+                        <button 
+                            type="button" 
+                            onClick={() => ejecutarEnvio(false)}
+                            className="flex-1 bg-white border-1 border-emerald-400 text-emerald-500 px-6 py-2.5 rounded-full font-black text-[10px] uppercase italic shadow-sm active:scale-95 hover:bg-emerald-50 transition-all"
+                        >
+                            Guardar y Seguir
+                        </button>
+                        <button 
+                            type="button" 
+                            onClick={() => ejecutarEnvio(true)}
+                            className="flex-1 bg-emerald-600 text-white px-6 py-2.5 rounded-full font-black text-[10px] uppercase shadow-lg shadow-emerald-200 active:scale-95 hover:bg-emerald-700 transition-all"
+                        >
+                            Guardar y Salir
+                        </button>
+                    </>
+                )}
             </div>
         </form>
     );

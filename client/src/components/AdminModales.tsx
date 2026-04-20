@@ -13,6 +13,8 @@ import { FormularioTrabajoRealizado } from "../components/FormularioTrabajoReali
 import { FormularioNuevoTrabajador } from "../components/FormularioNuevoTrabajador";
 import { FormularioCompra } from "../components/FormularioCompra";
 
+import { ModalConfirmacion } from "./ModalConfirmacion";
+
 // PDF
 import { FormularioGenerarPagoPDF } from "../components/FormularioGenerarPagoPDF";
 
@@ -35,6 +37,14 @@ interface GanadoHook {
     cambiarVista: (vista: 'lista' | 'formulario') => void;
     guardarAnimal: (animal: any, cerrar: boolean) => void;
     setCategoriaSeleccionada: (cat: string) => void;
+    abrirEdicion: (animal: any) => void;
+    animalAEditar: any | null;
+    cancelarEdicion: () => void;
+    modalConfirmacion: { isOpen: boolean; id: number | null; nombre: string };
+    eliminando: boolean;
+    abrirModalEliminar: (id: number, nombre: string) => void;
+    cerrarModalConfirmacion: () => void;
+    confirmarEliminar: () => Promise<void>;
 }
 
 interface CerdosHook {
@@ -42,11 +52,19 @@ interface CerdosHook {
     vista: 'lista' | 'formulario';
     listaCerdos: any[];
     sugerenciaId: string;
-    categoriaCerdo: string;
+    categoriaSeleccionada: string;
     cerrarModal: () => void;
     cambiarVista: (vista: 'lista' | 'formulario') => void;
     guardarCerdo: (datos: any, cerrar: boolean) => void;
-    setCategoriaCerdo: (cat: string) => void;
+    setCategoriaSeleccionada: (cat: string) => void;
+    cerdoAEditar: any | null;
+    abrirEdicion: (cerdo: any) => void;
+    cancelarEdicion: () => void;
+    modalConfirmacion: { isOpen: boolean; id: number | null; nombre: string };
+    eliminando: boolean;
+    abrirModalEliminar: (id: number, nombre: string) => void;
+    cerrarModalConfirmacion: () => void;
+    confirmarEliminar: () => Promise<void>;
 }
 
 interface VacunasHook {
@@ -57,6 +75,14 @@ interface VacunasHook {
     cerrarModal: () => void;
     cambiarVista: (vista: 'lista' | 'formulario') => void;
     guardarVacuna: (datos: any, cerrar: boolean) => void;
+    vacunaAEditar: any | null;
+    abrirEdicion: (vacuna: any) => void;
+    cancelarEdicion: () => void;
+    modalConfirmacion: { isOpen: boolean; id: number | null; nombre: string };
+    eliminando: boolean;
+    abrirModalEliminar: (id: number, nombre: string) => void;
+    cerrarModalConfirmacion: () => void;
+    confirmarEliminar: () => Promise<void>;
 }
 
 interface VentasHook {
@@ -67,6 +93,14 @@ interface VentasHook {
     cerrarModal: () => void;
     cambiarVista: (vista: 'lista' | 'formulario') => void;
     guardarVenta: (datos: any, cerrar: boolean) => void;
+    ventaAEditar: any | null;
+    abrirEdicion: (venta: any) => void;
+    cancelarEdicion: () => void;
+    modalConfirmacion: { isOpen: boolean; id: number | null; nombre: string };
+    eliminando: boolean;
+    abrirModalEliminar: (id: number, nombre: string) => void;
+    cerrarModalConfirmacion: () => void;
+    confirmarEliminar: () => Promise<void>;
 }
 
 interface PagosHook {
@@ -126,12 +160,25 @@ interface GenerarPDFHook {
 interface SolicitudCompraHook {
     isModalOpen: boolean;
     vista: 'lista' | 'formulario';
+    solicitudes: any[];
     solicitudesPendientes: any[];
+    solicitudesAprobadas: any[];
+    solicitudesRechazadas: any[];
     tipoSeleccionado: 'insumo' | 'alimento';
     cerrarModal: () => void;
     cambiarVista: (vista: 'lista' | 'formulario') => void;
     crearSolicitud: (datos: any, cerrar: boolean) => void;
     setTipoSeleccionado: (tipo: 'insumo' | 'alimento') => void;
+    solicitudAEditar: any | null;
+    setSolicitudAEditar: (solicitud: any) => void;
+    bannerVisible: boolean;
+    cerrarBanner: () => void;
+    eliminarSolicitud: (id: number, motivo: string) => void;
+    modalConfirmacion: { isOpen: boolean; id: number | null; nombre: string };
+    eliminando: boolean;
+    abrirModalEliminar: (id: number, nombre: string) => void;
+    cerrarModalConfirmacion: () => void;
+    confirmarEliminar: () => Promise<void>;
 }
 
 interface ConsumoInsumosHook {
@@ -142,6 +189,19 @@ interface ConsumoInsumosHook {
     cerrarModal: () => void;
     cambiarVista: (vista: 'lista' | 'formulario') => void;
     registrarConsumo: (datos: any, cerrar: boolean) => void;
+}
+
+interface RegistrarCompraHook {
+    isModalOpen: boolean;
+    vista: 'lista' | 'formulario';
+    solicitudesAprobadas: any[];
+    tipoSeleccionado: 'insumo' | 'alimento';
+    setTipoSeleccionado: (tipo: 'insumo' | 'alimento') => void;
+    cerrarModal: () => void;
+    cambiarVista: (vista: 'lista' | 'formulario') => void;
+    setSolicitudAEditar: (solicitud: any) => void;
+    ejecutarCompra: (id: number) => Promise<void>;
+    ejecutarCompraReal: (datos: any) => Promise<void>;
 }
 
 interface Props {
@@ -156,6 +216,7 @@ interface Props {
     generarPDF: GenerarPDFHook;
     solicitudCompra: SolicitudCompraHook;
     consumoInsumos: ConsumoInsumosHook;
+    registrarCompra: RegistrarCompraHook;
 }
 
 // ============================================================
@@ -163,7 +224,9 @@ interface Props {
 // ============================================================
 export const AdminModales = ({ 
     ganado, cerdos, vacunas, ventas, 
-    pagos, trabajo, trabajadores, compras, generarPDF, solicitudCompra, consumoInsumos
+    pagos, trabajo, trabajadores, compras, 
+    generarPDF, solicitudCompra, consumoInsumos,
+    registrarCompra
 }: Props) => {
 
     const [pagoSeleccionado, setPagoSeleccionado] = useState<any | null>(null);
@@ -177,11 +240,11 @@ export const AdminModales = ({
                 isOpen={ganado?.isModalOpen ?? false} 
                 onClose={ganado?.cerrarModal ?? (() => {})} 
                 titulo={ganado?.vista === 'lista' ? "CONTROL DE INVENTARIO" : "REGISTRO DE GANADO"} 
-                width="max-w-2xl"
+                width="max-w-3xl"
             >
                 {ganado?.vista === 'lista' ? (
                     <div className="flex flex-col gap-6 p-4">
-                        <div className="overflow-hidden rounded-xl border border-gray-100 shadow-sm">
+                        <div className="overflow-x-auto rounded-xl border border-gray-100 shadow-sm">
                             <table className="w-full text-left text-[11px] uppercase tracking-wider">
                                 <thead className="bg-gray-50 text-gray-400">
                                     <tr>
@@ -189,11 +252,15 @@ export const AdminModales = ({
                                         <th className="p-3">OFICIAL</th>
                                         <th className="p-3">SEXO</th>
                                         <th className="p-3">ESTADO</th>
+                                        <th className="p-3 text-center">ACCIONES</th>
                                     </tr>
                                 </thead>
                                 <tbody className="text-gray-600">
                                     {ganado?.listaGanado?.length > 0 ? ganado.listaGanado.map((animal: any) => (
-                                        <tr key={animal.id} className="border-t border-gray-50 hover:bg-gray-50 transition-colors">
+                                        <tr 
+                                            key={animal.id} 
+                                            className="group border-t border-gray-50 hover:bg-gray-50 transition-all duration-200"
+                                        >
                                             <td className="p-3 font-bold">{animal.local}</td>
                                             <td className="p-3">{animal.oficial || '—'}</td>
                                             <td className="p-3">{animal.sexo}</td>
@@ -202,10 +269,26 @@ export const AdminModales = ({
                                                     {animal.estado?.nombre || animal.estado || 'Activo'}
                                                 </span>
                                             </td>
+                                            <td className="p-3">
+                                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 justify-center">
+                                                    <button
+                                                        onClick={() => ganado?.abrirEdicion?.(animal)}
+                                                        className="text-blue-500 hover:text-blue-700 text-[10px] font-bold px-2 py-1 rounded-full hover:bg-blue-50 transition-all"
+                                                    >
+                                                        ✏️ Editar
+                                                    </button>
+                                                    <button
+                                                        onClick={() => ganado?.abrirModalEliminar?.(animal.id, animal.local)}
+                                                        className="text-red-500 hover:text-red-700 text-[10px] font-bold px-2 py-1 rounded-full hover:bg-red-50 transition-all"
+                                                    >
+                                                        🗑️ Eliminar
+                                                    </button>
+                                                </div>
+                                            </td>
                                         </tr>
                                     )) : (
                                         <tr>
-                                            <td colSpan={4} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">
+                                            <td colSpan={5} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">
                                                 — Sin registros aún —
                                             </td>
                                         </tr>
@@ -227,6 +310,8 @@ export const AdminModales = ({
                         categoriaSeleccionada={ganado?.categoriaSeleccionada ?? ""} 
                         setCategoria={ganado?.setCategoriaSeleccionada ?? (() => {})} 
                         onGuardar={(datos: any, cerrar: boolean) => ganado?.guardarAnimal?.(datos, cerrar)} 
+                        animalAEditar={ganado?.animalAEditar ?? null}
+                        onCancelarEdicion={() => ganado?.cancelarEdicion?.()}
                     />
                 )}
             </ModalGenerico>
@@ -237,12 +322,12 @@ export const AdminModales = ({
             <ModalGenerico 
                 isOpen={cerdos?.isModalOpen ?? false} 
                 onClose={cerdos?.cerrarModal ?? (() => {})} 
-                titulo={cerdos?.vista === 'lista' ? "INVENTARIO PORCINO" : "REGISTRAR CERDOS"} 
-                width="max-w-2xl"
+                titulo={cerdos?.vista === 'lista' ? "INVENTARIO PORCINO" : "REGISTRAR CERDO"} 
+                width="max-w-3xl"
             >
                 {cerdos?.vista === 'lista' ? (
                     <div className="flex flex-col gap-6 p-4">
-                        <div className="overflow-hidden rounded-xl border border-emerald-100 shadow-sm">
+                        <div className="overflow-x-auto rounded-xl border border-emerald-100 shadow-sm">
                             <table className="w-full text-left text-[11px] uppercase">
                                 <thead className="bg-emerald-50 text-emerald-700">
                                     <tr>
@@ -250,27 +335,44 @@ export const AdminModales = ({
                                         <th className="p-3">OFICIAL</th>
                                         <th className="p-3">SEXO</th>
                                         <th className="p-3">ESTADO</th>
+                                        <th className="p-3 text-center">ACCIONES</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {cerdos?.listaCerdos?.length > 0 
-                                        ? [...cerdos.listaCerdos]
+                                    {cerdos?.listaCerdos?.length > 0 ? 
+                                        [...cerdos.listaCerdos]
                                             .sort((a: any, b: any) => (a.local || a.codigo_local || '').localeCompare(b.local || b.codigo_local || ''))
                                             .map((cerdo: any) => (
-                                                <tr key={cerdo.id_animal || cerdo.id} className="border-t border-emerald-50">
-                                                    <td className="p-3 font-bold">{cerdo.local || cerdo.codigo_local || '—'}</td>
-                                                    <td className="p-3">{cerdo.oficial || cerdo.num_ica_chapeta || '—'}</td>
+                                                <tr key={cerdo.id} className="group border-t border-emerald-50 hover:bg-emerald-50/30 transition-all duration-200">
+                                                    <td className="p-3 font-bold">{cerdo.local || '—'}</td>
+                                                    <td className="p-3">{cerdo.oficial || '—'}</td>
                                                     <td className="p-3">{cerdo.sexo || '—'}</td>
                                                     <td className="p-3">
                                                         <span className="bg-emerald-100 text-emerald-600 px-2 py-1 rounded-full text-[9px]">
-                                                            {cerdo.estado?.nombre || cerdo.EstadoAni?.nombre || 'Activo'}
+                                                            {cerdo.estado || 'Activo'}
                                                         </span>
+                                                    </td>
+                                                    <td className="p-3">
+                                                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 justify-center">
+                                                            <button
+                                                                onClick={() => cerdos?.abrirEdicion?.(cerdo)}
+                                                                className="text-blue-500 hover:text-blue-700 text-[10px] font-bold px-2 py-1 rounded-full hover:bg-blue-50 transition-all"
+                                                            >
+                                                                ✏️ Editar
+                                                            </button>
+                                                            <button
+                                                                onClick={() => cerdos?.abrirModalEliminar?.(cerdo.id, cerdo.local)}
+                                                                className="text-red-500 hover:text-red-700 text-[10px] font-bold px-2 py-1 rounded-full hover:bg-red-50 transition-all"
+                                                            >
+                                                                🗑️ Eliminar
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             ))
                                         : (
                                             <tr>
-                                                <td colSpan={4} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">
+                                                <td colSpan={5} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">
                                                     — Sin registros aún —
                                                 </td>
                                             </tr>
@@ -289,9 +391,11 @@ export const AdminModales = ({
                     <FormularioCerdo 
                         listaCerdos={cerdos?.listaCerdos ?? []}
                         sugerenciaId={cerdos?.sugerenciaId ?? ""} 
-                        categoriaSeleccionada={cerdos?.categoriaCerdo ?? "C"} 
-                        setCategoria={cerdos?.setCategoriaCerdo ?? (() => {})} 
+                        categoriaSeleccionada={cerdos?.categoriaSeleccionada ?? "C"} 
+                        setCategoria={cerdos?.setCategoriaSeleccionada ?? (() => {})} 
                         onGuardar={(datos: any, cerrar: boolean) => cerdos?.guardarCerdo?.(datos, cerrar)} 
+                        cerdoAEditar={cerdos?.cerdoAEditar ?? null}
+                        onCancelarEdicion={() => cerdos?.cancelarEdicion?.()}
                     />
                 )}
             </ModalGenerico>
@@ -302,41 +406,70 @@ export const AdminModales = ({
             <ModalGenerico 
                 isOpen={vacunas?.isModalOpen ?? false} 
                 onClose={vacunas?.cerrarModal ?? (() => {})} 
-                titulo={vacunas?.vista === 'lista' ? "HISTORIAL DE VACUNACIÓN" : "REGISTRAR VACUNAS"} 
-                width="max-w-2xl"
+                titulo={vacunas?.vista === 'lista' ? "HISTORIAL DE VACUNACIÓN" : "REGISTRAR VACUNA"} 
+                width="max-w-4xl"
             >
                 {vacunas?.vista === 'lista' ? (
                     <div className="flex flex-col gap-6 p-4">
-                        <div className="overflow-hidden rounded-xl border border-cyan-100 shadow-sm">
-                            <table className="w-full text-left text-[11px] uppercase">
+                        <div className="overflow-x-auto rounded-xl border border-cyan-100 shadow-sm">
+                            <table className="w-full text-left text-[10px] uppercase">
                                 <thead className="bg-cyan-50 text-cyan-700">
                                     <tr>
-                                        <th className="p-3">ANIMAL</th>
-                                        <th className="p-3">VACUNA</th>
-                                        <th className="p-3">FECHA</th>
-                                        <th className="p-3">REFUERZO</th>
+                                        <th className="p-2">ANIMAL</th>
+                                        <th className="p-2">VACUNA</th>
+                                        <th className="p-2">DOSIS</th>
+                                        <th className="p-2">FECHA APP</th>
+                                        <th className="p-2">REFUERZO</th>
+                                        <th className="p-2">VETERINARIO</th>
+                                        <th className="p-2">ADMIN</th>
+                                        <th className="p-2 text-center">ACCIONES</th>
                                     </tr>
                                 </thead>
                                 <tbody className="text-gray-600">
                                     {vacunas?.listaVacunas?.length > 0 ? vacunas.listaVacunas.map((v: any) => (
-                                        <tr key={v.id_reg_vac || v.id} className="border-t border-cyan-50">
-                                            <td className="p-3 font-bold">
+                                        <tr key={v.id_reg_vac} className="group border-t border-cyan-50 hover:bg-cyan-50/30 transition-all duration-200">
+                                            <td className="p-2 font-bold">
                                                 {v.animal?.codigo_local || v.Animal?.codigo_local || '—'}
                                             </td>
-                                            <td className="p-3">
-                                                {v.vacuna?.nombre_vacuna || v.tipo_vacuna || '—'}
+                                            <td className="p-2">
+                                                {v.tipo_vacuna || '—'}
                                             </td>
-                                            <td className="p-3">
-                                                {v.fecha_aplicacion?.split('T')[0] || v.fecha || '—'}
+                                            <td className="p-2">
+                                                {v.dosis ? `${v.dosis} ml` : '—'}
                                             </td>
-                                            <td className="p-3 font-semibold text-orange-500">
-                                                {v.proximo_refuerzo?.split('T')[0] || v.refuerzo || '—'}
+                                            <td className="p-2">
+                                                {v.fecha_aplicacion?.split('T')[0] || '—'}
+                                            </td>
+                                            <td className="p-2 text-orange-600 font-semibold">
+                                                {v.proximo_refuerzo?.split('T')[0] || '—'}
+                                            </td>
+                                            <td className="p-2">
+                                                {v.veterinario || '—'}
+                                            </td>
+                                            <td className="p-2">
+                                                {v.admin_nombre || '—'}
+                                            </td>
+                                            <td className="p-2">
+                                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 justify-center">
+                                                    <button
+                                                        onClick={() => vacunas?.abrirEdicion?.(v)}
+                                                        className="text-blue-500 hover:text-blue-700 text-[10px] font-bold px-2 py-1 rounded-full hover:bg-blue-50 transition-all"
+                                                    >
+                                                        ✏️ Editar
+                                                    </button>
+                                                    <button
+                                                        onClick={() => vacunas?.abrirModalEliminar?.(v.id_reg_vac, v.tipo_vacuna)}
+                                                        className="text-red-500 hover:text-red-700 text-[10px] font-bold px-2 py-1 rounded-full hover:bg-red-50 transition-all"
+                                                    >
+                                                        🗑️ Eliminar
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     )) : (
                                         <tr>
-                                            <td colSpan={4} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">
-                                                — Sin registros aún —
+                                            <td colSpan={8} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">
+                                                — Sin registros de vacunación —
                                             </td>
                                         </tr>
                                     )}
@@ -347,13 +480,15 @@ export const AdminModales = ({
                             onClick={() => vacunas?.cambiarVista?.('formulario')} 
                             className="bg-cyan-600 text-white py-3 rounded-full font-bold uppercase text-[10px] shadow-lg hover:shadow-cyan-200 transition-all"
                         >
-                            + Registrar Nueva Aplicación
-                        </button>   
+                            + Registrar Nueva Vacuna
+                        </button>
                     </div>
                 ) : (
                     <FormularioVacuna
                         listaAnimales={vacunas?.animalesDisponibles ?? []} 
                         onGuardar={(datos: any, cerrar: boolean) => vacunas?.guardarVacuna?.(datos, cerrar)} 
+                        vacunaAEditar={vacunas?.vacunaAEditar ?? null}
+                        onCancelarEdicion={() => vacunas?.cancelarEdicion?.()}
                     />
                 )}
             </ModalGenerico>
@@ -364,37 +499,77 @@ export const AdminModales = ({
             <ModalGenerico 
                 isOpen={ventas?.isModalOpen ?? false} 
                 onClose={ventas?.cerrarModal ?? (() => {})} 
-                titulo={ventas?.vista === 'lista' ? "HISTORIAL DE VENTAS" : "REGISTRAR VENTAS"} 
-                width="max-w-2xl"
+                titulo={ventas?.vista === 'lista' ? "HISTORIAL DE VENTAS" : "REGISTRAR VENTA"} 
+                width="max-w-4xl"
             >
                 {ventas?.vista === 'lista' ? (
                     <div className="flex flex-col gap-6 p-4">
-                        <div className="overflow-hidden rounded-xl border border-orange-100 shadow-sm">
-                            <table className="w-full text-left text-[11px] uppercase">
+                        <div className="overflow-x-auto rounded-xl border border-orange-100 shadow-sm">
+                            <table className="w-full text-left text-[10px] uppercase">
                                 <thead className="bg-orange-50 text-orange-700">
                                     <tr>
-                                        <th className="p-3">ANIMAL</th>
-                                        <th className="p-3">COMPRADOR</th>
-                                        <th className="p-3">FECHA</th>
-                                        <th className="p-3">MONTO TOTAL</th>
+                                        <th className="p-2">ANIMAL</th>
+                                        <th className="p-2">COMPRADOR</th>
+                                        <th className="p-2">PESO (kg)</th>
+                                        <th className="p-2">PRECIO/KG</th>
+                                        <th className="p-2">TOTAL</th>
+                                        <th className="p-2">FECHA</th>
+                                        <th className="p-2">MÉTODO</th>
+                                        <th className="p-2">FACTURA</th>
+                                        <th className="p-2 text-center">ACCIONES</th>
                                     </tr>
                                 </thead>
                                 <tbody className="text-gray-600">
-                                    {ventas?.listaVentas?.length > 0 ? ventas.listaVentas.map((v: any) => (
-                                        <tr key={v.id_venta || v.id} className="border-t border-orange-50 hover:bg-orange-50/30 transition-colors">
-                                            <td className="p-3 font-bold">
-                                                {v.animal?.codigo_local || v.Animal?.codigo_local || '—'}
-                                            </td>
-                                            <td className="p-3">{v.comprador || '—'}</td>
-                                            <td className="p-3">{v.fecha_venta?.split('T')[0] || '—'}</td>
-                                            <td className="p-3 font-bold text-emerald-600">
-                                                ${v.precio_total?.toLocaleString() || '0'}
-                                            </td>
-                                        </tr>
-                                    )) : (
+                                    {ventas?.listaVentas?.length > 0 ? ventas.listaVentas.map((v: any) => {
+                                        const precioKilo = v.peso_venta > 0 ? v.precio_total / v.peso_venta : 0;
+                                        return (
+                                            <tr key={v.id_venta} className="group border-t border-orange-50 hover:bg-orange-50/30 transition-all duration-200">
+                                                <td className="p-2 font-bold">
+                                                    {v.animal?.codigo_local || v.Animal?.codigo_local || '—'}
+                                                </td>
+                                                <td className="p-2">
+                                                    {v.comprador || '—'}
+                                                </td>
+                                                <td className="p-2 text-right">
+                                                    {v.peso_venta ? `${v.peso_venta.toLocaleString()} kg` : '—'}
+                                                </td>
+                                                <td className="p-2 text-right">
+                                                    {precioKilo > 0 ? `$${precioKilo.toLocaleString('es-CO')}` : '—'}
+                                                </td>
+                                                <td className="p-2 text-right font-bold text-emerald-600">
+                                                    ${v.precio_total?.toLocaleString('es-CO') || '0'}
+                                                </td>
+                                                <td className="p-2">
+                                                    {v.fecha_venta?.split('T')[0] || '—'}
+                                                </td>
+                                                <td className="p-2">
+                                                    {v.metodo_pago || '—'}
+                                                </td>
+                                                <td className="p-2">
+                                                    {v.num_factura || '—'}
+                                                </td>
+                                                <td className="p-2">
+                                                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 justify-center">
+                                                        <button
+                                                            onClick={() => ventas?.abrirEdicion?.(v)}
+                                                            className="text-blue-500 hover:text-blue-700 text-[10px] font-bold px-2 py-1 rounded-full hover:bg-blue-50 transition-all"
+                                                        >
+                                                            ✏️ Editar
+                                                        </button>
+                                                        <button
+                                                            onClick={() => ventas?.abrirModalEliminar?.(v.id_venta, v.comprador)}
+                                                            className="text-red-500 hover:text-red-700 text-[10px] font-bold px-2 py-1 rounded-full hover:bg-red-50 transition-all"
+                                                        >
+                                                            🗑️ Eliminar
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    }) : (
                                         <tr>
-                                            <td colSpan={4} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">
-                                                — Sin registros aún —
+                                            <td colSpan={9} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">
+                                                — Sin registros de ventas —
                                             </td>
                                         </tr>
                                     )}
@@ -412,6 +587,8 @@ export const AdminModales = ({
                     <FormularioVenta 
                         listaAnimales={ventas?.animalesDisponibles ?? []} 
                         onGuardar={(datos: any, cerrar: boolean) => ventas?.guardarVenta?.(datos, cerrar)} 
+                        ventaAEditar={ventas?.ventaAEditar ?? null}
+                        onCancelarEdicion={() => ventas?.cancelarEdicion?.()}
                     />
                 )}
             </ModalGenerico>
@@ -607,7 +784,7 @@ export const AdminModales = ({
             </ModalGenerico>
 
             {/* ============================================================ */}
-            {/* COMPRAS */}
+            {/* COMPRAS (SOLICITUDES) */}
             {/* ============================================================ */}
             <ModalGenerico 
                 isOpen={compras?.isModalOpen ?? false} 
@@ -782,47 +959,164 @@ export const AdminModales = ({
             </ModalGenerico>
 
             {/* ============================================================ */}
-            {/* SOLICITUDES DE COMPRA */}
+            {/* SOLICITUDES DE COMPRA (PEDIR) */}
             {/* ============================================================ */}
             <ModalGenerico 
                 isOpen={solicitudCompra?.isModalOpen ?? false} 
                 onClose={solicitudCompra?.cerrarModal ?? (() => {})} 
                 titulo="SOLICITUDES DE COMPRA" 
-                width="max-w-3xl"
+                width="max-w-4xl"
             >
                 {solicitudCompra?.vista === 'lista' ? (
                     <div className="flex flex-col gap-6 p-4">
-                        <div className="overflow-hidden rounded-xl border border-amber-100 shadow-sm">
+                        {/* Banner tipo WhatsApp para solicitudes rechazadas */}
+                        {solicitudCompra?.bannerVisible && solicitudCompra?.solicitudesRechazadas?.length > 0 && (
+                            <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-right-5 duration-300">
+                                <div className="bg-red-500 text-white rounded-lg shadow-2xl max-w-sm w-full overflow-hidden">
+                                    <div className="flex items-center justify-between p-3 bg-red-600">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-lg">⚠️</span>
+                                            <span className="text-xs font-bold uppercase tracking-wider">Solicitudes Rechazadas</span>
+                                        </div>
+                                        <button 
+                                            onClick={() => solicitudCompra?.cerrarBanner?.()}
+                                            className="text-white hover:text-gray-200 transition-colors"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                    <div className="p-3 bg-red-500">
+                                        <p className="text-[11px] font-medium">
+                                            Tienes {solicitudCompra.solicitudesRechazadas.length} solicitud(es) que fueron rechazadas:
+                                        </p>
+                                        <ul className="mt-2 space-y-1">
+                                            {solicitudCompra.solicitudesRechazadas.slice(0, 3).map((s: any) => (
+                                                <li key={s.id_solicitud} className="text-[10px] opacity-90">
+                                                    • {s.tipoInsumo || s.tipoAlimento || 'Producto'} - {s.cantidad} {s.unidad_medida}
+                                                </li>
+                                            ))}
+                                            {solicitudCompra.solicitudesRechazadas.length > 3 && (
+                                                <li className="text-[9px] opacity-75 italic">
+                                                    y {solicitudCompra.solicitudesRechazadas.length - 3} más...
+                                                </li>
+                                            )}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="overflow-x-auto rounded-xl border border-amber-100 shadow-sm">
                             <table className="w-full text-left text-[11px] uppercase">
                                 <thead className="bg-amber-50 text-amber-700">
                                     <tr>
-                                        <th className="p-3">TIPO</th>
-                                        <th className="p-3">PRODUCTO</th>
-                                        <th className="p-3">CANTIDAD</th>
-                                        <th className="p-3">FECHA</th>
-                                        <th className="p-3">ESTADO</th>
+                                        <th className="p-2">TIPO</th>
+                                        <th className="p-2">PRODUCTO</th>
+                                        <th className="p-2">CANTIDAD</th>
+                                        <th className="p-2">UNIDAD</th>
+                                        <th className="p-2">FECHA</th>
+                                        <th className="p-2">ESTADO</th>
+                                        <th className="p-2 text-center">ACCIONES</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {solicitudCompra?.solicitudesPendientes?.length > 0 ? solicitudCompra.solicitudesPendientes.map((s: any) => (
-                                        <tr key={s.id} className="border-t border-amber-50">
-                                            <td className="p-3 font-bold">{s.categoria_general || s.tipo || '—'}</td>
-                                            <td className="p-3">{s.tipo_insumo || s.tipo_alimento || '—'}</td>
-                                            <td className="p-3">{s.cantidad || 0} {s.unidad_medida || ''}</td>
-                                            <td className="p-3">{s.fecha_propuesta || s.fecha_compra || '—'}</td>
-                                            <td className="p-3">
-                                                <span className="px-2 py-1 rounded-full text-[9px] bg-yellow-100 text-yellow-600">
-                                                    {s.estado || 'Pendiente'}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    )) : (
-                                        <tr>
-                                            <td colSpan={5} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">
-                                                — Sin solicitudes pendientes —
-                                            </td>
-                                        </tr>
-                                    )}
+                                <tbody className="text-gray-600">
+                                    {solicitudCompra?.solicitudes?.length > 0 ? 
+                                        [...solicitudCompra.solicitudes]
+                                            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                                            .map((s: any) => {
+                                                const esRechazada = s.estado_sol === 'Rechazada';
+                                                const esAprobada = s.estado_sol === 'Aprobada';
+                                                const esPendiente = s.estado_sol === 'Pendiente';
+                                                
+                                                return (
+                                                    <tr 
+                                                        key={s.id_solicitud} 
+                                                        className={`group border-t transition-all duration-200 ${
+                                                            esRechazada ? 'bg-red-50/30 border-red-200 hover:bg-red-100/50' : 
+                                                            esAprobada ? 'bg-green-50/30 border-green-200 hover:bg-green-100/50' : 
+                                                            'border-amber-50 hover:bg-amber-50/30'
+                                                        }`}
+                                                    >
+                                                        <td className="p-2 font-bold">
+                                                            {s.tipo === 'insumo' ? '🛒 INSUMO' : '🌾 ALIMENTO'}
+                                                        </td>
+                                                        <td className="p-2">
+                                                            {s.tipoInsumo || s.tipoAlimento || '—'}
+                                                        </td>
+                                                        <td className="p-2">
+                                                            {s.cantidad}
+                                                        </td>
+                                                        <td className="p-2">
+                                                            {s.unidad_medida || '—'}
+                                                        </td>
+                                                        <td className="p-2">
+                                                            {s.fecha_compra?.split('T')[0] || '—'}
+                                                        </td>
+                                                        <td className="p-2">
+                                                            {esRechazada ? (
+                                                                <span className="px-2 py-1 rounded-full text-[9px] bg-red-100 text-red-600 font-bold">
+                                                                    🚫 RECHAZADA
+                                                                </span>
+                                                            ) : esAprobada ? (
+                                                                <span className="px-2 py-1 rounded-full text-[9px] bg-green-100 text-green-600 font-bold">
+                                                                    ✅ APROBADA
+                                                                </span>
+                                                            ) : (
+                                                                <span className="px-2 py-1 rounded-full text-[9px] bg-yellow-100 text-yellow-600 font-bold">
+                                                                    ⏳ PENDIENTE
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                        <td className="p-2">
+                                                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 justify-center">
+                                                                {esAprobada && (
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            // Abrir el modal de registrarCompra con esta solicitud
+                                                                            registrarCompra?.setSolicitudAEditar?.(s);
+                                                                            registrarCompra?.cambiarVista?.('formulario');
+                                                                            // registrarCompra?.abrirModal?.();
+                                                                        }}
+                                                                        className="text-emerald-600 hover:text-emerald-800 text-[10px] font-bold px-2 py-1 rounded-full hover:bg-emerald-50 transition-all"
+                                                                    >
+                                                                        📦 Registrar Compra
+                                                                    </button>
+                                                                )}
+                                                                {esPendiente && (
+                                                                    <>
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                solicitudCompra?.setSolicitudAEditar?.(s);
+                                                                                solicitudCompra?.cambiarVista?.('formulario');
+                                                                            }}
+                                                                            className="text-blue-500 hover:text-blue-700 text-[10px] font-bold px-2 py-1 rounded-full hover:bg-blue-50 transition-all"
+                                                                        >
+                                                                            ✏️ Editar
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => solicitudCompra?.abrirModalEliminar?.(s.id_solicitud, s.tipoInsumo || s.tipoAlimento || 'solicitud')}
+                                                                            className="text-red-500 hover:text-red-700 text-[10px] font-bold px-2 py-1 rounded-full hover:bg-red-50 transition-all"
+                                                                        >
+                                                                            🗑️ Eliminar
+                                                                        </button>
+                                                                    </>
+                                                                )}
+                                                                {esRechazada && (
+                                                                    <span className="text-gray-400 text-[9px] italic">
+                                                                        No disponible
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            }) : (
+                                                <tr>
+                                                    <td colSpan={7} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">
+                                                        — Sin solicitudes registradas —
+                                                    </td>
+                                                </tr>
+                                            )}
                                 </tbody>
                             </table>
                         </div>
@@ -832,16 +1126,109 @@ export const AdminModales = ({
                         >
                             + Nueva Solicitud
                         </button>
+
+                        {/* Modal de confirmación para eliminar */}
+                        <ModalConfirmacion
+                            isOpen={solicitudCompra?.modalConfirmacion?.isOpen || false}
+                            onClose={() => solicitudCompra?.cerrarModalConfirmacion?.()}
+                            onConfirm={() => solicitudCompra?.confirmarEliminar?.()}
+                            titulo="CONFIRMAR ELIMINACIÓN"
+                            mensaje="¿Estás seguro de que deseas eliminar esta solicitud?"
+                            subtitulo={`ID: ${solicitudCompra?.modalConfirmacion?.nombre || ''}`}
+                            loading={solicitudCompra?.eliminando || false}
+                            tipo="eliminar"
+                        />
                     </div>
                 ) : (
                     <FormularioSolicitudCompra
-                        solicitudAEditar={null}
+                        solicitudAEditar={solicitudCompra?.solicitudAEditar ?? null}
                         tipoSeleccionado={solicitudCompra?.tipoSeleccionado ?? 'insumo'}
                         setTipoSeleccionado={solicitudCompra?.setTipoSeleccionado ?? (() => {})}
                         trabajadoresActivos={trabajadores?.trabajadoresActivos ?? []}
                         onGuardar={(datos: any, cerrar: boolean) => solicitudCompra?.crearSolicitud?.(datos, cerrar)}
                         onCancelar={() => solicitudCompra?.cambiarVista?.('lista')}
                         usuarioActual="Admin"
+                    />
+                )}
+            </ModalGenerico>
+
+            {/* ============================================================ */}
+            {/* REGISTRAR COMPRA REAL (ejecutar solicitudes aprobadas) */}
+            {/* ============================================================ */}
+            <ModalGenerico 
+                isOpen={registrarCompra?.isModalOpen ?? false} 
+                onClose={registrarCompra?.cerrarModal ?? (() => {})} 
+                titulo="REGISTRAR COMPRA REAL" 
+                width="max-w-3xl"
+            >
+                {registrarCompra?.vista === 'lista' ? (
+                    <div className="flex flex-col gap-6 p-4">
+                        {/* Tabla de solicitudes APROBADAS para ejecutar */}
+                        <div className="overflow-x-auto rounded-xl border border-orange-100 shadow-sm">
+                            <table className="w-full text-left text-[11px] uppercase">
+                                <thead className="bg-orange-50 text-orange-700">
+                                    <tr>
+                                        <th className="p-2">ID</th>
+                                        <th className="p-2">PRODUCTO</th>
+                                        <th className="p-2">CANTIDAD</th>
+                                        <th className="p-2">UNIDAD</th>
+                                        <th className="p-2">PROVEEDOR</th>
+                                        <th className="p-2 text-center">ACCIÓN</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {registrarCompra?.solicitudesAprobadas?.length > 0 ? (
+                                        registrarCompra.solicitudesAprobadas.map((s: any) => (
+                                            <tr key={s.id} className="border-t border-orange-50 hover:bg-orange-50/30">
+                                                <td className="p-2 font-bold">#{s.id}</td>
+                                                <td className="p-2">{s.tipo_insumo || s.tipo_alimento || '—'}</td>
+                                                <td className="p-2">{s.cantidad}</td>
+                                                <td className="p-2">{s.unidad_medida || '—'}</td>
+                                                <td className="p-2">{s.proveedor || '—'}</td>
+                                                <td className="p-2 text-center">
+                                                    <button
+                                                        onClick={() => {
+                                                            registrarCompra?.setSolicitudAEditar?.(s);
+                                                            registrarCompra?.cambiarVista?.('formulario');
+                                                        }}
+                                                        className="bg-orange-500 text-white text-[10px] font-bold px-3 py-1 rounded-full hover:bg-orange-600 transition-all"
+                                                    >
+                                                        📦 Registrar Compra
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan={6} className="p-6 text-center text-gray-300">
+                                                — No hay solicitudes aprobadas pendientes de ejecutar —
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                        <button 
+                            onClick={() => {
+                                registrarCompra?.setSolicitudAEditar?.(null);
+                                registrarCompra?.cambiarVista?.('formulario');
+                            }} 
+                            className="bg-orange-500 text-white py-3 rounded-full font-bold uppercase text-[10px] shadow-lg hover:bg-orange-600 transition-all"
+                        >
+                            + Registrar Compra Directa
+                        </button>
+                    </div>
+                ) : (
+                    <FormularioCompra 
+                        tipoSeleccionado={registrarCompra?.tipoSeleccionado ?? 'insumo'}
+                        setTipoSeleccionado={registrarCompra?.setTipoSeleccionado ?? (() => {})}
+                        onGuardar={async (datos: any, cerrar: boolean) => {
+                            console.log('Ejecutar compra real:', datos);
+                            await registrarCompra?.ejecutarCompraReal?.(datos);
+                            if (cerrar) registrarCompra?.cerrarModal?.();
+                        }}
+                        onCancelar={() => registrarCompra?.cambiarVista?.('lista')}
+                        solicitudesAprobadas={registrarCompra?.solicitudesAprobadas ?? []}
                     />
                 )}
             </ModalGenerico>
@@ -903,6 +1290,42 @@ export const AdminModales = ({
                     />
                 )}
             </ModalGenerico>
+
+            {/* ============================================================ */}
+            {/* MODAL DE CONFIRMACIÓN REUTILIZABLE */}
+            {/* ============================================================ */}
+            <ModalConfirmacion
+                isOpen={
+                    ganado?.modalConfirmacion?.isOpen || 
+                    cerdos?.modalConfirmacion?.isOpen || 
+                    vacunas?.modalConfirmacion?.isOpen || 
+                    ventas?.modalConfirmacion?.isOpen || 
+                    false
+                }
+                onClose={() => {
+                    if (ganado?.modalConfirmacion?.isOpen) ganado?.cerrarModalConfirmacion?.();
+                    if (cerdos?.modalConfirmacion?.isOpen) cerdos?.cerrarModalConfirmacion?.();
+                    if (vacunas?.modalConfirmacion?.isOpen) vacunas?.cerrarModalConfirmacion?.();
+                    if (ventas?.modalConfirmacion?.isOpen) ventas?.cerrarModalConfirmacion?.();
+                }}
+                onConfirm={() => {
+                    if (ganado?.modalConfirmacion?.isOpen) ganado?.confirmarEliminar?.();
+                    if (cerdos?.modalConfirmacion?.isOpen) cerdos?.confirmarEliminar?.();
+                    if (vacunas?.modalConfirmacion?.isOpen) vacunas?.confirmarEliminar?.();
+                    if (ventas?.modalConfirmacion?.isOpen) ventas?.confirmarEliminar?.();
+                }}
+                titulo="CONFIRMAR ELIMINACIÓN"
+                mensaje="¿Estás seguro de que deseas eliminar este registro?"
+                subtitulo={`ID: ${ganado?.modalConfirmacion?.nombre || cerdos?.modalConfirmacion?.nombre || vacunas?.modalConfirmacion?.nombre || ventas?.modalConfirmacion?.nombre || ''}`}
+                loading={
+                    ganado?.eliminando || 
+                    cerdos?.eliminando || 
+                    vacunas?.eliminando || 
+                    ventas?.eliminando || 
+                    false
+                }
+                tipo="eliminar"
+            />
         </>
     );
 };
