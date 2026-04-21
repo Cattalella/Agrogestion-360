@@ -19,7 +19,7 @@ import { ActualizarWallpaperDto } from './dto/actualizar-wallpaper.dto';
 import { ActualizarColoresDto } from './dto/actualizar-colores.dto';
 import { AutenticacionGuardia } from '../../compartido/guardias/autenticacion.guardia';
 import { UsuarioActual } from '../../compartido/decoradores/usuario-actual.decorador';
-import { configuracionSubida } from '../../compartido/utilidades/archivos.utilidad';
+import { configuracionSubida, configuracionSubidaMemoria } from '../../compartido/utilidades/archivos.utilidad';
 
 @Controller('encabezado')
 @UseGuards(AutenticacionGuardia)
@@ -49,7 +49,7 @@ export class EncabezadoController {
   // POST /api/encabezado/perfil/foto
   // ============================================================
   @Post('perfil/foto')
-  @UseInterceptors(FileInterceptor('foto', configuracionSubida('perfiles')))
+  @UseInterceptors(FileInterceptor('foto', configuracionSubidaMemoria()))
   async actualizarFotoPerfil(
     @UsuarioActual('id_persona') idUsuario: number,
     @UploadedFile() archivo: Express.Multer.File,

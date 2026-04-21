@@ -4,6 +4,7 @@ import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { BadRequestException } from '@nestjs/common';
+import { memoryStorage } from 'multer';
 
 export const configuracionSubida = (carpeta: string): MulterOptions => ({
   storage: diskStorage({
@@ -33,21 +34,21 @@ export const configuracionSubida = (carpeta: string): MulterOptions => ({
     }
     cb(null, true);
   },
-    import { memoryStorage } from 'multer';
+});
 
-    export const configuracionSubidaMemoria = (): MulterOptions => ({
-      storage: memoryStorage(),
-      limits: {
-        fileSize: 5 * 1024 * 1024,
-      },
-      fileFilter: (req, file, cb) => {
-        const tiposPermitidos = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-        if (!tiposPermitidos.includes(file.mimetype)) {
-          return cb(
-            new BadRequestException('Solo se permiten imágenes (JPEG, PNG, WEBP, GIF)'),
-            false
-          );
-        }
-        cb(null, true);
-      },
+export const configuracionSubidaMemoria = (): MulterOptions => ({
+  storage: memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+  },
+  fileFilter: (req, file, cb) => {
+    const tiposPermitidos = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!tiposPermitidos.includes(file.mimetype)) {
+      return cb(
+        new BadRequestException('Solo se permiten imágenes (JPEG, PNG, WEBP, GIF)'),
+        false
+      );
+    }
+    cb(null, true);
+  },
 });
