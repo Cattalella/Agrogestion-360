@@ -103,4 +103,26 @@ export class AutenticacionController {
   ) {
     return this.autenticacionService.crearAdministrador(datos, idDueno);
   }
+
+  // ============================================================
+  // POST /api/autenticacion/solicitar-recuperacion-supabase
+  // ============================================================
+  @Post('solicitar-recuperacion-supabase')
+  async solicitarRecuperacionSupabase(@Body('email') email: string) {
+    return this.autenticacionService.solicitarRecuperacionSupabase(email);
+  }
+
+  // ============================================================
+  // POST /api/autenticacion/actualizar-contrasena-supabase
+  // ============================================================
+  @Post('actualizar-contrasena-supabase')
+  async actualizarContrasenaSupabase(
+    @Body('accessToken') accessToken: string,
+    @Body('nuevaContrasena') nuevaContrasena: string,
+  ) {
+    return this.autenticacionService.actualizarContrasenaSupabase(
+      accessToken,
+      nuevaContrasena,
+    );
+  }
 }

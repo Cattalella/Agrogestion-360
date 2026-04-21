@@ -234,6 +234,7 @@ export const useSolicitudCompra = () => {
         }
     };
 
+<<<<<<< HEAD
     // ============================================================
     // 🎯 GUARDAR (CREAR O ACTUALIZAR SEGÚN CORRESPONDA)
     // ============================================================
@@ -248,6 +249,22 @@ export const useSolicitudCompra = () => {
     // ============================================================
     // FILTROS
     // ============================================================
+=======
+    // 🆕 Función para cambiar estado de solicitud
+const cambiarEstadoSolicitud = async (id: number, estado: 'Aprobada' | 'Rechazada') => {
+    try {
+        await apiClient.patch(`/inventario/solicitudes/${id}/procesar`, { 
+            estado: estado  // ✅ 'estado' no 'estado_sol'
+        });
+        await cargarSolicitudes();
+        console.log(`✅ Solicitud ${id} marcada como ${estado}`);
+    } catch (error: any) {
+        console.error('❌ Error al cambiar estado:', error);
+        alert(error.response?.data?.mensaje || 'Error al procesar la solicitud');
+    }
+};
+
+>>>>>>> ac7679975803c595b63f608fa8a316af01e4af0b
     const solicitudesPendientes = solicitudes.filter(s => s.estado_sol === 'Pendiente');
     const solicitudesAprobadas = solicitudes.filter(s => s.estado_sol === 'Aprobada');
     const solicitudesRechazadas = solicitudes.filter(s => s.estado_sol === 'Rechazada');
@@ -273,6 +290,9 @@ export const useSolicitudCompra = () => {
         abrirModalEliminar,
         cerrarModalConfirmacion,
         confirmarEliminar,
+        
+        // 🆕 Cambiar estado de solicitud
+        cambiarEstadoSolicitud,
         
         setVista,
         setTipoSeleccionado,

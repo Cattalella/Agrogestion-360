@@ -12,9 +12,10 @@ const DEFAULT_IMG = "https://cdn-icons-png.flaticon.com/512/1144/1144760.png";
 // 📌 INTERFAZ PARA SOLICITUD
 // ============================================================
 interface Solicitud {
-    id: string | number;
+    id?: string | number;
+    id_solicitud?: string | number; // 🆕 agregar este campo
     usuario?: string;
-    fotoUsuario?: string;  // 🆕 Esta es la propiedad que faltaba
+    fotoUsuario?: string;
     tipo?: string;
     tipoInsumo?: string;
     tipoAlimento?: string;
@@ -22,6 +23,7 @@ interface Solicitud {
     unidadMedida?: string;
     motivo?: string;
 }
+
 
 export const Solicitudes = () => {
     const { solicitudesPendientes, cambiarEstadoSolicitud } = useSolicitudCompra();
@@ -105,12 +107,15 @@ export const Solicitudes = () => {
     // ============================================================
     // MANEJAR ACCIÓN (APROBAR/RECHAZAR)
     // ============================================================
-    const manejarAccion = (estado: 'Aprobada' | 'Rechazada') => {
-        if (seleccionado) {
-            cambiarEstadoSolicitud(Number(seleccionado.id), estado);
-            cerrarModal();
-        }
-    };
+const manejarAccion = (estado: 'Aprobada' | 'Rechazada') => {
+    if (seleccionado) {
+        // Intentar con id_solicitud primero, luego id como fallback
+        const id = (seleccionado as any).id_solicitud || seleccionado.id;
+        console.log('ID a procesar:', id, seleccionado); // para verificar
+        cambiarEstadoSolicitud(Number(id), estado);
+        cerrarModal();
+    }
+};
 
     // ============================================================
     // FORMATEAR DETALLE

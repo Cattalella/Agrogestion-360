@@ -42,7 +42,7 @@ export const Navegar = () => {
     });
 
     const [avatar, setAvatar] = useState<string | null>(() => {
-        return localStorage.getItem('userAvatar') || null;
+        return localStorage.getItem('userAvatar') || localStorage.getItem('foto_perfil') || null;
     });
 
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -70,14 +70,13 @@ export const Navegar = () => {
                         setRol(datos.rol);
                     }
 
-                    // Solo usar foto del backend si NO hay una guardada localmente
-                    const avatarLocal = localStorage.getItem('userAvatar');
-                    if (datos.foto_perfil && !avatarLocal) {
+                    if (datos.foto_perfil) {
                         setAvatar(datos.foto_perfil);
                         localStorage.setItem('userAvatar', datos.foto_perfil);
                         localStorage.setItem('foto_perfil', datos.foto_perfil);
-                    } else if (!datos.foto_perfil && avatarLocal) {
-                        setAvatar(avatarLocal);
+                    } else {
+                        const avatarLocal = localStorage.getItem('userAvatar') || localStorage.getItem('foto_perfil') || null;
+                        if (avatarLocal) setAvatar(avatarLocal);
                     }
                 }
             } catch (error) {
@@ -86,6 +85,20 @@ export const Navegar = () => {
         };
 
         cargarPerfil();
+    }, []);
+
+    // Escuchar cuando se actualiza la foto desde ModalPerfil
+    useEffect(() => {
+        const handleFotoActualizada = () => {
+            const nuevaFoto = localStorage.getItem('foto_perfil');
+            if (nuevaFoto) {
+                setAvatar(nuevaFoto);
+                localStorage.setItem('userAvatar', nuevaFoto);
+            }
+        };
+
+        window.addEventListener('fotoPerfilActualizada', handleFotoActualizada);
+        return () => window.removeEventListener('fotoPerfilActualizada', handleFotoActualizada);
     }, []);
 
     const formatearRol = (rolTexto: string): string => {
@@ -107,14 +120,12 @@ export const Navegar = () => {
         const file = event.target.files?.[0];
         if (file && file.type.startsWith('image/')) {
             try {
-                // Comprimir a 200x200 antes de guardar en localStorage
                 const comprimida = await comprimirImagen(file, 200, 200, 0.7);
                 setAvatar(comprimida);
                 localStorage.setItem('userAvatar', comprimida);
                 localStorage.setItem('foto_perfil', comprimida);
                 window.dispatchEvent(new Event('fotoPerfilActualizada'));
 
-                // Subir original al backend
                 const token = localStorage.getItem('token');
                 if (token) {
                     const formData = new FormData();

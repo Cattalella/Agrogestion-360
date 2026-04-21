@@ -8,16 +8,66 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
+import * as nodemailer from 'nodemailer';
 import { LoginDto } from './dto/login.dto';
 import { generarPayloadToken } from '../../compartido/utilidades/jwt.utilidad';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 @Injectable()
 export class AutenticacionService {
+  private supabase: SupabaseClient;
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
     private auditoria: AuditoriaService,
-  ) {}
+  ) {
+    // Inicializar Supabase
+    this.supabase = createClient(
+      process.env.SUPABASE_URL || '',
+      process.env.SUPABASE_ANON_KEY || '',
+    );
+  }
+
+  // ============================================================
+  // CONFIGURACIÓN DE NODEMAILER (MANTENIDO PARA COMPATIBILIDAD)
+  // ============================================================
+  private crearTransportador() {
+    return nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+  }
+
+  private async enviarCorreoRecuperacion(email: string, link: string) {
+    const transporter = this.crearTransportador();
+
+    await transporter.sendMail({
+      from: `"Agrogestion 360" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: 'Confirma tu cambio de contraseña',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: auto; padding: 32px; border: 1px solid #e5e7eb; border-radius: 12px;">
+          <h2 style="color: #15803d; text-align: center;">Agrogestion 360</h2>
+          <p style="color: #374151;">Recibimos una solicitud para cambiar tu contraseña.</p>
+          <p style="color: #374151;">Haz clic en el botón para confirmar el cambio:</p>
+
+          <div style="text-align: center; margin: 32px 0;">
+            <a href="${link}"
+              style="background-color: #15803d; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 14px; letter-spacing: 1px;">
+              CONFIRMAR CAMBIO DE CONTRASEÑA
+            </a>
+          </div>
+
+          <p style="color: #6b7280; font-size: 13px;">Este link expira en <strong>1 hora</strong>.</p>
+          <p style="color: #6b7280; font-size: 13px;">Si no solicitaste este cambio, ignora este correo.</p>
+        </div>
+      `,
+    });
+  }
 
   // ============================================================
   // INICIAR SESIÓN
@@ -79,7 +129,7 @@ export class AutenticacionService {
   }
 
   // ============================================================
-  // RECUPERAR CONTRASEÑA (Solicitud Inicial)
+  // RECUPERAR CONTRASEÑA CON NODEMAILER (MANTENIDO)
   // ============================================================
   async solicitarRecuperacion(email: string, nuevaContrasena: string) {
     const persona = await this.prisma.persona.findUnique({
@@ -91,60 +141,69 @@ export class AutenticacionService {
       throw new BadRequestException('El correo electrónico no está registrado');
     }
 
-    // Generar Token seguro
+    // Marcar tokens anteriores como usados
+    await this.prisma.recuperacionClave.updateMany({
+      where: {
+        id_persona: persona.id_persona,
+        usado: false,
+      },
+      data: {
+        usado: true,
+      },
+    });
+
     const token = crypto.randomBytes(32).toString('hex');
     const tokenHash = await bcrypt.hash(token, 10);
     const nuevaClaveHash = await bcrypt.hash(nuevaContrasena, 10);
-    
-    // Expiración en 1 hora
+
     const expiracion = new Date();
     expiracion.setHours(expiracion.getHours() + 1);
 
-    // Guardar en BD
     await this.prisma.recuperacionClave.create({
       data: {
         id_persona: persona.id_persona,
         token_hash: tokenHash,
         nueva_contrasena_hash: nuevaClaveHash,
-        fecha_expiracion: expiracion
-      }
+        fecha_expiracion: expiracion,
+      },
     });
 
-    // Simulación de envío de correo
-    const linkConfirmacion = `http://localhost:5173/confirmar-reset?token=${token}&email=${email}`;
-    
-    console.log('\n============================================================');
-    console.log(`📧 [EMAIL SIMULADO] A: ${email}`);
-    console.log(`Acción: Confirmar cambio de contraseña`);
-    console.log(`Link: ${linkConfirmacion}`);
-    console.log('============================================================\n');
+    const urlBase = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const linkConfirmacion = `${urlBase}/confirmar-reset?token=${token}&email=${email}`;
+
+    await this.enviarCorreoRecuperacion(email, linkConfirmacion);
+
+    console.log(`📧 Correo de recuperación enviado a: ${email}`);
 
     return {
       mensaje: 'Se ha enviado un link de confirmación a tu correo electrónico',
-      ...(process.env.NODE_ENV === 'development' && { link_debug: linkConfirmacion }),
     };
   }
 
   // ============================================================
-  // CONFIRMAR CAMBIO DE CONTRASEÑA
+  // CONFIRMAR CAMBIO DE CONTRASEÑA CON NODEMAILER (MANTENIDO)
   // ============================================================
   async confirmarRecuperacion(email: string, token: string) {
     const persona = await this.prisma.persona.findUnique({
       where: { email },
-      include: { tokens: { where: { usado: false } } }
+      include: { 
+        tokens: {
+          where: { 
+            usado: false,
+            fecha_expiracion: { gt: new Date() }
+          }
+        } 
+      }
     });
 
     if (!persona || persona.tokens.length === 0) {
-      throw new BadRequestException('No hay solicitudes de cambio pendientes para este correo');
+      throw new BadRequestException('No hay solicitudes de cambio pendientes o válidas para este correo');
     }
 
-    // Buscar el token válido
     let tokenValido: any = null;
     for (const t of persona.tokens) {
       const esCorrecto = await bcrypt.compare(token, t.token_hash);
-      const expirado = new Date() > t.fecha_expiracion;
-      
-      if (esCorrecto && !expirado) {
+      if (esCorrecto) {
         tokenValido = t;
         break;
       }
@@ -154,16 +213,15 @@ export class AutenticacionService {
       throw new BadRequestException('El link de confirmación es inválido o ha expirado');
     }
 
-    // Aplicar el cambio
     await this.prisma.$transaction([
       this.prisma.persona.update({
         where: { id_persona: persona.id_persona },
-        data: { contrasena_hash: tokenValido.nueva_contrasena_hash }
+        data: { contrasena_hash: tokenValido.nueva_contrasena_hash },
       }),
       this.prisma.recuperacionClave.update({
         where: { id_token: tokenValido.id_token },
-        data: { usado: true }
-      })
+        data: { usado: true },
+      }),
     ]);
 
     await this.auditoria.registrar({
@@ -180,7 +238,7 @@ export class AutenticacionService {
   }
 
   // ============================================================
-  // CAMBIAR CONTRASEÑA
+  // CAMBIAR CONTRASEÑA (MÚLTIPLES VECES AL DÍA)
   // ============================================================
   async cambiarContrasena(
     idUsuario: number,
@@ -203,6 +261,11 @@ export class AutenticacionService {
 
     if (!contrasenaValida) {
       throw new BadRequestException('Contraseña actual incorrecta');
+    }
+
+    const esMismaContrasena = await bcrypt.compare(nuevaContrasena, persona.contrasena_hash || '');
+    if (esMismaContrasena) {
+      throw new BadRequestException('La nueva contraseña debe ser diferente a la actual');
     }
 
     const nuevoHash = await bcrypt.hash(nuevaContrasena, 10);
@@ -280,7 +343,7 @@ export class AutenticacionService {
   }
 
   // ============================================================
-  // REGISTRAR ADMINISTRADOR (RF.1.1.1)
+  // REGISTRAR ADMINISTRADOR
   // ============================================================
   async crearAdministrador(datos: any, idDueno: number) {
     const existente = await this.prisma.persona.findFirst({
@@ -332,4 +395,97 @@ export class AutenticacionService {
 
     return nuevaPersona;
   }
+
+  // ============================================================
+  // RECUPERAR CONTRASEÑA CON SUPABASE (NUEVO)
+  // ============================================================
+  async solicitarRecuperacionSupabase(email: string) {
+    // 1. Verificar que el email existe en tu BD (Prisma)
+    const persona = await this.prisma.persona.findUnique({
+      where: { email },
+      include: { rol: true }
+    });
+
+    if (!persona) {
+      throw new BadRequestException('El correo electrónico no está registrado');
+    }
+
+    // 2. Usar Supabase para enviar el correo de restablecimiento
+    const redirectUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/actualizar-contrasena`;
+    
+    const { error } = await this.supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: redirectUrl,
+    });
+
+    if (error) {
+      throw new BadRequestException('Error al enviar el correo: ' + error.message);
+    }
+
+    await this.auditoria.registrar({
+      id_usuario: persona.id_persona,
+      accion: 'SOLICITUD_RECUPERACION_SUPABASE',
+      descripcion: `Solicitud de recuperación con Supabase para ${email}`,
+      entidad: 'Autenticacion',
+      rol: persona.rol?.nombre_rol || 'Usuario',
+    });
+
+    return {
+      mensaje: 'Se ha enviado un link de recuperación a tu correo electrónico',
+    };
+  }
+
+  // ============================================================
+// ACTUALIZAR CONTRASEÑA CON SUPABASE (VERSIÓN CON ACCESS TOKEN)
+// ============================================================
+async actualizarContrasenaSupabase(accessToken: string, nuevaContrasena: string) {
+  // 1. Establecer la sesión con el accessToken
+  const { data: { user }, error: sessionError } = await this.supabase.auth.setSession({
+    access_token: accessToken,
+    refresh_token: '', // No es necesario para este caso
+  });
+
+  if (sessionError) {
+    throw new BadRequestException('Error al establecer sesión: ' + sessionError.message);
+  }
+
+  // 2. Actualizar la contraseña en Supabase
+  const { error: updateError } = await this.supabase.auth.updateUser({
+    password: nuevaContrasena
+  });
+
+  if (updateError) {
+    throw new BadRequestException('Error al actualizar contraseña: ' + updateError.message);
+  }
+
+  // 3. También actualizar la contraseña en tu BD local (Prisma)
+  if (user?.email) {
+    const nuevaClaveHash = await bcrypt.hash(nuevaContrasena, 10);
+    await this.prisma.persona.updateMany({
+      where: { email: user.email },
+      data: { contrasena_hash: nuevaClaveHash }
+    });
+  }
+
+  // 4. Registrar en auditoría
+  if (user?.email) {
+    const persona = await this.prisma.persona.findUnique({
+      where: { email: user.email },
+      include: { rol: true }
+    });
+
+    if (persona) {
+      await this.auditoria.registrar({
+        id_usuario: persona.id_persona,
+        accion: 'ACTUALIZAR_CONTRASENA_SUPABASE',
+        descripcion: 'Contraseña actualizada vía Supabase',
+        entidad: 'Autenticacion',
+        rol: persona.rol?.nombre_rol || 'Usuario',
+      });
+    }
+  }
+
+  return {
+    mensaje: 'Contraseña actualizada correctamente',
+  };
+}
 }

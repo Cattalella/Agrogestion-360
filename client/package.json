@@ -12,6 +12,7 @@
   "dependencies": {
     "@gsap/react": "^2.1.2",
     "@react-pdf/renderer": "^4.4.1",
+    "@supabase/supabase-js": "^2.104.0",
     "@tailwindcss/vite": "^4.2.0",
     "axios": "^1.15.0",
     "framer-motion": "^12.34.3",

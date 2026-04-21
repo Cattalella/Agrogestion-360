@@ -74,20 +74,20 @@ export class EncabezadoService {
   // ============================================================
   // ACTUALIZAR FOTO DE PERFIL
   // ============================================================
-    async actualizarFotoPerfil(idUsuario: number, archivo: Express.Multer.File) {
-    // Guardar la ruta del archivo
-    const rutaFoto = `/archivos-subidos/perfiles/${archivo.filename}`;
+async actualizarFotoPerfil(idUsuario: number, archivo: Express.Multer.File) {
+    // Convertir el archivo a base64
+    const base64 = `data:${archivo.mimetype};base64,${archivo.buffer.toString('base64')}`;
     
     await this.prisma.persona.update({
         where: { id_persona: idUsuario },
-        data: { foto_perfil: rutaFoto },
+        data: { foto_perfil: base64 },
     });
 
     return {
         mensaje: 'Foto de perfil actualizada',
-        foto_perfil: rutaFoto,
+        foto_perfil: base64,
     };
-    }
+}
 
   // ============================================================
   // ACTUALIZAR WALLPAPER (Fondo personalizado)
