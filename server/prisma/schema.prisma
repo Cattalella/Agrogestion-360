@@ -257,7 +257,7 @@ model TrabajoRealizado {
   fecha_inicio      DateTime
   fecha_fin         DateTime
   duracion_horas    Decimal          @db.Decimal(5, 2)
-  evidencia_url     String           @db.VarChar(500)
+  evidencia_url     String           @db.Text
   observaciones     String?
   createdAt         DateTime         @default(now())
   updatedAt         DateTime

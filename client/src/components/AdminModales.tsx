@@ -1,5 +1,7 @@
 import { ModalGenerico } from "../components/ModalGenerico";
 import { useState } from "react";
+import { VistaInventario } from "./VistaInventario";
+import { useInventario } from "../hooks/useInventario";
 
 // Formularios pecuarios
 import { FormularioGanado } from "../components/FormularioGanado";
@@ -101,6 +103,8 @@ interface VentasHook {
     abrirModalEliminar: (id: number, nombre: string) => void;
     cerrarModalConfirmacion: () => void;
     confirmarEliminar: () => Promise<void>;
+    anularPagos: (id: number, justificacion: string) => Promise<void>;
+
 }
 
 interface PagosHook {
@@ -112,6 +116,8 @@ interface PagosHook {
     cerrarModal: () => void;
     cambiarVista: (vista: 'lista' | 'formulario') => void;
     guardarPago: (datos: any, cerrar: boolean) => void;
+    abrirEdicion: (pago: any) => void;
+    anularPago: (id: number, justificacion: string) => Promise<void>;
 }
 
 interface TrabajoHook {
@@ -122,6 +128,7 @@ interface TrabajoHook {
     cerrarModal: () => void;
     cambiarVista: (vista: 'lista' | 'formulario') => void;
     registrarTrabajo: (datos: any, cerrar: boolean) => void;
+    abrirEdicion: (trabajo: any) => void;
 }
 
 interface TrabajadoresHook {
@@ -179,6 +186,7 @@ interface SolicitudCompraHook {
     abrirModalEliminar: (id: number, nombre: string) => void;
     cerrarModalConfirmacion: () => void;
     confirmarEliminar: () => Promise<void>;
+    guardarSolicitud: (datos: any, cerrar: boolean) => Promise<void>;  // ✅ AGREGAR ESTA LÍNEA
 }
 
 interface ConsumoInsumosHook {
@@ -217,6 +225,8 @@ interface Props {
     solicitudCompra: SolicitudCompraHook;
     consumoInsumos: ConsumoInsumosHook;
     registrarCompra: RegistrarCompraHook;
+    isInventarioOpen: boolean;
+    onCloseInventario: () => void;
 }
 
 // ============================================================
@@ -226,10 +236,12 @@ export const AdminModales = ({
     ganado, cerdos, vacunas, ventas, 
     pagos, trabajo, trabajadores, compras, 
     generarPDF, solicitudCompra, consumoInsumos,
-    registrarCompra
+    registrarCompra,
+    isInventarioOpen, onCloseInventario
 }: Props) => {
 
     const [pagoSeleccionado, setPagoSeleccionado] = useState<any | null>(null);
+    const inventarioHook = useInventario();
 
     return (
         <>
@@ -600,11 +612,11 @@ export const AdminModales = ({
                 isOpen={pagos?.isModalOpen ?? false} 
                 onClose={pagos?.cerrarModal ?? (() => {})} 
                 titulo={pagos?.vista === 'lista' ? "REGISTRO DE PAGOS" : "REGISTRAR NUEVO PAGO"} 
-                width="max-w-2xl"
+                width="max-w-3xl"
             >
                 {pagos?.vista === 'lista' ? (
                     <div className="flex flex-col gap-6 p-4">
-                        <div className="overflow-hidden rounded-xl border border-purple-100 shadow-sm">
+                        <div className="overflow-x-auto rounded-xl border border-purple-100 shadow-sm">
                             <table className="w-full text-left text-[11px] uppercase">
                                 <thead className="bg-purple-50 text-purple-700">
                                     <tr>
@@ -612,11 +624,12 @@ export const AdminModales = ({
                                         <th className="p-3">MONTO</th>
                                         <th className="p-3">FECHA</th>
                                         <th className="p-3">ESTADO</th>
+                                        <th className="p-3 text-center">ACCIONES</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {pagos?.listaPagos?.length > 0 ? pagos.listaPagos.map((p: any) => (
-                                        <tr key={p.id_pago || p.id} className="border-t border-purple-50">
+                                        <tr key={p.id_pago || p.id} className="border-t border-purple-50 hover:bg-purple-50/30 transition-all group">
                                             <td className="p-3 font-bold">{p.Trabajador?.nombre_completo || p.id_trabajador || '—'}</td>
                                             <td className="p-3">${p.monto_total?.toLocaleString() || '0'}</td>
                                             <td className="p-3">{p.fecha_pago?.split('T')[0] || '—'}</td>
@@ -624,15 +637,46 @@ export const AdminModales = ({
                                                 <span className={`px-2 py-1 rounded-full text-[9px] ${
                                                     p.estado_pago === 'Pagado con firma' ? 'bg-green-100 text-green-600' : 
                                                     p.estado_pago === 'Pendiente de firma' ? 'bg-yellow-100 text-yellow-600' : 
-                                                    'bg-red-100 text-red-600'
+                                                    p.estado_pago === 'Anulado' ? 'bg-red-100 text-red-600' :
+                                                    'bg-gray-100 text-gray-600'
                                                 }`}>
-                                                    {p.estado_pago || p.estado || 'No pagado'}
+                                                    {p.estado_pago || 'No pagado'}
                                                 </span>
+                                            </td>
+                                            <td className="p-3">
+                                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 justify-center">
+                                                    {p.estado_pago !== 'Anulado' && (
+                                                        <>
+                                                            <button
+                                                                onClick={() => pagos?.abrirEdicion?.(p)}
+                                                                className="text-blue-500 hover:text-blue-700 text-[10px] font-bold px-2 py-1 rounded-full hover:bg-blue-50 transition-all"
+                                                            >
+                                                                ✏️ Editar
+                                                            </button>
+                                                            <button
+                                                                onClick={() => {
+                                                                    if (window.confirm('¿Anular este pago? Se requerirá justificación.')) {
+                                                                        const justificacion = prompt('Motivo de la anulación:');
+                                                                        if (justificacion) {
+                                                                            pagos?.anularPago?.(p.id_pago, justificacion);
+                                                                        }
+                                                                    }
+                                                                }}
+                                                                className="text-red-500 hover:text-red-700 text-[10px] font-bold px-2 py-1 rounded-full hover:bg-red-50 transition-all"
+                                                            >
+                                                                🚫 Anular
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                    {p.estado_pago === 'Anulado' && (
+                                                        <span className="text-gray-400 text-[9px] italic">Anulado</span>
+                                                    )}
+                                                </div>
                                             </td>
                                         </tr>
                                     )) : (
                                         <tr>
-                                            <td colSpan={4} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">
+                                            <td colSpan={5} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">
                                                 — Sin pagos registrados —
                                             </td>
                                         </tr>
@@ -651,6 +695,7 @@ export const AdminModales = ({
                     <FormularioPagos 
                         pagoAEditar={pagos?.pagoAEditar ?? null} 
                         listaTrabajadores={pagos?.trabajadores ?? []}
+                        trabajosRealizados={trabajo?.trabajos ?? []}
                         onGuardar={(datos: any, cerrar: boolean) => pagos?.guardarPago?.(datos, cerrar)} 
                         onCancelar={() => pagos?.cambiarVista?.('lista')} 
                     />
@@ -867,9 +912,9 @@ export const AdminModales = ({
             >
                 {generarPDF?.vista === 'lista' ? (
                     <div className="flex flex-col gap-6 p-4">
-                        <div className="overflow-hidden rounded-xl border border-teal-100 shadow-sm">
+                        <div className="overflow-hidden rounded-xl border border-teal-300 shadow-sm">
                             <table className="w-full text-left text-[11px] uppercase">
-                                <thead className="bg-teal-50 text-teal-700">
+                                <thead className="bg-teal-50 text-teal-800">
                                     <tr>
                                         <th className="p-3">ID FORMATO</th>
                                         <th className="p-3">TRABAJADOR</th>
@@ -906,7 +951,7 @@ export const AdminModales = ({
                             ) : (
                                 <>
                                     <select 
-                                        className="border rounded-lg p-2 text-sm bg-white" 
+                                        className="border rounded-full p-2 text-sm bg-white" 
                                         value={pagoSeleccionado?.id_pago || pagoSeleccionado?.id || ''} 
                                         onChange={(e) => { 
                                             const pago = pagos?.listaPagos?.find((p: any) => (p.id_pago || p.id) === Number(e.target.value)); 
@@ -929,7 +974,7 @@ export const AdminModales = ({
                                             } 
                                         }} 
                                         disabled={!pagoSeleccionado} 
-                                        className="bg-teal-600 text-white py-3 rounded-full font-bold uppercase text-[10px] shadow-lg hover:bg-teal-700 transition-all disabled:opacity-50"
+                                        className="bg-teal-800 text-white py-3 cursor-pointer hover:scale-102 tracking-[2px] rounded-full font-bold uppercase text-[10px] shadow-lg hover:bg-black transition-all disabled:opacity-50"
                                     >
                                         + Generar Nuevo Formato de Pago
                                     </button>
@@ -1145,7 +1190,9 @@ export const AdminModales = ({
                         tipoSeleccionado={solicitudCompra?.tipoSeleccionado ?? 'insumo'}
                         setTipoSeleccionado={solicitudCompra?.setTipoSeleccionado ?? (() => {})}
                         trabajadoresActivos={trabajadores?.trabajadoresActivos ?? []}
-                        onGuardar={(datos: any, cerrar: boolean) => solicitudCompra?.crearSolicitud?.(datos, cerrar)}
+                        onGuardar={async (datos: any, cerrar: boolean) => { await solicitudCompra?.guardarSolicitud?.(datos, cerrar);
+
+                        }}
                         onCancelar={() => solicitudCompra?.cambiarVista?.('lista')}
                         usuarioActual="Admin"
                     />
@@ -1229,6 +1276,32 @@ export const AdminModales = ({
                         }}
                         onCancelar={() => registrarCompra?.cambiarVista?.('lista')}
                         solicitudesAprobadas={registrarCompra?.solicitudesAprobadas ?? []}
+                    />
+                )}
+            </ModalGenerico>
+
+            {/* ============================================================ */}
+            {/* VER INVENTARIO */}
+            {/* ============================================================ */}
+            <ModalGenerico 
+                isOpen={isInventarioOpen ?? false}
+                onClose={onCloseInventario ?? (() => {})}
+                titulo="INVENTARIO ACTUAL" 
+                width="max-w-5xl"
+            >
+                {inventarioHook.cargando ? (
+                    <div className="p-8 text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto"></div>
+                        <p className="text-gray-400 text-xs mt-2">Cargando inventario...</p>
+                    </div>
+                ) : inventarioHook.error ? (
+                    <div className="p-4 bg-red-50 text-red-600 rounded-xl text-center">
+                        ❌ {inventarioHook.error}
+                    </div>
+                ) : (
+                    <VistaInventario 
+                        inventario={inventarioHook.inventario}
+                        alertas={inventarioHook.alertas}
                     />
                 )}
             </ModalGenerico>

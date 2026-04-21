@@ -1,3 +1,4 @@
+// server/src/modulos/trabajadores/dto/Actualizar-pago.dto.ts
 import { IsString, IsOptional, IsNumber, IsDateString, Min } from 'class-validator';
 
 export class ActualizarPagoDto {

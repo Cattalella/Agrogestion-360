@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Camera, Clock } from "lucide-react";
+import { Camera, Clock, User, Briefcase, FileText } from "lucide-react";
+import { useFotosStorage } from "../utils/useFotosStorage";  // ← AGREGAR
 
 interface TrabajoRealizado {
     id_trabajo: number;
@@ -31,6 +32,9 @@ export const FormularioTrabajoRealizado = ({
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [preview, setPreview] = useState<string | null>(null);
     const [errores, setErrores] = useState<Record<string, string>>({});
+    
+    // 🔥 Hook para agregar fotos al Carrusel
+    const { agregarFotoDesdeBase64 } = useFotosStorage();
 
     const estadoInicial = {
         id_trabajador: "",
@@ -93,9 +97,14 @@ export const FormularioTrabajoRealizado = ({
             const reader = new FileReader();
             reader.onloadend = () => {
                 const base64 = reader.result as string;
+                console.log('🟡 [Trabajo] Base64 generado, longitud:', base64.length);
                 setPreview(base64);
                 setFormData(prev => ({ ...prev, evidencia_url: base64 }));
                 setErrores(prev => ({ ...prev, evidencia_url: '' }));
+                
+                // 🔥 AGREGAR LA FOTO AL CARRUSEL
+                agregarFotoDesdeBase64(base64, 'trabajo');
+                console.log('🟡 [Trabajo] agregarFotoDesdeBase64 llamado');
             };
             reader.readAsDataURL(file);
         }
@@ -143,6 +152,7 @@ export const FormularioTrabajoRealizado = ({
             observaciones: formData.observaciones || null,
         };
 
+        console.log('📤 Datos a enviar (Trabajo Realizado):', datosParaBackend);
         onGuardar(datosParaBackend, cerrar);
 
         if (!cerrar && !trabajoAEditar) {
@@ -166,6 +176,10 @@ export const FormularioTrabajoRealizado = ({
 
                 {/* Trabajador */}
                 <div>
+                    <label className="text-[9px] uppercase ml-4 text-amber-600 font-black tracking-tighter">
+                        <User size={10} className="inline mr-1" />
+                        Trabajador <span className="text-red-400">*</span>
+                    </label>
                     <select
                         name="id_trabajador"
                         value={formData.id_trabajador}
@@ -178,7 +192,7 @@ export const FormularioTrabajoRealizado = ({
                         } ${trabajoAEditar ? 'opacity-60 cursor-not-allowed' : ''}`}
                     >
                         <option value="">SELECCIONAR TRABAJADOR *</option>
-                        {listaTrabajadores.filter(t => t.estado === 'Activo').map(t => (
+                        {listaTrabajadores.filter(t => t.estado?.toLowerCase() === 'activo').map(t => (
                             <option key={t.id_trabajador} value={t.id_trabajador}>
                                 {t.nombre_completo} - {t.tipo_trabajo}
                             </option>
@@ -189,18 +203,28 @@ export const FormularioTrabajoRealizado = ({
                     )}
                 </div>
 
-                {/* Categoría */}
+                {/* Categoría del Trabajo */}
                 <div>
-                    <input
+                    <label className="text-[9px] uppercase ml-4 text-amber-600 font-black tracking-tighter">
+                        <Briefcase size={10} className="inline mr-1" />
+                        Categoría <span className="text-red-400">*</span>
+                    </label>
+                    <select
                         name="categoria_trabajo"
                         value={formData.categoria_trabajo}
                         onChange={manejarCambio}
-                        type="text"
-                        placeholder="CATEGORÍA DEL TRABAJO *"
-                        className={`w-full border-1 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 transition-all ${
+                        className={`w-full border-1 rounded-full px-6 py-2 text-[12px] bg-white focus:outline-none focus:ring-2 cursor-pointer transition-all ${
                             errores.categoria_trabajo ? 'border-red-400 focus:ring-red-300' : 'border-amber-200 focus:ring-amber-300'
                         }`}
-                    />
+                    >
+                        <option value="">SELECCIONAR CATEGORÍA *</option>
+                        <option value="Mantenimiento">🔧 MANTENIMIENTO</option>
+                        <option value="Alimentación">🌾 ALIMENTACIÓN</option>
+                        <option value="Vacunación">💉 VACUNACIÓN</option>
+                        <option value="Limpieza">🧹 LIMPIEZA</option>
+                        <option value="Construcción">🏗️ CONSTRUCCIÓN</option>
+                        <option value="Otro">📌 OTRO</option>
+                    </select>
                     {errores.categoria_trabajo && (
                         <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.categoria_trabajo}</p>
                     )}
@@ -208,12 +232,16 @@ export const FormularioTrabajoRealizado = ({
 
                 {/* Tipo de Actividad */}
                 <div>
+                    <label className="text-[9px] uppercase ml-4 text-amber-600 font-black tracking-tighter">
+                        <FileText size={10} className="inline mr-1" />
+                        Tipo de Actividad <span className="text-red-400">*</span>
+                    </label>
                     <input
                         name="tipo_actividad"
                         value={formData.tipo_actividad}
                         onChange={manejarCambio}
                         type="text"
-                        placeholder="TIPO DE ACTIVIDAD *"
+                        placeholder="Ej: Reparación de cerca, Suministro de alimento..."
                         className={`w-full border-1 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 transition-all ${
                             errores.tipo_actividad ? 'border-red-400 focus:ring-red-300' : 'border-amber-200 focus:ring-amber-300'
                         }`}
@@ -224,14 +252,20 @@ export const FormularioTrabajoRealizado = ({
                 </div>
 
                 {/* Observaciones */}
-                <textarea
-                    name="observaciones"
-                    value={formData.observaciones}
-                    onChange={manejarCambio}
-                    placeholder="OBSERVACIONES"
-                    rows={3}
-                    className="border-1 border-amber-200 rounded-2xl px-6 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-amber-300 resize-none"
-                />
+                <div>
+                    <label className="text-[9px] uppercase ml-4 text-amber-600 font-black tracking-tighter">
+                        <FileText size={10} className="inline mr-1" />
+                        Observaciones
+                    </label>
+                    <textarea
+                        name="observaciones"
+                        value={formData.observaciones}
+                        onChange={manejarCambio}
+                        placeholder="Notas adicionales sobre el trabajo..."
+                        rows={3}
+                        className="w-full border-1 border-amber-200 rounded-2xl px-6 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-amber-300 resize-none"
+                    />
+                </div>
             </div>
 
             {/* ============================================================ */}
@@ -241,16 +275,16 @@ export const FormularioTrabajoRealizado = ({
 
                 {/* Fecha Inicio */}
                 <div className="flex flex-col gap-1">
-                    <label className="text-[9px] uppercase ml-4 text-amber-400 font-black tracking-tighter">
+                    <label className="text-[9px] uppercase ml-4 text-amber-600 font-black tracking-tighter">
                         <Clock size={10} className="inline mr-1" />
-                        Fecha Inicio <span className="text-red-400">*</span>
+                        Fecha y Hora Inicio <span className="text-red-400">*</span>
                     </label>
                     <input
                         name="fecha_inicio"
                         value={formData.fecha_inicio}
                         onChange={manejarCambio}
                         type="datetime-local"
-                        className={`border-1 rounded-full px-6 py-2 text-[11px] focus:outline-none focus:ring-2 text-gray-500 transition-all ${
+                        className={`border-1 uppercase rounded-full px-6 py-2 text-[11px] focus:outline-none focus:ring-2 text-gray-500 transition-all ${
                             errores.fecha_inicio ? 'border-red-400 focus:ring-red-300' : 'border-amber-100 focus:ring-amber-300'
                         }`}
                     />
@@ -261,16 +295,16 @@ export const FormularioTrabajoRealizado = ({
 
                 {/* Fecha Fin */}
                 <div className="flex flex-col gap-1">
-                    <label className="text-[9px] uppercase ml-4 text-amber-400 font-black tracking-tighter">
+                    <label className="text-[9px] uppercase ml-4 text-amber-600 font-black tracking-tighter">
                         <Clock size={10} className="inline mr-1" />
-                        Fecha Fin <span className="text-red-400">*</span>
+                        Fecha y Hora Fin <span className="text-red-400">*</span>
                     </label>
                     <input
                         name="fecha_fin"
                         value={formData.fecha_fin}
                         onChange={manejarCambio}
                         type="datetime-local"
-                        className={`border-1 rounded-full px-6 py-2 text-[11px] focus:outline-none focus:ring-2 text-gray-500 transition-all ${
+                        className={`border-1 uppercase rounded-full px-6 py-2 text-[11px] focus:outline-none focus:ring-2 text-gray-500 transition-all ${
                             errores.fecha_fin ? 'border-red-400 focus:ring-red-300' : 'border-amber-100 focus:ring-amber-300'
                         }`}
                     />
@@ -282,8 +316,8 @@ export const FormularioTrabajoRealizado = ({
                 {/* Duración calculada automáticamente — RN.8.1.2 */}
                 <div className={`rounded-full px-6 py-2 text-[11px] font-bold flex items-center gap-2 transition-all ${
                     duracionCalculada
-                        ? 'bg-amber-50 border-1 border-amber-200 text-amber-700'
-                        : 'bg-gray-50 border-1 border-gray-100 text-gray-300'
+                        ? 'bg-amber-50 border border-amber-200 text-amber-700'
+                        : 'bg-gray-50 border border-gray-100 text-gray-300'
                 }`}>
                     <Clock size={11} />
                     {duracionCalculada
@@ -292,54 +326,60 @@ export const FormularioTrabajoRealizado = ({
                 </div>
 
                 {/* Evidencia Fotográfica — RN.8.1.2 obligatoria */}
-                <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={manejarArchivo}
-                    accept="image/*"
-                    className="hidden"
-                />
+                <div>
+                    <label className="text-[9px] uppercase ml-4 text-amber-600 font-black tracking-tighter">
+                        <Camera size={10} className="inline mr-1" />
+                        Evidencia Fotográfica <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={manejarArchivo}
+                        accept="image/*"
+                        className="hidden"
+                    />
 
-                <div
-                    onClick={() => fileInputRef.current?.click()}
-                    className={`group border-1 border-dashed rounded-[1.5rem] p-3 flex flex-col items-center justify-center gap-1 cursor-pointer transition-all min-h-[110px] relative overflow-hidden ${
-                        errores.evidencia_url
-                            ? 'border-red-400 bg-red-50'
-                            : 'border-amber-200 hover:bg-amber-50 hover:border-amber-400'
-                    }`}
-                >
-                    {preview ? (
-                        <>
-                            <img
-                                src={preview}
-                                className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:scale-110 transition-transform duration-500"
-                                alt="Evidencia"
-                            />
-                            <div className="absolute inset-0 bg-amber-900/20 flex flex-col items-center justify-center backdrop-blur-[1px]">
-                                <Camera size={18} className="text-white drop-shadow-md" />
-                                <span className="text-[8px] font-black text-white uppercase tracking-widest mt-1">Cambiar</span>
-                            </div>
-                        </>
-                    ) : (
-                        <>
-                            <p className="text-[9px] uppercase font-black tracking-widest text-amber-600">
-                                {errores.evidencia_url ? 'EVIDENCIA OBLIGATORIA *' : 'EVIDENCIA FOTOGRÁFICA *'}
-                            </p>
-                            <div className="w-8 h-8 border-1 border-amber-200 rounded-full flex items-center justify-center bg-white shadow-sm group-hover:rotate-90 transition-transform">
-                                <Camera size={14} className="text-amber-400" />
-                            </div>
-                        </>
+                    <div
+                        onClick={() => fileInputRef.current?.click()}
+                        className={`group border-1 border-dashed rounded-[1.5rem] p-3 flex flex-col items-center justify-center gap-1 cursor-pointer transition-all min-h-[110px] relative overflow-hidden ${
+                            errores.evidencia_url
+                                ? 'border-red-400 bg-red-50'
+                                : 'border-amber-200 hover:bg-amber-50 hover:border-amber-400'
+                        }`}
+                    >
+                        {preview ? (
+                            <>
+                                <img
+                                    src={preview}
+                                    className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:scale-110 transition-transform duration-500"
+                                    alt="Evidencia"
+                                />
+                                <div className="absolute inset-0 bg-amber-900/20 flex flex-col items-center justify-center backdrop-blur-[1px]">
+                                    <Camera size={18} className="text-white drop-shadow-md" />
+                                    <span className="text-[8px] font-black text-white uppercase tracking-widest mt-1">Cambiar</span>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-[9px] uppercase font-black tracking-widest text-amber-600">
+                                    {errores.evidencia_url ? 'EVIDENCIA OBLIGATORIA *' : 'Haz clic para subir foto'}
+                                </p>
+                                <div className="w-8 h-8 border-1 border-amber-200 rounded-full flex items-center justify-center bg-white shadow-sm group-hover:rotate-90 transition-transform">
+                                    <Camera size={14} className="text-amber-400" />
+                                </div>
+                            </>
+                        )}
+                    </div>
+                    {errores.evidencia_url && (
+                        <p className="text-[9px] text-red-500 ml-4 mt-1">{errores.evidencia_url}</p>
                     )}
                 </div>
-                {errores.evidencia_url && (
-                    <p className="text-[9px] text-red-500 -mt-2 ml-4">{errores.evidencia_url}</p>
-                )}
             </div>
 
             {/* ============================================================ */}
             {/* BOTONES */}
             {/* ============================================================ */}
-            <div className="col-span-2 flex justify-between gap-4 mt-2">
+            <div className="col-span-2 flex justify-between gap-4 mt-4">
                 <button
                     type="button"
                     onClick={() => ejecutarEnvio(false)}
@@ -352,10 +392,11 @@ export const FormularioTrabajoRealizado = ({
                     onClick={() => ejecutarEnvio(true)}
                     className="flex-1 bg-amber-600 hover:bg-amber-700 text-white px-6 py-3 rounded-r-full rounded-l-lg font-black text-[11px] uppercase shadow-md active:scale-95 transition-all"
                 >
-                    {trabajoAEditar ? 'Actualizar' : 'Guardar y Salir'}
+                    {trabajoAEditar ? 'Actualizar Trabajo' : 'Guardar y Salir'}
                 </button>
             </div>
 
+            {/* Botón Cancelar */}
             <div className="col-span-2 flex justify-center">
                 <button
                     type="button"

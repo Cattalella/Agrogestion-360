@@ -32,6 +32,9 @@ export class TrabajadoresService {
       throw new BadRequestException('Ya existe un trabajador con ese tipo y número de documento');
     }
 
+    // Normalizar estado a minúscula
+    const estadoNormalizado = datos.estado?.toLowerCase() === 'activo' ? 'activo' : 'inactivo';
+
     return this.prisma.trabajador.create({
       data: {
         nombre_completo: datos.nombre_completo,
@@ -41,7 +44,7 @@ export class TrabajadoresService {
         telefono: datos.telefono || null,
         telefono_familiar: datos.telefono_familiar || null,
         direccion: datos.direccion || null,
-        estado: datos.estado || 'Activo',
+        estado: estadoNormalizado,
         fecha_ingreso: datos.fecha_ingreso ? new Date(datos.fecha_ingreso) : new Date(),
         observaciones: datos.observaciones || null,
         updatedAt: new Date()
@@ -58,6 +61,12 @@ export class TrabajadoresService {
       throw new NotFoundException('Trabajador no encontrado');
     }
 
+    // Normalizar estado a minúscula si viene
+    let estadoNormalizado = datos.estado;
+    if (estadoNormalizado) {
+      estadoNormalizado = estadoNormalizado.toLowerCase() === 'activo' ? 'activo' : 'inactivo';
+    }
+
     return this.prisma.trabajador.update({
       where: { id_trabajador: id },
       data: {
@@ -68,7 +77,7 @@ export class TrabajadoresService {
         telefono: datos.telefono,
         telefono_familiar: datos.telefono_familiar,
         direccion: datos.direccion,
-        estado: datos.estado,
+        estado: estadoNormalizado,
         fecha_ingreso: datos.fecha_ingreso ? new Date(datos.fecha_ingreso) : undefined,
         observaciones: datos.observaciones,
         updatedAt: new Date()
@@ -88,7 +97,7 @@ export class TrabajadoresService {
     return this.prisma.trabajador.update({
       where: { id_trabajador: id },
       data: {
-        estado: 'Inactivo',
+        estado: 'inactivo',
         updatedAt: new Date()
       }
     });
@@ -102,7 +111,7 @@ export class TrabajadoresService {
     return this.prisma.trabajoRealizado.findMany({
       include: {
         Trabajador: {
-          select: { nombre_completo: true }
+          select: { nombre_completo: true, id_trabajador: true }
         }
       },
       orderBy: { fecha_inicio: 'desc' }
@@ -114,16 +123,15 @@ export class TrabajadoresService {
       where: { id_trabajador: parseInt(datos.id_trabajador) }
     });
 
-    if (!trabajador || trabajador.estado !== 'Activo') {
+    // Validar trabajador activo (acepta 'activo' y 'Activo')
+    if (!trabajador || trabajador.estado.toLowerCase() !== 'activo') {
       throw new BadRequestException('Solo trabajadores activos pueden registrar trabajo');
     }
 
-    // RN.8.1.2: Evidencia fotográfica obligatoria
     if (!datos.evidencia_url) {
       throw new BadRequestException('La evidencia fotográfica es obligatoria');
     }
 
-    // RN.8.1.2: Duración calculada automáticamente si no viene
     let duracion = datos.duracion_horas;
     if (!duracion && datos.fecha_inicio && datos.fecha_fin) {
       const inicio = new Date(datos.fecha_inicio);
@@ -148,7 +156,7 @@ export class TrabajadoresService {
         updatedAt: new Date()
       },
       include: {
-        Trabajador: { select: { nombre_completo: true } }
+        Trabajador: { select: { nombre_completo: true, id_trabajador: true } }
       }
     });
   }
@@ -162,7 +170,6 @@ export class TrabajadoresService {
       throw new NotFoundException('Trabajo no encontrado');
     }
 
-    // Recalcular duración si cambian las fechas
     let duracion = datos.duracion_horas;
     if (!duracion && datos.fecha_inicio && datos.fecha_fin) {
       const inicio = new Date(datos.fecha_inicio);
@@ -183,12 +190,11 @@ export class TrabajadoresService {
         updatedAt: new Date()
       },
       include: {
-        Trabajador: { select: { nombre_completo: true } }
+        Trabajador: { select: { nombre_completo: true, id_trabajador: true } }
       }
     });
   }
 
-  // RN.8.1.2: Eliminación debe estar justificada y registrada
   async eliminarTrabajo(id: number, justificacion?: string) {
     const trabajo = await this.prisma.trabajoRealizado.findUnique({
       where: { id_trabajo: id }
@@ -239,7 +245,8 @@ export class TrabajadoresService {
       throw new BadRequestException('Trabajador no encontrado');
     }
 
-    if (trabajador.estado !== 'Activo') {
+    // 🔥 VALIDACIÓN CORREGIDA: acepta 'activo' y 'Activo'
+    if (trabajador.estado.toLowerCase() !== 'activo') {
       throw new BadRequestException('Solo se puede pagar a trabajadores activos');
     }
 
@@ -290,9 +297,6 @@ export class TrabajadoresService {
     return pago;
   }
 
-  // ============================================================
-  // 📌 ACTUALIZAR PAGO — RN.8.1.1: solo si NO está anulado
-  // ============================================================
   async actualizarPago(id: number, datos: any) {
     const pago = await this.prisma.pagoTrabajador.findUnique({
       where: { id_pago: id }
@@ -302,7 +306,6 @@ export class TrabajadoresService {
       throw new NotFoundException('Pago no encontrado');
     }
 
-    // RN.8.1.1: No se puede editar un pago anulado
     if (pago.estado_pago === 'Anulado' || pago.justificacion_anulacion) {
       throw new BadRequestException('No se puede editar un pago anulado');
     }
@@ -334,9 +337,6 @@ export class TrabajadoresService {
     return pagoActualizado;
   }
 
-  // ============================================================
-  // 📌 ANULAR PAGO — RN.8.1.1: conserva historial, requiere justificación
-  // ============================================================
   async anularPago(id: number, justificacion: string) {
     if (!justificacion?.trim()) {
       throw new BadRequestException('La justificación es obligatoria para anular un pago');
@@ -410,13 +410,13 @@ export class TrabajadoresService {
 
   async contarTrabajadoresActivos(): Promise<number> {
     return this.prisma.trabajador.count({
-      where: { estado: 'Activo' }
+      where: { estado: 'activo' }
     });
   }
 
   async listarTrabajadoresActivos() {
     return this.prisma.trabajador.findMany({
-      where: { estado: 'Activo' },
+      where: { estado: 'activo' },
       select: { nombre_completo: true },
       orderBy: { nombre_completo: 'asc' }
     });

@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 // Utilidades
-import { useFotosStorage } from "../utils/storage";
+import { useFotosStorage } from "../utils/useFotosStorage";
 
 // Hooks pecuarios
 import { useGanado } from "../hooks/useGanado";
@@ -18,9 +18,10 @@ import { useTrabajoRealizado } from "../hooks/useTrabajoRealizado";
 import { useNuevoTrabajador } from "../hooks/useNuevoTrabajador";
 import { useRegistrarCompra } from "../hooks/useRegistrarCompra";
 
-// 🆕 Hooks de inventario
+// Hooks de inventario
 import { useSolicitudCompra } from "../hooks/useSolicitudCompra";
 import { useConsumoInsumos } from "../hooks/useConsumoInsumos";
+import { useInventario } from "../hooks/useInventario";
 
 // Componentes de layout
 import { Encabezado } from "../components/Encabezado";
@@ -60,16 +61,42 @@ export const Admin = () => {
     // ============================================================
     const solicitudCompra = useSolicitudCompra() as any;
     const consumoInsumos = useConsumoInsumos() as any;
+    const inventario = useInventario() as any;
 
     // ============================================================
-    // FOTOS Y EVIDENCIAS
+    // HOOK DE FOTOS (reemplaza el anterior)
     // ============================================================
-    const [listasFotos, setListasFotos] = useFotosStorage();
+    const { 
+        fotos: todasLasFotos, 
+        agregarFoto, 
+        eliminarFoto, 
+        eliminarTodasFotos, 
+        toggleLike 
+    } = useFotosStorage();
+
+    // Filtrar solo fotos de trabajo realizado
+    const fotosTrabajo = todasLasFotos.filter(f => f.origen === 'trabajo');
+
+    // ============================================================
+    // ESTADO PARA MODAL DE INVENTARIO
+    // ============================================================
+    const [isInventarioOpen, setIsInventarioOpen] = useState(false);
+
+    // ============================================================
+    // MANEJADORES
+    // ============================================================
+    const handleVerInventarioClick = () => {
+        inventario.recargar();
+        setIsInventarioOpen(true);
+    };
+
+    // ============================================================
+    // MODAL DE CONFIRMACIÓN (BORRAR FOTOS)
+    // ============================================================
     const [modalConfig, setModalConfig] = useState({ abierto: false, mensaje: "", accion: () => {} });
 
     const manejarSubida = (nuevaFoto: FotoEvidencia) => {
-        const nuevas = [nuevaFoto, ...listasFotos];
-        setListasFotos(nuevas);
+        agregarFoto(nuevaFoto);
     };
 
     const abrirModalBorrarTodo = () => {
@@ -77,7 +104,7 @@ export const Admin = () => {
             abierto: true,
             mensaje: "Vas a eliminar todas las fotos de evidencia. Esta acción no se puede deshacer.",
             accion: () => {
-                setListasFotos([]);
+                eliminarTodasFotos();
                 setModalConfig(prev => ({ ...prev, abierto: false }));
             }
         });
@@ -88,8 +115,7 @@ export const Admin = () => {
             abierto: true,
             mensaje: "Vas a eliminar esta foto de evidencia permanentemente.",
             accion: () => {
-                const filtradas = listasFotos.filter(f => f.id !== id);
-                setListasFotos(filtradas);
+                eliminarFoto(id);
                 setModalConfig(prev => ({ ...prev, abierto: false }));
             }
         });
@@ -113,6 +139,9 @@ export const Admin = () => {
                 generarPDF={generarPDF}
                 solicitudCompra={solicitudCompra}
                 consumoInsumos={consumoInsumos}
+                registrarCompra={compras}
+                isInventarioOpen={isInventarioOpen}
+                onCloseInventario={() => setIsInventarioOpen(false)}
             />
 
             {/* ============================================================ */}
@@ -161,13 +190,14 @@ export const Admin = () => {
                 onRegFormatoPagoClick={generarPDF.abrirModal}
                 onRegSolicitudClick={solicitudCompra.abrirModal}
                 onRegConsumoClick={consumoInsumos.abrirModal}
+                onVerInventarioClick={handleVerInventarioClick}
             />
 
             {/* ============================================================ */}
-            {/* HERO 3 — EVIDENCIAS */}
+            {/* HERO 3 — EVIDENCIAS (SOLO TRABAJOS) */}
             {/* ============================================================ */}
             <Hero3
-                fotos={listasFotos}
+                fotos={fotosTrabajo}
                 rol="admin"
                 onSubirClick={manejarSubida}
                 onBorrarTodo={abrirModalBorrarTodo}

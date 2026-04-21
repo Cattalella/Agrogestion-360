@@ -7,6 +7,8 @@ export type FotoEvidencia = {
     url: string;
     fecha: string;
     like?: boolean;
+    origen?: 'consumo' | 'trabajo' | 'general';
+    idReferencia?: number;
 };
 
 interface SeccionEvidenciasProps {
@@ -118,11 +120,12 @@ export const Carrusel = ({ fotos, rol, onSubirClick, onBorrarTodo, onBorrarUnaFo
                     onChange={(e) => {
                         const archivo = e.target.files?.[0];
                         if (archivo) {
-                            const nuevaFoto = URL.createObjectURL(archivo);
+                            const url = URL.createObjectURL(archivo);
                             const evidencia: FotoEvidencia = {
                                 id: Date.now(),
-                                url: nuevaFoto,
-                                fecha: new Date().toLocaleDateString()
+                                url: url,
+                                fecha: new Date().toLocaleDateString(),
+                                origen: 'general'
                             };
                             if(onSubirClick) onSubirClick(evidencia);
                         }

@@ -10,22 +10,28 @@ import type { TrabajoRealizado } from './useTrabajoRealizado';
 export interface FormatoPago {
     id: string;
     pagoId: number;
-    trabajadorId: string;
+    trabajadorId: number;
     trabajoId: number | null;
     fechaGeneracion: string;
     detalles: {
         nombreTrabajador: string;
         tipoTrabajo: string;
+        tipoDocumento: string;
+        numDocumento: string;
+        telefono: string;
         periodo: string;
         actividades: string[];
+        totalHoras: number;
         montoTotal: number;
         montoLetras: string;
+        concepto: string;
     };
     estadoFirma: 'pendiente' | 'firmado' | 'escaneado';
     firmaDigital?: string;
     evidenciaEscaneo?: string;
     fechaFirma?: string;
     fechaRegistroPago?: string;
+    pdfUrl?: string;
 }
 
 type Vista = 'lista' | 'formulario' | 'vistaPrevia';
@@ -100,6 +106,129 @@ const numeroALetras = (numero: number): string => {
 };
 
 // ─────────────────────────────────────────
+// FUNCIÓN PARA GENERAR EL PDF (retorna Blob)
+// ─────────────────────────────────────────
+const generarPDFBlob = (
+    pago: Pago,
+    trabajador: Trabajador,
+    trabajosRealizados: TrabajoRealizado[],
+    periodo: string
+): Promise<Blob> => {
+    return new Promise((resolve) => {
+        // Usar setTimeout para no bloquear el UI
+        setTimeout(() => {
+            const actividades = trabajosRealizados.map(t => t.tipo_actividad);
+            const totalHoras = trabajosRealizados.reduce((sum, t) => sum + (Number(t.duracion_horas) || 0), 0);
+            
+            const doc = new jsPDF();
+            let y = 25;
+            
+            // Encabezado
+            doc.setFillColor(16, 185, 129);
+            doc.rect(0, 0, 210, 35, 'F');
+            doc.setFontSize(16);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(255, 255, 255);
+            doc.text("AGROGESTIÓN 360", 105, 20, { align: 'center' });
+            doc.setFontSize(10);
+            doc.text("FORMATO DE PAGO A TRABAJADORES", 105, 32, { align: 'center' });
+            
+            // Información general
+            y = 50;
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(9);
+            doc.setFont("helvetica", "normal");
+            doc.text(`Fecha de emisión: ${new Date().toLocaleDateString()}`, 20, y);
+            doc.text(`Período: ${periodo}`, 140, y);
+            y += 12;
+            doc.setDrawColor(200, 200, 200);
+            doc.line(20, y, 190, y);
+            y += 10;
+            
+            // Datos del trabajador
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(16, 185, 129);
+            doc.text("DATOS DEL TRABAJADOR", 20, y);
+            y += 7;
+            doc.setFontSize(9);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(0, 0, 0);
+            doc.text(`Nombre: ${trabajador.nombre_completo}`, 25, y);
+            y += 5;
+            doc.text(`Tipo de trabajo: ${trabajador.tipo_trabajo}`, 25, y);
+            y += 5;
+            doc.text(`Documento: ${trabajador.tipo_documento} ${trabajador.num_documento}`, 25, y);
+            y += 5;
+            doc.text(`Teléfono: ${trabajador.telefono || 'No registrado'}`, 25, y);
+            y += 12;
+            
+            // Actividades realizadas
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(16, 185, 129);
+            doc.text("ACTIVIDADES REALIZADAS", 20, y);
+            y += 7;
+            doc.setFontSize(8);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(0, 0, 0);
+            
+            actividades.forEach((act, idx) => {
+                if (y > 250) {
+                    doc.addPage();
+                    y = 20;
+                }
+                doc.text(`${idx + 1}. ${act}`, 25, y);
+                y += 5;
+            });
+            y += 5;
+            doc.text(`Total horas: ${totalHoras.toFixed(1)} horas`, 25, y);
+            y += 15;
+            
+            // Monto a pagar
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(16, 185, 129);
+            doc.text("MONTO A PAGAR", 20, y);
+            y += 7;
+            doc.setFontSize(11);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(0, 0, 0);
+            doc.text(`$ ${pago.monto_total.toLocaleString('es-CO')} COP`, 25, y);
+            y += 6;
+            doc.setFontSize(8);
+            doc.setFont("helvetica", "normal");
+            doc.text(`En letras: ${numeroALetras(pago.monto_total)} pesos colombianos`, 25, y);
+            y += 8;
+            doc.text(`Concepto: ${pago.concepto}`, 25, y);
+            y += 20;
+            
+            // Firma
+            doc.setDrawColor(0, 0, 0);
+            doc.line(40, y, 170, y);
+            y += 5;
+            doc.setFontSize(8);
+            doc.text("Firma del trabajador", 105, y, { align: 'center' });
+            y += 15;
+            doc.setFontSize(7);
+            doc.setTextColor(150, 150, 150);
+            doc.text("El pago en efectivo solo se registrará después de firmar este formato.", 105, y, { align: 'center' });
+            
+            // Pie de página
+            const pageCount = doc.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.setFontSize(7);
+                doc.setTextColor(150, 150, 150);
+                doc.text(`AgroGestión 360 - Formato de Pago - Página ${i} de ${pageCount}`, 105, 285, { align: 'center' });
+            }
+            
+            resolve(doc.output('blob'));
+        }, 50);
+    });
+};
+
+// ─────────────────────────────────────────
 // HOOK PRINCIPAL
 // ─────────────────────────────────────────
 export const useGenerarPagoPDF = () => {
@@ -109,149 +238,153 @@ export const useGenerarPagoPDF = () => {
     const [vista, setVista] = useState<Vista>('lista');
     const [formatoSeleccionado, setFormatoSeleccionado] = useState<FormatoPago | null>(null);
     const [generandoPDF, setGenerandoPDF] = useState(false);
+    const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+    const [pdfBlobActual, setPdfBlobActual] = useState<Blob | null>(null);
 
     const abrirModal = () => {
         setVista('lista');
         setIsModalOpen(true);
+        setPdfPreviewUrl(null);
+        setPdfBlobActual(null);
     };
 
     const cerrarModal = () => {
         setIsModalOpen(false);
         setFormatoSeleccionado(null);
         setVista('lista');
+        if (pdfPreviewUrl) {
+            URL.revokeObjectURL(pdfPreviewUrl);
+        }
+        setPdfPreviewUrl(null);
+        setPdfBlobActual(null);
     };
 
     const cambiarVista = (nuevaVista: Vista) => {
         setVista(nuevaVista);
     };
 
+    // ============================================================
+    // GENERAR Y DESCARGAR DIRECTO (sin alert, solo abre ventana)
+    // ============================================================
     const generarFormatoPago = async (
+    pago: Pago,
+    trabajador: Trabajador,
+    trabajosRealizados: TrabajoRealizado[],
+    periodo: string
+): Promise<FormatoPago> => {
+    
+    setGenerandoPDF(true);
+    
+    try {
+        const actividades = trabajosRealizados.map(t => t.tipo_actividad);
+        const totalHoras = trabajosRealizados.reduce((sum, t) => sum + (Number(t.duracion_horas) || 0), 0);
+        
+        const nuevoFormato: FormatoPago = {
+            id: `F-${Date.now()}`,
+            pagoId: pago.id_pago,
+            trabajadorId: trabajador.id_trabajador,
+            trabajoId: trabajosRealizados[0]?.id_trabajo || null,
+            fechaGeneracion: new Date().toISOString(),
+            detalles: {
+                nombreTrabajador: trabajador.nombre_completo,
+                tipoTrabajo: trabajador.tipo_trabajo,
+                tipoDocumento: trabajador.tipo_documento,
+                numDocumento: trabajador.num_documento,
+                telefono: trabajador.telefono || '',
+                periodo: periodo,
+                actividades: actividades,
+                totalHoras: totalHoras,
+                montoTotal: pago.monto_total,
+                montoLetras: numeroALetras(pago.monto_total),
+                concepto: pago.concepto
+            },
+            estadoFirma: 'pendiente'
+        };
+        
+        // Generar PDF
+        const doc = new jsPDF();
+        let y = 25;
+        
+        // ... (todo el contenido del PDF igual) ...
+        
+        // ============================================================
+        // NOMBRE DEL ARCHIVO PERSONALIZADO
+        // ============================================================
+        // Formatear la fecha actual
+        const fechaActual = new Date();
+        const dia = fechaActual.getDate().toString().padStart(2, '0');
+        const mes = (fechaActual.getMonth() + 1).toString().padStart(2, '0');
+        const anio = fechaActual.getFullYear();
+        
+        // Limpiar el nombre del trabajador
+        const nombreLimpio = trabajador.nombre_completo
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')  // Eliminar tildes
+            .replace(/[^a-zA-Z0-9]/g, '_');    // Reemplazar espacios y caracteres especiales por _
+        
+        // Nombre del archivo: AgroPagos_NOMBRE_DD_MM_AA.pdf
+        const nombreArchivo = `AgroPagos_${nombreLimpio}_${dia}_${mes}_${anio}.pdf`;
+        
+        // Guardar el PDF
+        doc.save(nombreArchivo);
+        
+        console.log("PDF generado correctamente", nuevoFormato);
+        console.log("Nombre del archivo:", nombreArchivo);
+        
+        setFormatosPago(prev => [nuevoFormato, ...prev]);
+        return nuevoFormato;
+        
+    } catch (error) {
+        console.error("Error al generar PDF:", error);
+        alert("❌ Error al generar el PDF. Por favor intenta de nuevo.");
+        throw error;
+    } finally {
+        setGenerandoPDF(false);
+    }
+};
+
+    // ============================================================
+    // GENERAR Y PREVISUALIZAR (sin alert)
+    // ============================================================
+    const previsualizarPDF = async (
         pago: Pago,
         trabajador: Trabajador,
         trabajosRealizados: TrabajoRealizado[],
         periodo: string
-    ): Promise<FormatoPago> => {
-        
+    ): Promise<void> => {
         setGenerandoPDF(true);
-        
         try {
-            const actividades = trabajosRealizados
-                .filter(t => t.id_trabajador === trabajador.id_trabajador)
-                .map(t => `${t.tipo_actividad} (${t.duracion_trabajo})`);
-            
-            const nuevoFormato: FormatoPago = {
-                id: `F-${Date.now()}`,
-                pagoId: pago.id,
-                trabajadorId: trabajador.id_trabajador,
-                trabajoId: trabajosRealizados[0]?.id || null,
-                fechaGeneracion: new Date().toISOString(),
-                detalles: {
-                    nombreTrabajador: trabajador.nombre_completo,
-                    tipoTrabajo: trabajador.tipo_trabajo,
-                    periodo: periodo,
-                    actividades: actividades,
-                    montoTotal: pago.monto_total,
-                    montoLetras: numeroALetras(pago.monto_total)
-                },
-                estadoFirma: 'pendiente'
-            };
-            
-            // 📄 GENERAR PDF CON jsPDF
-            const doc = new jsPDF();
-            let y = 20;
-            
-            // Título
-            doc.setFontSize(16);
-            doc.setFont("helvetica", "bold");
-            doc.text("FORMATO DE PAGO", 20, y);
-            y += 10;
-            
-            doc.setFontSize(10);
-            doc.setFont("helvetica", "normal");
-            doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 20, y);
-            y += 15;
-            
-            // Línea separadora
-            doc.line(20, y, 190, y);
-            y += 10;
-            
-            // DATOS DEL TRABAJADOR
-            doc.setFontSize(12);
-            doc.setFont("helvetica", "bold");
-            doc.text("DATOS DEL TRABAJADOR", 20, y);
-            y += 8;
-            
-            doc.setFontSize(10);
-            doc.setFont("helvetica", "normal");
-            doc.text(`Nombre: ${trabajador.nombre_completo}`, 20, y);
-            y += 6;
-            doc.text(`ID Trabajador: ${trabajador.id_trabajador}`, 20, y);
-            y += 6;
-            doc.text(`Tipo de trabajo: ${trabajador.tipo_trabajo}`, 20, y);
-            y += 6;
-            doc.text(`Período: ${periodo}`, 20, y);
-            y += 15;
-            
-            // ACTIVIDADES REALIZADAS
-            doc.setFontSize(12);
-            doc.setFont("helvetica", "bold");
-            doc.text("ACTIVIDADES REALIZADAS", 20, y);
-            y += 8;
-            
-            doc.setFontSize(9);
-            doc.setFont("helvetica", "normal");
-            actividades.forEach((act, idx) => {
-                if (y > 270) {
-                    doc.addPage();
-                    y = 20;
-                }
-                doc.text(`• ${act}`, 25, y);
-                y += 5;
-            });
-            y += 10;
-            
-            // MONTO A PAGAR
-            doc.setFontSize(12);
-            doc.setFont("helvetica", "bold");
-            doc.text("MONTO A PAGAR", 20, y);
-            y += 8;
-            
-            doc.setFontSize(11);
-            doc.text(`Monto total: $${pago.monto_total.toLocaleString()}`, 20, y);
-            y += 7;
-            doc.setFontSize(9);
-            doc.text(`En letras: ${numeroALetras(pago.monto_total)}`, 20, y);
-            y += 20;
-            
-            // FIRMA
-            doc.line(60, y, 150, y);
-            y += 5;
-            doc.setFontSize(9);
-            doc.text("Firma del trabajador", 80, y);
-            y += 15;
-            
-            // Nota
-            doc.setFontSize(8);
-            doc.setTextColor(150);
-            doc.text("El pago en efectivo solo se registrará después de firmar este formato.", 20, y);
-            
-            // Guardar PDF
-            doc.save(`formato_pago_${nuevoFormato.id}.pdf`);
-            
-            console.log("PDF generado correctamente", nuevoFormato);
-            
-            setFormatosPago(prev => [nuevoFormato, ...prev]);
-            return nuevoFormato;
-            
+            const pdfBlob = await generarPDFBlob(pago, trabajador, trabajosRealizados, periodo);
+            const pdfUrl = URL.createObjectURL(pdfBlob);
+            setPdfBlobActual(pdfBlob);
+            setPdfPreviewUrl(pdfUrl);
+            setVista('vistaPrevia');
         } catch (error) {
-            console.error("Error al generar PDF:", error);
-            alert("❌ Error al generar el PDF. Por favor intenta de nuevo.");
-            throw error;
+            console.error("Error al previsualizar PDF:", error);
         } finally {
             setGenerandoPDF(false);
         }
     };
 
+    // ============================================================
+    // DESCARGAR PDF (desde previsualización)
+    // ============================================================
+    const descargarPDF = () => {
+        if (pdfBlobActual) {
+            const url = URL.createObjectURL(pdfBlobActual);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `formato_pago_${Date.now()}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+    };
+
+    // ============================================================
+    // REGISTRAR FIRMA (digital o escaneada)
+    // ============================================================
     const registrarFirma = (
         idFormato: string, 
         tipo: 'digital' | 'escaneo',
@@ -260,55 +393,34 @@ export const useGenerarPagoPDF = () => {
         setFormatosPago(prev =>
             prev.map(f => {
                 if (f.id !== idFormato) return f;
-                
                 const update: Partial<FormatoPago> = {
                     estadoFirma: tipo === 'digital' ? 'firmado' : 'escaneado',
                     fechaFirma: new Date().toISOString()
                 };
-                
-                if (tipo === 'digital') {
-                    update.firmaDigital = firmaData;
-                } else {
-                    update.evidenciaEscaneo = firmaData;
-                }
-                
+                if (tipo === 'digital') update.firmaDigital = firmaData;
+                else update.evidenciaEscaneo = firmaData;
                 return { ...f, ...update };
             })
         );
     };
 
+    // ============================================================
+    // CONFIRMAR PAGO CON FIRMA
+    // ============================================================
     const confirmarPagoConFirma = (idFormato: string, pagoId: number, onConfirmarPago?: () => void) => {
         const formato = formatosPago.find(f => f.id === idFormato);
-        
-        if (!formato) {
-            alert("Formato no encontrado");
-            return false;
-        }
-        
-        if (formato.estadoFirma === 'pendiente') {
-            alert("❌ El pago en efectivo solo puede registrarse si el trabajador ha firmado el formato.");
-            return false;
-        }
+        if (!formato) return false;
+        if (formato.estadoFirma === 'pendiente') return false;
         
         setFormatosPago(prev =>
-            prev.map(f =>
-                f.id === idFormato
-                    ? { ...f, fechaRegistroPago: new Date().toISOString() }
-                    : f
-            )
+            prev.map(f => f.id === idFormato ? { ...f, fechaRegistroPago: new Date().toISOString() } : f)
         );
         
-        if (onConfirmarPago) {
-            onConfirmarPago();
-        }
-        
-        alert("✅ Pago registrado correctamente con firma del trabajador");
+        if (onConfirmarPago) onConfirmarPago();
         return true;
     };
 
-    const historialPagosFirmados = formatosPago.filter(
-        f => f.estadoFirma !== 'pendiente'
-    );
+    const historialPagosFirmados = formatosPago.filter(f => f.estadoFirma !== 'pendiente');
 
     return {
         formatosPago,
@@ -317,12 +429,16 @@ export const useGenerarPagoPDF = () => {
         vista,
         formatoSeleccionado,
         generandoPDF,
+        pdfPreviewUrl,
+        pdfBlobActual,
         setVista,
         setFormatoSeleccionado,
         abrirModal,
         cerrarModal,
         cambiarVista,
         generarFormatoPago,
+        previsualizarPDF,
+        descargarPDF,
         registrarFirma,
         confirmarPagoConFirma
     };

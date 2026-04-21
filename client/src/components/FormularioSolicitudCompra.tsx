@@ -7,6 +7,7 @@ import type {
     UnidadMedida 
 } from "../hooks/useSolicitudCompra";
 import type { Trabajador } from "../hooks/useNuevoTrabajador";
+import { AlertCircle } from "lucide-react";
 
 interface Props {
     solicitudAEditar: SolicitudCompra | null;
@@ -31,7 +32,7 @@ export const FormularioSolicitudCompra = ({
     const [form, setForm] = useState({
         tipo: tipoSeleccionado,
         fechaPropuesta: "",
-        cantidad: 0,
+        cantidad: "",
         unidadMedida: "kg" as UnidadMedida,
         motivo: "",
         tipoInsumo: "",
@@ -43,6 +44,9 @@ export const FormularioSolicitudCompra = ({
         categoriaAlimento: "",
         usuario: usuarioActual,
     });
+
+    const [errores, setErrores] = useState<Record<string, string>>({});
+    const [enviando, setEnviando] = useState(false);
 
     // ============================================================
     // 🔄 SINCRONIZAR form.tipo con tipoSeleccionado
@@ -59,7 +63,7 @@ export const FormularioSolicitudCompra = ({
             setForm({
                 tipo: solicitudAEditar.tipo,
                 fechaPropuesta: solicitudAEditar.fecha_compra || "",
-                cantidad: solicitudAEditar.cantidad,
+                cantidad: solicitudAEditar.cantidad?.toString() || "",
                 unidadMedida: solicitudAEditar.unidad_medida,
                 motivo: solicitudAEditar.motivo,
                 tipoInsumo: solicitudAEditar.tipoInsumo || "",
@@ -82,7 +86,7 @@ export const FormularioSolicitudCompra = ({
             setForm({
                 tipo: tipoSeleccionado,
                 fechaPropuesta: "",
-                cantidad: 0,
+                cantidad: "",
                 unidadMedida: "kg",
                 motivo: "",
                 tipoInsumo: "",
@@ -94,53 +98,87 @@ export const FormularioSolicitudCompra = ({
                 categoriaAlimento: "",
                 usuario: usuarioActual,
             });
+            setErrores({});
         }
     }, [solicitudAEditar, tipoSeleccionado, usuarioActual]);
 
     // ============================================================
-    // 📤 ENVIAR FORMULARIO
+    // VALIDACIÓN
     // ============================================================
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
+    const validarFormulario = (): boolean => {
+        const nuevosErrores: Record<string, string> = {};
         
+        // Fecha propuesta (debe ser hoy o futura)
         if (!form.fechaPropuesta) {
-            alert("La fecha propuesta es obligatoria.");
-            return;
-        }
-        if (form.cantidad <= 0) {
-            alert("La cantidad debe ser mayor a 0.");
-            return;
-        }
-        if (!form.motivo.trim()) {
-            alert("El motivo es obligatorio.");
-            return;
+            nuevosErrores.fechaPropuesta = 'La fecha propuesta es obligatoria';
+        } else {
+            const fechaSeleccionada = new Date(form.fechaPropuesta);
+            const hoy = new Date();
+            hoy.setHours(0, 0, 0, 0);
+            if (fechaSeleccionada < hoy) {
+                nuevosErrores.fechaPropuesta = 'La fecha no puede ser anterior a hoy';
+            }
         }
         
-        if (form.tipo === 'insumo' && !form.tipoInsumo) {
-            alert("Debes especificar el tipo de insumo.");
-            return;
+        const cantidadNum = parseFloat(form.cantidad);
+        if (!form.cantidad || isNaN(cantidadNum) || cantidadNum <= 0) {
+            nuevosErrores.cantidad = 'La cantidad debe ser mayor a 0';
+        }
+        
+        if (!form.motivo.trim()) {
+            nuevosErrores.motivo = 'El motivo es obligatorio';
+        }
+        
+        if (form.tipo === 'insumo' && !form.tipoInsumo.trim()) {
+            nuevosErrores.tipoInsumo = 'Debes especificar el tipo de insumo';
         }
         
         if (form.tipo === 'alimento') {
-            if (!form.tipoAlimento) {
-                alert("Debes especificar el tipo de alimento.");
-                return;
+            if (!form.tipoAlimento.trim()) {
+                nuevosErrores.tipoAlimento = 'Debes especificar el tipo de alimento';
             }
             if (!form.especieDestino) {
-                alert("Debes seleccionar la especie destino.");
-                return;
+                nuevosErrores.especieDestino = 'Debes seleccionar la especie destino';
             }
         }
         
-        onGuardar(form, true);
+        setErrores(nuevosErrores);
+        return Object.keys(nuevosErrores).length === 0;
+    };
+
+    // ============================================================
+    // 📤 ENVIAR FORMULARIO
+    // ============================================================
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        
+        if (!validarFormulario()) return;
+        
+        setEnviando(true);
+        
+        try {
+            const datosEnvio = {
+                ...form,
+                cantidad: parseFloat(form.cantidad),
+            };
+            await onGuardar(datosEnvio, true);
+        } catch (error) {
+            console.error("Error al enviar solicitud:", error);
+            setErrores(prev => ({ ...prev, general: 'Error al enviar la solicitud' }));
+        } finally {
+            setEnviando(false);
+        }
     };
 
     const tipoActual = tipoSeleccionado;
 
     return (
         <form onSubmit={handleSubmit} className="flex flex-col gap-5 p-4">
+            {/* ============================================================ */}
+            {/* TÍTULO */}
+            {/* ============================================================ */}
             <div className="text-center border-b pb-3">
-                <h2 className="text-lg font-bold text-gray-700">
+                <h2 className="text-lg font-bold text-emerald-700">
                     {solicitudAEditar ? "EDITAR SOLICITUD" : "NUEVA SOLICITUD"}
                 </h2>
                 <p className="text-xs text-gray-400">
@@ -150,6 +188,26 @@ export const FormularioSolicitudCompra = ({
                 </p>
             </div>
 
+            {/* ============================================================ */}
+            {/* ERROR GENERAL */}
+            {/* ============================================================ */}
+            {errores.general && (
+                <div className="bg-red-50 rounded-2xl p-3 border border-red-200 flex items-center gap-2">
+                    <AlertCircle size={16} className="text-red-500" />
+                    <p className="text-xs text-red-600">{errores.general}</p>
+                    <button
+                        type="button"
+                        onClick={() => setErrores(prev => ({ ...prev, general: '' }))}
+                        className="ml-auto text-red-400 hover:text-red-600"
+                    >
+                        ✕
+                    </button>
+                </div>
+            )}
+
+            {/* ============================================================ */}
+            {/* SELECTOR DE TIPO */}
+            {/* ============================================================ */}
             <div className="flex gap-4 border-b pb-4">
                 <label className="flex items-center gap-2 cursor-pointer">
                     <input 
@@ -158,8 +216,9 @@ export const FormularioSolicitudCompra = ({
                         checked={tipoActual === 'insumo'} 
                         onChange={() => setTipoSeleccionado('insumo')} 
                         disabled={!!solicitudAEditar} 
+                        className="accent-emerald-500"
                     />
-                    <span className={tipoActual === 'insumo' ? "font-bold text-green-600" : "text-gray-600"}>
+                    <span className={tipoActual === 'insumo' ? "font-bold text-emerald-600" : "text-gray-600"}>
                         📦 Insumo
                     </span>
                 </label>
@@ -170,6 +229,7 @@ export const FormularioSolicitudCompra = ({
                         checked={tipoActual === 'alimento'} 
                         onChange={() => setTipoSeleccionado('alimento')} 
                         disabled={!!solicitudAEditar} 
+                        className="accent-blue-500"
                     />
                     <span className={tipoActual === 'alimento' ? "font-bold text-blue-600" : "text-gray-600"}>
                         🍖 Alimento
@@ -177,38 +237,64 @@ export const FormularioSolicitudCompra = ({
                 </label>
             </div>
 
+            {/* ============================================================ */}
+            {/* CAMPOS COMUNES */}
+            {/* ============================================================ */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Fecha Propuesta */}
                 <div className="flex flex-col gap-1">
-                    <label className="text-xs font-bold text-gray-600 uppercase">
+                    <label className="text-[9px] uppercase ml-4 text-emerald-600 font-black tracking-tighter">
                         📅 Fecha en que se necesita *
                     </label>
                     <input 
                         type="date" 
-                        className="border rounded-full p-2 text-sm px-4" 
+                        className={`border rounded-full p-2 text-sm px-4 focus:outline-none focus:ring-2 focus:ring-emerald-300 transition-all ${
+                            errores.fechaPropuesta ? 'border-red-400 focus:ring-red-300' : 'border-gray-200'
+                        }`}
                         value={form.fechaPropuesta} 
-                        onChange={(e) => setForm({ ...form, fechaPropuesta: e.target.value })} 
-                        required 
+                        onChange={(e) => {
+                            setForm({ ...form, fechaPropuesta: e.target.value });
+                            setErrores(prev => ({ ...prev, fechaPropuesta: '' }));
+                        }} 
                     />
-                    <span className="text-[10px] text-gray-400">¿Cuándo necesitas recibir el producto?</span>
+                    {errores.fechaPropuesta && (
+                        <p className="text-[9px] text-red-500 ml-4 mt-1">{errores.fechaPropuesta}</p>
+                    )}
+                    <span className="text-[8px] text-gray-400 ml-4">¿Cuándo necesitas recibir el producto?</span>
                 </div>
+
+                {/* Cantidad */}
                 <div className="flex flex-col gap-1">
-                    <label className="text-xs font-bold text-gray-600 uppercase">🔢 Cantidad *</label>
+                    <label className="text-[9px] uppercase ml-4 text-emerald-600 font-black tracking-tighter">
+                        🔢 Cantidad *
+                    </label>
                     <input 
                         type="number" 
                         step="0.01" 
-                        className="border rounded-full p-2 text-sm px-4" 
-                        value={form.cantidad} 
-                        onChange={(e) => setForm({ ...form, cantidad: Number(e.target.value) })} 
-                        required 
+                        className={`border rounded-full p-2 text-sm px-4 focus:outline-none focus:ring-2 focus:ring-emerald-300 transition-all ${
+                            errores.cantidad ? 'border-red-400 focus:ring-red-300' : 'border-gray-200'
+                        }`}
+                        value={form.cantidad}
+                        onChange={(e) => {
+                            setForm({ ...form, cantidad: e.target.value });
+                            setErrores(prev => ({ ...prev, cantidad: '' }));
+                        }} 
+                        placeholder="0"
                     />
+                    {errores.cantidad && (
+                        <p className="text-[9px] text-red-500 ml-4 mt-1">{errores.cantidad}</p>
+                    )}
                 </div>
+
+                {/* Unidad de Medida */}
                 <div className="flex flex-col gap-1">
-                    <label className="text-xs font-bold text-gray-600 uppercase">📏 Unidad de Medida *</label>
+                    <label className="text-[9px] uppercase ml-4 text-emerald-600 font-black tracking-tighter">
+                        📏 Unidad de Medida *
+                    </label>
                     <select 
-                        className="border rounded-full p-2 text-sm bg-white px-4" 
+                        className="border border-gray-200 rounded-full p-2 text-sm bg-white px-4 focus:outline-none focus:ring-2 focus:ring-emerald-300"
                         value={form.unidadMedida} 
                         onChange={(e) => setForm({ ...form, unidadMedida: e.target.value as UnidadMedida })} 
-                        required
                     >
                         <option value="kg">Kilogramos (kg)</option>
                         <option value="litros">Litros (L)</option>
@@ -219,25 +305,35 @@ export const FormularioSolicitudCompra = ({
                 </div>
             </div>
 
+            {/* ============================================================ */}
+            {/* DATOS DEL INSUMO */}
+            {/* ============================================================ */}
             {tipoActual === 'insumo' && (
-                <div className="bg-green-50 rounded-xl p-4 border border-green-200 space-y-4">
-                    <p className="text-xs font-bold text-green-600 uppercase">📦 Datos del Insumo</p>
+                <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-200 space-y-4">
+                    <p className="text-[10px] font-black text-emerald-600 uppercase">📦 Datos del Insumo</p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="flex flex-col gap-1">
-                            <label className="text-xs font-semibold text-gray-700">Nombre del insumo *</label>
+                            <label className="text-[9px] font-semibold text-gray-700">Nombre del insumo *</label>
                             <input 
                                 type="text" 
                                 placeholder="Ej: Fertilizante NPK, Herbicida, etc." 
-                                className="border rounded-full p-2 text-sm px-4" 
+                                className={`border rounded-full p-2 text-sm px-4 focus:outline-none bg-white focus:ring-2 focus:ring-emerald-300 ${
+                                    errores.tipoInsumo ? 'border-red-400 focus:ring-red-300' : 'border-gray-200'
+                                }`}
                                 value={form.tipoInsumo} 
-                                onChange={(e) => setForm({ ...form, tipoInsumo: e.target.value })} 
-                                required 
+                                onChange={(e) => {
+                                    setForm({ ...form, tipoInsumo: e.target.value });
+                                    setErrores(prev => ({ ...prev, tipoInsumo: '' }));
+                                }} 
                             />
+                            {errores.tipoInsumo && (
+                                <p className="text-[9px] text-red-500 ml-4 mt-1">{errores.tipoInsumo}</p>
+                            )}
                         </div>
                         <div className="flex flex-col gap-1">
-                            <label className="text-xs font-semibold text-gray-700">Categoría</label>
+                            <label className="text-[9px] font-semibold text-gray-700">Categoría</label>
                             <select 
-                                className="border rounded-full p-2 text-sm bg-white px-4" 
+                                className="border border-gray-200 rounded-full p-2 text-sm bg-white px-4 focus:outline-none focus:ring-2 focus:ring-emerald-300"
                                 value={form.categoriaInsumo} 
                                 onChange={(e) => setForm({ ...form, categoriaInsumo: e.target.value as CategoriaInsumo })}
                             >
@@ -249,41 +345,55 @@ export const FormularioSolicitudCompra = ({
                             </select>
                         </div>
                         <div className="flex flex-col gap-1">
-                            <label className="text-xs font-semibold text-gray-700">⏰ Fecha de vencimiento (opcional)</label>
+                            <label className="text-[9px] font-semibold text-gray-700">⏰ Fecha de vencimiento (opcional)</label>
                             <input 
                                 type="date" 
-                                className="border rounded-full p-2 text-sm px-4" 
+                                className="border border-gray-200 bg-white rounded-full p-2 text-sm px-4 focus:outline-none focus:ring-2 focus:ring-emerald-300"
                                 value={form.fechaVencimiento} 
                                 onChange={(e) => setForm({ ...form, fechaVencimiento: e.target.value })} 
                             />
-                            <span className="text-[10px] text-gray-400">¿Hasta cuándo es válido este insumo?</span>
+                            <span className="text-[8px] text-gray-400">¿Hasta cuándo es válido este insumo?</span>
                         </div>
                     </div>
                 </div>
             )}
 
+            {/* ============================================================ */}
+            {/* DATOS DEL ALIMENTO */}
+            {/* ============================================================ */}
             {tipoActual === 'alimento' && (
-                <div className="bg-blue-50 rounded-xl p-4 border border-blue-200 space-y-4">
-                    <p className="text-xs font-bold text-blue-600 uppercase">🌾 Datos del Alimento</p>
+                <div className="bg-blue-50 rounded-2xl p-4 border border-blue-200 space-y-4">
+                    <p className="text-[10px] font-black text-blue-600 uppercase">🌾 Datos del Alimento</p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="flex flex-col gap-1">
-                            <label className="text-xs font-semibold text-gray-700">Nombre del alimento *</label>
+                            <label className="text-[9px] font-semibold text-gray-700">Nombre del alimento *</label>
                             <input 
                                 type="text" 
                                 placeholder="Ej: Concentrado, Maíz, Sorgo, etc." 
-                                className="border rounded-full p-2 text-sm px-4" 
+                                className={`border bg-white rounded-full p-2 text-sm px-4 focus:outline-none focus:ring-2 focus:ring-blue-300 ${
+                                    errores.tipoAlimento ? 'border-red-400 focus:ring-red-300' : 'border-gray-200'
+                                }`}
                                 value={form.tipoAlimento} 
-                                onChange={(e) => setForm({ ...form, tipoAlimento: e.target.value })} 
-                                required 
+                                onChange={(e) => {
+                                    setForm({ ...form, tipoAlimento: e.target.value });
+                                    setErrores(prev => ({ ...prev, tipoAlimento: '' }));
+                                }} 
                             />
+                            {errores.tipoAlimento && (
+                                <p className="text-[9px] text-red-500 ml-4 mt-1">{errores.tipoAlimento}</p>
+                            )}
                         </div>
                         <div className="flex flex-col gap-1">
-                            <label className="text-xs font-semibold text-gray-700">🐖 Especie destino *</label>
+                            <label className="text-[9px] font-semibold text-gray-700">🐖 Especie destino *</label>
                             <select 
-                                className="border rounded-full p-2 text-sm bg-white px-4" 
+                                className={`border rounded-full p-2 text-sm bg-white px-4 focus:outline-none focus:ring-2 focus:ring-blue-300 ${
+                                    errores.especieDestino ? 'border-red-400' : 'border-gray-200'
+                                }`}
                                 value={form.especieDestino} 
-                                onChange={(e) => setForm({ ...form, especieDestino: e.target.value as EspecieDestino })} 
-                                required
+                                onChange={(e) => {
+                                    setForm({ ...form, especieDestino: e.target.value as EspecieDestino });
+                                    setErrores(prev => ({ ...prev, especieDestino: '' }));
+                                }} 
                             >
                                 <option value="">Seleccionar especie</option>
                                 <option value="cerdos">🐷 Cerdos</option>
@@ -291,72 +401,102 @@ export const FormularioSolicitudCompra = ({
                                 <option value="ganado">🐮 Ganado</option>
                                 <option value="gallinas">🐔 Gallinas</option>
                             </select>
+                            {errores.especieDestino && (
+                                <p className="text-[9px] text-red-500 ml-4 mt-1">{errores.especieDestino}</p>
+                            )}
                         </div>
                         <div className="flex flex-col gap-1">
-                            <label className="text-xs font-semibold text-gray-700">🏭 Proveedor</label>
+                            <label className="text-[9px] font-semibold text-gray-700">🏭 Proveedor</label>
                             <input 
                                 type="text" 
                                 placeholder="Nombre de la empresa o proveedor" 
-                                className="border rounded-full p-2 text-sm px-4" 
+                                className="border border-gray-200 bg-white rounded-full p-2 text-sm px-4 focus:outline-none focus:ring-2 focus:ring-blue-300"
                                 value={form.proveedor} 
                                 onChange={(e) => setForm({ ...form, proveedor: e.target.value })} 
                             />
                         </div>
                         <div className="flex flex-col gap-1">
-                            <label className="text-xs font-semibold text-gray-700">📂 Categoría</label>
+                            <label className="text-[9px] font-semibold text-gray-700">📂 Categoría</label>
                             <input 
                                 type="text" 
                                 placeholder="Ej: Balanceado, Suplemento, Grano" 
-                                className="border rounded-full p-2 text-sm px-4" 
+                                className="border border-gray-200 bg-white rounded-full p-2 text-sm px-4 focus:outline-none focus:ring-2 focus:ring-blue-300"
                                 value={form.categoriaAlimento} 
                                 onChange={(e) => setForm({ ...form, categoriaAlimento: e.target.value })} 
                             />
                         </div>
                         <div className="flex flex-col gap-1">
-                            <label className="text-xs font-semibold text-gray-700">⏰ Fecha de vencimiento (opcional)</label>
+                            <label className="text-[9px] font-semibold text-gray-700">⏰ Fecha de vencimiento (opcional)</label>
                             <input 
                                 type="date" 
-                                className="border rounded-full p-2 text-sm px-4" 
+                                className="border border-gray-200 bg-white rounded-full p-2 text-sm px-4 focus:outline-none focus:ring-2 focus:ring-blue-300"
                                 value={form.fechaVencimiento} 
                                 onChange={(e) => setForm({ ...form, fechaVencimiento: e.target.value })} 
                             />
-                            <span className="text-[10px] text-gray-400">¿Hasta cuándo es válido este alimento?</span>
+                            <span className="text-[8px] text-gray-400">¿Hasta cuándo es válido este alimento?</span>
                         </div>
                     </div>
                 </div>
             )}
 
+            {/* ============================================================ */}
+            {/* MOTIVO */}
+            {/* ============================================================ */}
             <div className="flex flex-col gap-1">
-                <label className="text-xs font-bold text-gray-600 uppercase">💬 Motivo de la solicitud *</label>
+                <label className="text-[9px] uppercase ml-4 text-emerald-600 font-black tracking-tighter">
+                    💬 Motivo de la solicitud *
+                </label>
                 <textarea 
-                    className="border rounded-lg p-2 text-sm resize-none px-4" 
+                    className={`border rounded-2xl p-3 text-sm resize-none px-4 focus:outline-none focus:ring-2 focus:ring-emerald-300 transition-all ${
+                        errores.motivo ? 'border-red-400 focus:ring-red-300' : 'border-gray-200'
+                    }`}
                     rows={3} 
                     placeholder="Ej: Se requiere para alimentación de cerdos, stock bajo, reposición de inventario, etc." 
                     value={form.motivo} 
-                    onChange={(e) => setForm({ ...form, motivo: e.target.value })} 
-                    required 
+                    onChange={(e) => {
+                        setForm({ ...form, motivo: e.target.value });
+                        setErrores(prev => ({ ...prev, motivo: '' }));
+                    }} 
                 />
+                {errores.motivo && (
+                    <p className="text-[9px] text-red-500 ml-4 mt-1">{errores.motivo}</p>
+                )}
             </div>
 
+            {/* ============================================================ */}
+            {/* NOTA INFORMATIVA */}
+            {/* ============================================================ */}
             <div className="text-[10px] text-gray-400 bg-gray-50 rounded-full p-2 text-center">
                 📋 La solicitud se registrará con fecha, hora y usuario: <strong>{usuarioActual}</strong>
                 <br />
                 Estado inicial: <strong className="text-yellow-600">Pendiente</strong> - Solo el dueño puede aprobar/rechazar.
             </div>
 
+            {/* ============================================================ */}
+            {/* BOTONES */}
+            {/* ============================================================ */}
             <div className="flex justify-end gap-3 mt-4 pt-4 border-t">
                 <button 
                     type="button" 
                     onClick={onCancelar} 
-                    className="px-5 py-2 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors text-sm"
+                    disabled={enviando}
+                    className="px-5 py-2 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors text-sm disabled:opacity-50"
                 >
                     Cancelar
                 </button>
                 <button 
                     type="submit" 
-                    className="px-5 py-2 rounded-full bg-emerald-600 text-white font-medium hover:bg-emerald-700 transition-colors text-sm"
+                    disabled={enviando}
+                    className="px-5 py-2 rounded-full bg-emerald-600 text-white font-medium hover:bg-emerald-700 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                    {solicitudAEditar ? "✏️ Actualizar Solicitud" : "📤 Enviar Solicitud"}
+                    {enviando ? (
+                        <>
+                            <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            Enviando...
+                        </>
+                    ) : (
+                        solicitudAEditar ? "✏️ Actualizar Solicitud" : "📤 Enviar Solicitud"
+                    )}
                 </button>
             </div>
         </form>

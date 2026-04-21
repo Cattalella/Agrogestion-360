@@ -1,137 +1,159 @@
 import { useState, useEffect } from "react";
 import apiClient from "../api/apiClient";
+
+// ============================================================
+// 📌 TIPOS
+// ============================================================
 export type EstadoInventario = 'Disponible' | 'Bajo Stock' | 'Agotado' | 'Vencido';
 
 export interface ItemInventario {
-    id: string | number;
+    id: number;
     nombre: string;
     categoria: string;
     stockActual: number;
     stockMinimo: number;
     unidad: string;
-    estadoFisico?: string;
     fechaVencimiento?: string;
+    lote?: string;
+    proveedor?: string;
 }
 
-export type AlertaInventario = {
-    id: string;
-    itemId: string | number;
+export interface AlertaInventario {
+    id: number;
+    tipo: 'VENCIMIENTO' | 'BAJO_STOCK';
     nombre: string;
-    tipo: 'STOCK_BAJO' | 'VENCIMIENTO';
     mensaje: string;
-    diasRestantes?: number;
-};
+}
 
+// ============================================================
+// 📌 HOOK PRINCIPAL
+// ============================================================
 export const useInventario = () => {
-    const [inventario, setInventario] = useState<ItemInventario[]>([]);
+    const [inventario, setInventario] = useState<(ItemInventario & { estado: EstadoInventario })[]>([]);
     const [alertas, setAlertas] = useState<AlertaInventario[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [cargando, setCargando] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    const fetchInventario = async () => {
-        setLoading(true);
-        try {
-            const response = await apiClient.get('/inventario');
-            // Adaptar los datos del backend al formato del hook
-            const mapeado = response.data.map((item: any) => ({
+    // ============================================================
+    // CALCULAR ESTADO DEL ITEM
+    // ============================================================
+    const calcularEstado = (stockActual: number, stockMinimo: number, fechaVencimiento?: string): EstadoInventario => {
+        // Verificar vencimiento
+        if (fechaVencimiento) {
+            const hoy = new Date();
+            const vence = new Date(fechaVencimiento);
+            if (vence < hoy) return 'Vencido';
+        }
+        
+        // Verificar stock
+        if (stockActual <= 0) return 'Agotado';
+        if (stockActual <= stockMinimo) return 'Bajo Stock';
+        return 'Disponible';
+    };
+
+    // ============================================================
+    // GENERAR ALERTAS
+    // ============================================================
+    const generarAlertas = (items: any[]): AlertaInventario[] => {
+        const nuevasAlertas: AlertaInventario[] = [];
+        const hoy = new Date();
+        
+        items.forEach((item: any) => {
+            const stockActual = item.stockTotal || 0;
+            const stockMinimo = item.stock_minimo || 0;
+            
+            // Alerta de bajo stock
+            if (stockActual <= stockMinimo && stockActual > 0) {
+                nuevasAlertas.push({
+                    id: item.id_insumo,
+                    tipo: 'BAJO_STOCK',
+                    nombre: item.nombre_insumo,
+                    mensaje: `Stock bajo: ${stockActual} ${item.unidad_medida} disponible (mínimo: ${stockMinimo})`,
+                });
+            }
+            
+            // Alerta de vencimiento próximo (30 días)
+            if (item.lotes && item.lotes.length > 0) {
+                item.lotes.forEach((lote: any) => {
+                    if (lote.fecha_venc) {
+                        const fechaVence = new Date(lote.fecha_venc);
+                        const diasRestantes = Math.ceil((fechaVence.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+                        
+                        if (diasRestantes <= 30 && diasRestantes >= 0) {
+                            nuevasAlertas.push({
+                                id: lote.id_lote,
+                                tipo: 'VENCIMIENTO',
+                                nombre: item.nombre_insumo,
+                                mensaje: `Lote ${lote.numero_lote || 'N/A'} vence en ${diasRestantes} días (${lote.fecha_venc.split('T')[0]})`,
+                            });
+                        }
+                    }
+                });
+            }
+        });
+        
+        return nuevasAlertas;
+    };
+
+    // ============================================================
+    // TRANSFORMAR DATOS DEL BACKEND
+    // ============================================================
+    const transformarDatos = (data: any[]): (ItemInventario & { estado: EstadoInventario })[] => {
+        return data.map((item: any) => {
+            const stockActual = item.stockTotal || 0;
+            const stockMinimo = item.stock_minimo || 0;
+            const fechaVencimiento = item.lotes?.find((l: any) => l.fecha_venc)?.fecha_venc;
+            
+            // Obtener el lote más próximo a vencer
+            const loteProximo = item.lotes?.filter((l: any) => l.fecha_venc)
+                .sort((a: any, b: any) => new Date(a.fecha_venc).getTime() - new Date(b.fecha_venc).getTime())[0];
+            
+            return {
                 id: item.id_insumo,
                 nombre: item.nombre_insumo,
-                categoria: item.categoria,
-                stockActual: Number(item.stock_total || 0),
-                stockMinimo: Number(item.stock_minimo || 0),
+                categoria: item.categoria || 'General',
+                stockActual: stockActual,
+                stockMinimo: stockMinimo,
                 unidad: item.unidad_medida,
-                fechaVencimiento: item.proximo_vencimiento
-            }));
-            setInventario(mapeado);
-        } catch (error) {
-            console.error('❌ Error al cargar inventario:', error);
+                fechaVencimiento: loteProximo?.fecha_venc?.split('T')[0],
+                lote: loteProximo?.numero_lote,
+                proveedor: loteProximo?.proveedor,
+                estado: calcularEstado(stockActual, stockMinimo, fechaVencimiento),
+            };
+        });
+    };
+
+    // ============================================================
+    // CARGAR INVENTARIO
+    // ============================================================
+    const cargarInventario = async () => {
+        setCargando(true);
+        setError(null);
+        try {
+            const response = await apiClient.get('/inventario');
+            const itemsTransformados = transformarDatos(response.data);
+            const nuevasAlertas = generarAlertas(response.data);
+            
+            setInventario(itemsTransformados);
+            setAlertas(nuevasAlertas);
+        } catch (err: any) {
+            console.error('❌ Error al cargar inventario:', err);
+            setError(err.response?.data?.mensaje || 'Error al cargar inventario');
         } finally {
-            setLoading(false);
+            setCargando(false);
         }
     };
 
+    // Cargar al iniciar
     useEffect(() => {
-        fetchInventario();
+        cargarInventario();
     }, []);
 
-    // Motor de Alertas
-    useEffect(() => {
-        const agendarAlertas = () => {
-            const nuevasAlertas: AlertaInventario[] = [];
-            const fechaActual = new Date();
-
-            inventario.forEach(item => {
-                // Alerta de Bajo Stock
-                if (item.stockActual <= item.stockMinimo) {
-                    nuevasAlertas.push({
-                        id: `A-ST-${item.id}`,
-                        itemId: item.id,
-                        nombre: item.nombre,
-                        tipo: 'STOCK_BAJO',
-                        mensaje: item.stockActual === 0 
-                            ? `¡Atención! ${item.nombre} se ha agotado.` 
-                            : `El stock de ${item.nombre} (${item.stockActual}) está por debajo del mínimo permitido (${item.stockMinimo}).`
-                    });
-                }
-
-                // Alerta de Vencimiento
-                if (item.fechaVencimiento) {
-                    const fechaVence = new Date(item.fechaVencimiento);
-                    const diffMs = fechaVence.getTime() - fechaActual.getTime();
-                    const diasRestantes = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-
-                    if (diasRestantes <= 30 && diasRestantes >= 0) {
-                        nuevasAlertas.push({
-                            id: `A-VC-${item.id}`,
-                            itemId: item.id,
-                            nombre: item.nombre,
-                            tipo: 'VENCIMIENTO',
-                            mensaje: `El insumo ${item.nombre} vencerá en ${diasRestantes} días.`,
-                            diasRestantes
-                        });
-                    } else if (diasRestantes < 0) {
-                        nuevasAlertas.push({
-                            id: `A-VC-EXP-${item.id}`,
-                            itemId: item.id,
-                            nombre: item.nombre,
-                            tipo: 'VENCIMIENTO',
-                            mensaje: `¡Peligro! El insumo ${item.nombre} está VENCIDO desde hace ${Math.abs(diasRestantes)} días.`,
-                            diasRestantes
-                        });
-                    }
-                }
-            });
-
-            setAlertas(nuevasAlertas);
-        };
-
-        if (inventario.length > 0) agendarAlertas();
-    }, [inventario]);
-
-    const abrirModal = () => setIsModalOpen(true);
-    const cerrarModal = () => setIsModalOpen(false);
-
-    const inventarioConEstado = inventario.map(item => {
-        let estadoCalculado: EstadoInventario = 'Disponible';
-        if (item.stockActual === 0) estadoCalculado = 'Agotado';
-        else if (item.stockActual <= item.stockMinimo) estadoCalculado = 'Bajo Stock';
-        
-        if (item.fechaVencimiento) {
-            const fechaVence = new Date(item.fechaVencimiento);
-            if (fechaVence.getTime() < new Date().getTime()) {
-                estadoCalculado = 'Vencido';
-            }
-        }
-        return { ...item, estado: estadoCalculado };
-    });
-
     return {
-        inventario: inventarioConEstado,
+        inventario,
         alertas,
-        loading,
-        isModalOpen,
-        abrirModal,
-        cerrarModal,
-        refetch: fetchInventario
+        cargando,
+        error,
+        recargar: cargarInventario,
     };
 };

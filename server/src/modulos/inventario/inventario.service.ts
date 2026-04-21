@@ -159,7 +159,6 @@ export class InventarioService {
     if (datos.fecha_compra !== undefined) dataToUpdate.fecha_compra = new Date(datos.fecha_compra);
     if (datos.proveedor !== undefined) dataToUpdate.proveedor = datos.proveedor;
 
-    // Actualizar insumo si cambia
     if (datos.nombre_insumo) {
       let insumoId = solicitud.id_insumo;
       const insumoExistente = await this.prisma.catInsumos.findFirst({
@@ -211,9 +210,6 @@ export class InventarioService {
     });
   }
 
-  // ============================================================
-  // 🆕 EJECUTAR COMPRA REAL (con todos los datos del formulario)
-  // ============================================================
   async ejecutarCompraReal(datosCompra: any) {
     const {
       id_solicitud,
@@ -231,7 +227,6 @@ export class InventarioService {
       unidad_medida,
     } = datosCompra;
 
-    // 1. Verificar que la solicitud existe y está aprobada
     const solicitud = await this.prisma.solicitud.findUnique({
       where: { id_solicitud },
       include: { insumo: true },
@@ -245,7 +240,6 @@ export class InventarioService {
       throw new BadRequestException('La solicitud debe estar aprobada para ejecutar la compra');
     }
 
-    // 2. Buscar o crear el insumo en CatInsumos
     let id_insumo = solicitud.id_insumo;
 
     if (!id_insumo) {
@@ -261,7 +255,6 @@ export class InventarioService {
       id_insumo = nuevoInsumo.id_insumo;
     }
 
-    // 3. Crear el lote en LoteInv
     const lote = await this.prisma.loteInv.create({
       data: {
         id_insumo: id_insumo,
@@ -276,7 +269,6 @@ export class InventarioService {
       },
     });
 
-    // 4. Actualizar la solicitud con los datos de la compra real
     await this.prisma.solicitud.update({
       where: { id_solicitud },
       data: {
@@ -286,7 +278,6 @@ export class InventarioService {
       },
     });
 
-    // 5. Registrar auditoría (opcional)
     console.log(`✅ Compra real registrada para solicitud ${id_solicitud}, lote: ${numero_lote}`);
 
     return {
@@ -296,9 +287,6 @@ export class InventarioService {
     };
   }
 
-  // ============================================================
-  // EJECUTAR COMPRA (versión simple - solo marca como ejecutada)
-  // ============================================================
   async ejecutarCompra(idAdmin: number, idSolicitud: number, datosLote: any) {
     const solicitud = await this.prisma.solicitud.findFirst({
       where: { id_solicitud: idSolicitud, id_admin: idAdmin }
@@ -334,9 +322,6 @@ export class InventarioService {
     });
   }
 
-  // ============================================================
-  // 📌 ELIMINAR SOLICITUD (DELETE REAL)
-  // ============================================================
   async eliminarSolicitud(id: number, motivoEliminacion: string) {
     const solicitud = await this.prisma.solicitud.findUnique({
       where: { id_solicitud: id }
@@ -350,10 +335,8 @@ export class InventarioService {
       throw new BadRequestException('Solo se pueden eliminar solicitudes pendientes');
     }
 
-    // Registrar auditoría (opcional)
     console.log(`🗑️ Eliminando solicitud ${id} por motivo: ${motivoEliminacion}`);
 
-    // DELETE real
     return this.prisma.solicitud.delete({
       where: { id_solicitud: id }
     });
@@ -363,7 +346,20 @@ export class InventarioService {
   // 📌 CONSUMO DE INSUMOS
   // ============================================================
 
-  async registrarConsumo(idResponsable: number, datos: any) {
+  async registrarConsumo(datos: any) {
+    if (!datos.id_insumo) {
+      throw new BadRequestException('El id_insumo es obligatorio');
+    }
+    if (!datos.id_responsable) {
+      throw new BadRequestException('El id_responsable es obligatorio');
+    }
+    if (!datos.cantidad || datos.cantidad <= 0) {
+      throw new BadRequestException('La cantidad debe ser mayor a 0');
+    }
+    if (!datos.actividad) {
+      throw new BadRequestException('La actividad es obligatoria');
+    }
+
     const insumo = await this.prisma.catInsumos.findUnique({
       where: { id_insumo: datos.id_insumo },
       include: { lotes: { where: { cant_actual: { gt: 0 } }, orderBy: { fecha_venc: 'asc' } } }
@@ -398,16 +394,98 @@ export class InventarioService {
         restante -= aDescontar;
       }
 
-      return tx.consumoInsumo.create({
+      const consumo = await tx.consumoInsumo.create({
         data: {
           id_insumo: insumo.id_insumo,
-          id_responsable: idResponsable,
+          id_responsable: datos.id_responsable,
           actividad: datos.actividad,
           cantidad: new Decimal(cantidadAConsumir),
-          observaciones: datos.observaciones,
-          fecha_consumo: new Date()
+          observaciones: datos.observaciones || '',
+          fecha_consumo: new Date(datos.fecha_consumo || new Date())
         }
       });
+
+      try {
+        await this.auditoria.registrar({
+          id_usuario: datos.id_responsable,
+          accion: 'REGISTRO_CONSUMO',
+          descripcion: `Consumo de ${cantidadAConsumir} ${insumo.unidad_medida} de ${insumo.nombre_insumo} para actividad: ${datos.actividad}`,
+          entidad: 'ConsumoInsumo',
+          id_entidad: consumo.id_consumo,
+          rol: 'Administrador'
+        });
+      } catch (err) {
+        console.error('Error en auditoría:', err);
+      }
+
+      return {
+        mensaje: 'Consumo registrado exitosamente',
+        consumo
+      };
+    });
+  }
+
+  async obtenerConsumos() {
+    const consumos = await this.prisma.consumoInsumo.findMany({
+      include: {
+        CatInsumos: true,
+        Persona: true
+      },
+      orderBy: { fecha_consumo: 'desc' }
+    });
+
+    return consumos.map(c => ({
+      id: c.id_consumo,
+      actividad: c.actividad,
+      fecha_consumo: c.fecha_consumo,
+      id_insumo: c.id_insumo,
+      nombreInsumo: c.CatInsumos?.nombre_insumo,
+      cantidad: c.cantidad,
+      unidadMedida: c.CatInsumos?.unidad_medida,
+      responsable: c.Persona?.nombre_completo,
+      observaciones: c.observaciones
+    }));
+  }
+
+  async obtenerInsumosCriticos() {
+    const insumos = await this.prisma.catInsumos.findMany({
+      include: {
+        lotes: {
+          where: { cant_actual: { gt: 0 } }
+        }
+      }
+    });
+
+    return insumos
+      .map(insumo => {
+        const stock = insumo.lotes.reduce((acc, lote) => acc + Number(lote.cant_actual), 0);
+        return {
+          id: insumo.id_insumo,
+          nombre: insumo.nombre_insumo,
+          stock_actual: stock,
+          stock_minimo: insumo.stock_minimo,
+          unidad: insumo.unidad_medida,
+          critico: stock <= Number(insumo.stock_minimo)
+        };
+      })
+      .filter(i => i.critico);
+  }
+
+  async actualizarConsumo(id: number, datos: any) {
+    return this.prisma.consumoInsumo.update({
+      where: { id_consumo: id },
+      data: {
+        actividad: datos.actividad,
+        cantidad: datos.cantidad ? new Decimal(datos.cantidad) : undefined,
+        observaciones: datos.observaciones,
+        fecha_consumo: datos.fecha_consumo ? new Date(datos.fecha_consumo) : undefined
+      }
+    });
+  }
+
+  async eliminarConsumo(id: number) {
+    return this.prisma.consumoInsumo.delete({
+      where: { id_consumo: id }
     });
   }
 }

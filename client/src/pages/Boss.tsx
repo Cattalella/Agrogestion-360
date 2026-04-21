@@ -46,7 +46,7 @@ export const Boss = () => {
                 name: item.sector?.toUpperCase() || "SIN NOMBRE",
                 valor: item.total || 0,
                 color: item.sector?.toUpperCase() === "PORCICULTURA" ? "#10b981" : 
-                       item.sector?.toUpperCase() === "GANADERÍA" ? "#8b5cf6" : "#f43f5e",
+                        item.sector?.toUpperCase() === "GANADERÍA" ? "#8b5cf6" : "#f43f5e",
                 detalle: `Acumulado: ${item.total || 0}`
             }))
             : MOCK_GASTOS_SECTOR,

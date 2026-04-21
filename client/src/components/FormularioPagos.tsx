@@ -8,6 +8,18 @@ interface Trabajador {
     estado: string;
 }
 
+interface TrabajoRealizado {
+    id_trabajo: number;
+    id_trabajador?: number;
+    tipo_actividad: string;
+    fecha_inicio: string;
+    fecha_fin: string;
+    Trabajador?: {
+        id_trabajador: number;
+        nombre_completo: string;
+    };
+}
+
 interface Pago {
     id_pago: number;
     id_trabajador: number;
@@ -26,6 +38,7 @@ type EstadoPago = "No pagado" | "Pendiente de firma" | "Pagado con firma";
 interface Props {
     pagoAEditar: Pago | null;
     listaTrabajadores: Trabajador[];
+    trabajosRealizados?: TrabajoRealizado[];
     onGuardar: (datos: any, cerrar: boolean) => void;
     onCancelar: () => void;
 }
@@ -33,12 +46,14 @@ interface Props {
 export const FormularioPagos = ({
     pagoAEditar,
     listaTrabajadores,
+    trabajosRealizados = [],
     onGuardar,
     onCancelar
 }: Props) => {
 
     const estadoInicial = {
         id_trabajador: "",
+        id_trabajo: "",
         tipo_trabajo: "",
         fecha_pago: new Date().toISOString().split('T')[0],
         monto_total: "",
@@ -50,6 +65,7 @@ export const FormularioPagos = ({
     const [formData, setFormData] = useState(estadoInicial);
     const [errores, setErrores] = useState<Record<string, string>>({});
     const [mostrarAnulacion, setMostrarAnulacion] = useState(false);
+    const [trabajosFiltrados, setTrabajosFiltrados] = useState<TrabajoRealizado[]>([]);
 
     // ============================================================
     // GUARDIA: Pago ya anulado — solo lectura
@@ -63,6 +79,7 @@ export const FormularioPagos = ({
         if (pagoAEditar) {
             setFormData({
                 id_trabajador: pagoAEditar.id_trabajador?.toString() || "",
+                id_trabajo: pagoAEditar.id_trabajo?.toString() || "",
                 tipo_trabajo: "",
                 fecha_pago: pagoAEditar.fecha_pago?.split('T')[0] || "",
                 monto_total: pagoAEditar.monto_total?.toString() || "",
@@ -74,7 +91,20 @@ export const FormularioPagos = ({
     }, [pagoAEditar]);
 
     // ============================================================
-    // AUTO-COMPLETAR TIPO DE TRABAJO AL SELECCIONAR TRABAJADOR
+    // OBTENER ID DEL TRABAJADOR DESDE TRABAJO REALIZADO (seguro)
+    // ============================================================
+    const obtenerIdTrabajadorDeTrabajo = (trabajo: TrabajoRealizado): number | null => {
+        if (trabajo.Trabajador?.id_trabajador) {
+            return trabajo.Trabajador.id_trabajador;
+        }
+        if (trabajo.id_trabajador) {
+            return trabajo.id_trabajador;
+        }
+        return null;
+    };
+
+    // ============================================================
+    // AUTO-COMPLETAR TIPO DE TRABAJO Y FILTRAR TRABAJOS
     // ============================================================
     useEffect(() => {
         if (formData.id_trabajador) {
@@ -84,8 +114,16 @@ export const FormularioPagos = ({
             if (trabajador) {
                 setFormData(prev => ({ ...prev, tipo_trabajo: trabajador.tipo_trabajo }));
             }
+            // Filtrar trabajos del trabajador seleccionado (maneja ambos formatos)
+            const trabajosDelTrabajador = trabajosRealizados.filter(trabajo => {
+                const idTrabajador = obtenerIdTrabajadorDeTrabajo(trabajo);
+                return idTrabajador === parseInt(formData.id_trabajador);
+            });
+            setTrabajosFiltrados(trabajosDelTrabajador);
+        } else {
+            setTrabajosFiltrados([]);
         }
-    }, [formData.id_trabajador, listaTrabajadores]);
+    }, [formData.id_trabajador, listaTrabajadores, trabajosRealizados]);
 
     // ============================================================
     // MANEJADORES
@@ -138,8 +176,8 @@ export const FormularioPagos = ({
         if (!validarFormulario()) return;
 
         const datosParaBackend = {
-            id_trabajador: formData.id_trabajador,
-            tipo_trabajo: formData.tipo_trabajo,
+            id_trabajador: parseInt(formData.id_trabajador),
+            id_trabajo: formData.id_trabajo ? parseInt(formData.id_trabajo) : null,
             fecha_pago: formData.fecha_pago,
             monto_total: parseFloat(formData.monto_total),
             concepto: formData.concepto,
@@ -160,7 +198,6 @@ export const FormularioPagos = ({
     const ejecutarAnulacion = () => {
         if (!validarAnulacion()) return;
         onGuardar({
-            ...formData,
             id_pago: pagoAEditar?.id_pago,
             justificacion_anulacion: formData.justificacion_anulacion,
             accion: 'anular',
@@ -226,7 +263,7 @@ export const FormularioPagos = ({
 
                 {/* Trabajador */}
                 <div>
-                    <label className="text-[9px] uppercase ml-4 text-indigo-400 font-black tracking-tighter">
+                    <label className="text-[9px] uppercase ml-4 text-purple-600 font-black tracking-tighter">
                         <User size={10} className="inline mr-1" />
                         Trabajador <span className="text-red-400">*</span>
                     </label>
@@ -238,11 +275,11 @@ export const FormularioPagos = ({
                         className={`w-full border-1 rounded-full px-6 py-2 text-[12px] bg-white focus:outline-none focus:ring-2 cursor-pointer transition-all ${
                             errores.id_trabajador
                                 ? 'border-red-400 focus:ring-red-300'
-                                : 'border-indigo-200 focus:ring-indigo-300 text-indigo-700 font-bold'
+                                : 'border-purple-200 focus:ring-purple-300 text-purple-700 font-bold'
                         } ${pagoAEditar ? 'opacity-60 cursor-not-allowed' : ''}`}
                     >
                         <option value="">SELECCIONAR TRABAJADOR *</option>
-                        {listaTrabajadores.filter(t => t.estado === 'Activo').map(t => (
+                        {listaTrabajadores.filter(t => t.estado === 'activo').map(t => (
                             <option key={t.id_trabajador} value={t.id_trabajador}>
                                 {t.nombre_completo} - {t.tipo_trabajo}
                             </option>
@@ -253,26 +290,51 @@ export const FormularioPagos = ({
                     )}
                 </div>
 
+                {/* Trabajo Realizado (opcional) */}
+                <div>
+                    <label className="text-[9px] uppercase ml-4 text-purple-600 font-black tracking-tighter">
+                        <Briefcase size={10} className="inline mr-1" />
+                        Trabajo Realizado (opcional)
+                    </label>
+                    <select
+                        name="id_trabajo"
+                        value={formData.id_trabajo}
+                        onChange={manejarCambio}
+                        disabled={!formData.id_trabajador}
+                        className="w-full border-1 border-purple-200 rounded-full px-6 py-2 text-[12px] bg-white focus:outline-none focus:ring-2 focus:ring-purple-300 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <option value="">-- Sin trabajo asociado --</option>
+                        {trabajosFiltrados.map(t => {
+                            const fechaInicio = t.fecha_inicio?.split('T')[0] || '';
+                            const fechaFin = t.fecha_fin?.split('T')[0] || '';
+                            return (
+                                <option key={t.id_trabajo} value={t.id_trabajo}>
+                                    {t.tipo_actividad} ({fechaInicio} - {fechaFin})
+                                </option>
+                            );
+                        })}
+                    </select>
+                </div>
+
                 {/* Tipo de Trabajo (auto-completado) */}
                 <div>
-                    <label className="text-[9px] uppercase ml-4 text-indigo-400 font-black tracking-tighter">
+                    <label className="text-[9px] uppercase ml-4 text-purple-600 font-black tracking-tighter">
                         <Briefcase size={10} className="inline mr-1" />
                         Tipo de Trabajo
                     </label>
                     <input
                         name="tipo_trabajo"
                         value={formData.tipo_trabajo}
-                        onChange={manejarCambio}
                         type="text"
                         placeholder="Se auto-completa"
-                        className="w-full border-1 border-indigo-100 bg-indigo-50/30 rounded-full px-6 py-2 text-[12px] focus:outline-none text-gray-600"
+                        className="w-full border-1 border-purple-100 bg-purple-50/30 rounded-full px-6 py-2 text-[12px] focus:outline-none text-gray-600"
                         readOnly
                     />
                 </div>
 
                 {/* Fecha de Pago */}
                 <div className="flex flex-col gap-1">
-                    <label className="text-[9px] uppercase ml-4 text-indigo-400 font-black tracking-tighter">
+                    <label className="text-[9px] uppercase ml-4 text-purple-600 font-black tracking-tighter">
                         <Calendar size={10} className="inline mr-1" />
                         Fecha de Pago <span className="text-red-400">*</span>
                     </label>
@@ -282,7 +344,7 @@ export const FormularioPagos = ({
                         onChange={manejarCambio}
                         type="date"
                         className={`border-1 rounded-full px-6 py-2 text-[11px] focus:outline-none focus:ring-2 text-gray-500 transition-all ${
-                            errores.fecha_pago ? 'border-red-400 focus:ring-red-300' : 'border-indigo-100 focus:ring-indigo-300'
+                            errores.fecha_pago ? 'border-red-400 focus:ring-red-300' : 'border-purple-100 focus:ring-purple-300'
                         }`}
                     />
                     {errores.fecha_pago && (
@@ -298,7 +360,7 @@ export const FormularioPagos = ({
 
                 {/* Monto Total */}
                 <div>
-                    <label className="text-[9px] uppercase ml-4 text-indigo-400 font-black tracking-tighter">
+                    <label className="text-[9px] uppercase ml-4 text-purple-600 font-black tracking-tighter">
                         <DollarSign size={10} className="inline mr-1" />
                         Total Pagado <span className="text-red-400">*</span>
                     </label>
@@ -311,10 +373,10 @@ export const FormularioPagos = ({
                             inputMode="decimal"
                             placeholder="0"
                             className={`w-full border-1 rounded-full pl-4 pr-12 py-2 text-[12px] focus:outline-none focus:ring-2 text-right font-bold transition-all ${
-                                errores.monto_total ? 'border-red-400 focus:ring-red-300' : 'border-indigo-200 focus:ring-indigo-300'
+                                errores.monto_total ? 'border-red-400 focus:ring-red-300' : 'border-purple-200 focus:ring-purple-300'
                             }`}
                         />
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-bold text-indigo-400">$</span>
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-bold text-purple-500">$</span>
                     </div>
                     {errores.monto_total && (
                         <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.monto_total}</p>
@@ -323,7 +385,7 @@ export const FormularioPagos = ({
 
                 {/* Estado del Pago */}
                 <div>
-                    <label className="text-[9px] uppercase ml-4 text-indigo-400 font-black tracking-tighter">
+                    <label className="text-[9px] uppercase ml-4 text-purple-600 font-black tracking-tighter">
                         <CreditCard size={10} className="inline mr-1" />
                         Estado
                     </label>
@@ -331,7 +393,7 @@ export const FormularioPagos = ({
                         name="estado_pago"
                         value={formData.estado_pago}
                         onChange={manejarCambio}
-                        className="w-full border-1 border-indigo-200 rounded-full px-6 py-2 text-[12px] bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 cursor-pointer"
+                        className="w-full border-1 border-purple-200 rounded-full px-6 py-2 text-[12px] bg-white focus:outline-none focus:ring-2 focus:ring-purple-300 cursor-pointer"
                     >
                         <option value="No pagado">⏳ NO PAGADO</option>
                         <option value="Pendiente de firma">✍️ PENDIENTE DE FIRMA</option>
@@ -341,7 +403,7 @@ export const FormularioPagos = ({
 
                 {/* Concepto */}
                 <div>
-                    <label className="text-[9px] uppercase ml-4 text-indigo-400 font-black tracking-tighter">
+                    <label className="text-[9px] uppercase ml-4 text-purple-600 font-black tracking-tighter">
                         <FileText size={10} className="inline mr-1" />
                         Concepto <span className="text-red-400">*</span>
                     </label>
@@ -352,7 +414,7 @@ export const FormularioPagos = ({
                         placeholder="Describa el concepto del pago..."
                         rows={2}
                         className={`w-full border-1 rounded-2xl px-6 py-2 text-[12px] focus:outline-none focus:ring-2 resize-none transition-all ${
-                            errores.concepto ? 'border-red-400 focus:ring-red-300' : 'border-indigo-200 focus:ring-indigo-300'
+                            errores.concepto ? 'border-red-400 focus:ring-red-300' : 'border-purple-200 focus:ring-purple-300'
                         }`}
                     />
                     {errores.concepto && (
@@ -410,14 +472,14 @@ export const FormularioPagos = ({
                     <button
                         type="button"
                         onClick={() => ejecutarEnvio(false)}
-                        className="flex-1 bg-white border-1 border-indigo-400 text-indigo-500 px-6 py-3 rounded-l-full rounded-r-lg font-black text-[11px] uppercase italic shadow-sm active:scale-95 hover:bg-indigo-50 transition-all"
+                        className="flex-1 bg-white border-1 border-purple-400 text-purple-500 px-6 py-3 rounded-l-full rounded-r-lg font-black text-[11px] uppercase italic shadow-sm active:scale-95 hover:bg-purple-50 transition-all"
                     >
                         Guardar y Seguir
                     </button>
                     <button
                         type="button"
                         onClick={() => ejecutarEnvio(true)}
-                        className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-r-full rounded-l-lg font-black text-[11px] uppercase shadow-md active:scale-95 transition-all"
+                        className="flex-1 bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-r-full rounded-l-lg font-black text-[11px] uppercase shadow-md active:scale-95 transition-all"
                     >
                         {pagoAEditar ? 'Actualizar Pago' : 'Guardar y Salir'}
                     </button>

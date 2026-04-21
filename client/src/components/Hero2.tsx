@@ -13,7 +13,31 @@ import { useCerrarModal } from "../hooks/useCerrarModal";
 import nuevoadmin from "../assets/imgs/icon_Nadmin.webp";
 import administrador from "../assets/imgs/icon_administradores.webp";
 
-export const Hero2 = () => {
+interface Hero2Props {
+    pagos?: any;
+    trabajo?: any;
+    trabajadores?: any;
+    compras?: any;
+    onRegPagosClick?: () => void;
+    onRegTrabajoClick?: () => void;
+    onRegTrabajadoresClick?: () => void;
+    onRegComprasClick?: () => void;
+    onRegFormatoPagoClick?: () => void;
+    onRegSolicitudClick?: () => void;
+    onRegConsumoClick?: () => void;
+    onVerInventarioClick?: () => void;
+}
+
+export const Hero2 = ({ 
+    onRegPagosClick,
+    onRegTrabajoClick,
+    onRegTrabajadoresClick,
+    onRegComprasClick,
+    onRegFormatoPagoClick,
+    onRegSolicitudClick,
+    onRegConsumoClick,
+    onVerInventarioClick
+}: Hero2Props) => {
     const [verModalRevocados, setVerModalRevocados] = useState(false);
     const [verModalTrabajadores, setVerModalTrabajadores] = useState(false);
     const [verModalAdmin, setVerModalAdmin] = useState(false);
@@ -100,11 +124,14 @@ export const Hero2 = () => {
                     </div>
 
                     {/* TARJETA 2 — PAGOS A TRABAJADORES */}
-                    <div className="flex flex-col shadow-[0_2px_5px_rgba(0,0,0,0.5)] p-5 rounded-2xl flex-1 bg-white h-[18rem] min-w-[0]">
+                    <div 
+                        onClick={onRegFormatoPagoClick}
+                        className="flex flex-col shadow-[0_2px_5px_rgba(0,0,0,0.5)] p-5 rounded-2xl flex-1 bg-white h-[18rem] min-w-[0] cursor-pointer hover:shadow-[0_0_15px_rgba(16,185,129,0.3)] transition-all group"
+                    >
                         <div className="flex flex-col border-b-1 border-dashed pb-2 shrink-0">
                             <p className="tracking-[2px] font-black text-green-600 uppercase text-[0.7rem]">PAGOS A TRABAJADORES</p>
                             <p className="text-gray-800 text-[0.8rem] font-bold uppercase">
-                                PAGADO: ${loadingPagos ? '...' : totalPagado.toLocaleString('es-CO')}
+                            ${loadingPagos ? '...' : totalPagado.toLocaleString('es-CO')}
                             </p>
                         </div>
                         <ListaInsumos items={[]} />
@@ -116,7 +143,7 @@ export const Hero2 = () => {
 
                     {/* TARJETA 3 — TRABAJADORES ACTIVOS */}
                     <div
-                        onClick={() => setVerModalTrabajadores(true)}
+                        onClick={onRegTrabajadoresClick}
                         className="flex flex-col shadow-[0_2px_5px_rgba(0,0,0,0.5)] p-5 rounded-2xl flex-1 bg-white h-[18rem] min-w-[0] cursor-pointer hover:shadow-[0_0_15px_rgba(16,185,129,0.3)] transition-all group"
                     >
                         <div className="flex flex-col border-b-1 border-dashed pb-2 gap-2 shrink-0">
@@ -131,7 +158,26 @@ export const Hero2 = () => {
                             </span>
                         </p>
                     </div>
-                </div>
+
+                    {/* TARJETA 4 - VER INVENTARIO (NUEVA) */}
+                    <div
+                        onClick={onVerInventarioClick}
+                        className="flex flex-col shadow-[0_2px_5px_rgba(0,0,0,0.5)] p-5 rounded-2xl flex-1 bg-white h-[18rem] min-w-[0] cursor-pointer hover:shadow-[0_0_15px_rgba(249,115,22,0.3)] transition-all group"
+                    >
+                        <div className="flex flex-col border-b-1 border-dashed pb-2 gap-2 shrink-0">
+                            <p className="tracking-[2px] font-black text-orange-600 uppercase text-[0.7rem]">VER INVENTARIO</p>
+                        </div>
+                        <div className="mx-auto my-auto transition-transform group-hover:scale-110">
+                            <svg className="w-15 h-15 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                            </svg>
+                        </div>
+                        <p className="mt-auto text-[0.7rem] font-bold text-center text-orange-600">
+                            VER STOCK Y ALERTAS
+                        </p>
+                    </div>
+
+                </div> {/* ← Cierre del div de las tarjetas */}
 
                 {/* MODAL — NÓMINA ACTIVA */}
                 {verModalTrabajadores && (
@@ -154,13 +200,13 @@ export const Hero2 = () => {
                                         </div>
                                     ))
                                 ) : (
-                                    <p className="text-center text-gray-400 py-10 italic">Sin datos disponibles</p>
+                                    <p className="text-center text-gray-400 py-10 italic"></p>
                                 )}
                             </div>
                         </div>
                     </div>
                 )}
-            </div>
+            </div> {/* ← Cierre del div principal de la columna derecha */}
 
             {/* MODAL — ADMINISTRADORES REVOCADOS */}
             <ModalGenerico
@@ -265,6 +311,6 @@ export const Hero2 = () => {
                     )}
                 </div>
             </ModalGenerico>
-        </div>
+        </div> // ← Cierre del div principal
     );
 };

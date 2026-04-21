@@ -2,11 +2,10 @@ import { useState, useEffect } from "react";
 import { User, Phone, MapPin, Calendar, FileText, Briefcase, CreditCard } from "lucide-react";
 
 interface Trabajador {
-    id: number;
-    id_trabajador: string;
+    id_trabajador: number;
     nombre_completo: string;
     tipo_documento: string;
-    numero_documento: string;
+    num_documento: string;
     tipo_trabajo: string;
     telefono: string;
     telefono_familiar: string;
@@ -32,10 +31,9 @@ export const FormularioNuevoTrabajador = ({
 }: Props) => {
     
     const estadoInicial = {
-        id_trabajador: "",
         nombre_completo: "",
         tipo_documento: "",
-        numero_documento: "",
+        num_documento: "",
         tipo_trabajo: "",
         telefono: "",
         telefono_familiar: "",
@@ -54,10 +52,9 @@ export const FormularioNuevoTrabajador = ({
     useEffect(() => {
         if (trabajadorAEditar) {
             setFormData({
-                id_trabajador: trabajadorAEditar.id_trabajador || "",
                 nombre_completo: trabajadorAEditar.nombre_completo || "",
                 tipo_documento: trabajadorAEditar.tipo_documento || "",
-                numero_documento: trabajadorAEditar.numero_documento || "",
+                num_documento: trabajadorAEditar.num_documento || "",
                 tipo_trabajo: trabajadorAEditar.tipo_trabajo || "",
                 telefono: trabajadorAEditar.telefono || "",
                 telefono_familiar: trabajadorAEditar.telefono_familiar || "",
@@ -86,10 +83,9 @@ export const FormularioNuevoTrabajador = ({
     const validarFormulario = (): boolean => {
         const nuevosErrores: Record<string, string> = {};
         
-        if (!formData.id_trabajador.trim()) nuevosErrores.id_trabajador = 'ID del trabajador es obligatorio';
         if (!formData.nombre_completo.trim()) nuevosErrores.nombre_completo = 'Nombre completo es obligatorio';
         if (!formData.tipo_documento) nuevosErrores.tipo_documento = 'Selecciona un tipo de documento';
-        if (!formData.numero_documento.trim()) nuevosErrores.numero_documento = 'Número de documento es obligatorio';
+        if (!formData.num_documento.trim()) nuevosErrores.num_documento = 'Número de documento es obligatorio';
         if (!formData.tipo_trabajo.trim()) nuevosErrores.tipo_trabajo = 'Tipo de trabajo es obligatorio';
         if (!formData.telefono.trim()) nuevosErrores.telefono = 'Teléfono es obligatorio';
         if (!formData.fecha_ingreso) nuevosErrores.fecha_ingreso = 'Fecha de ingreso es obligatoria';
@@ -131,30 +127,9 @@ export const FormularioNuevoTrabajador = ({
             {/* COLUMNA IZQUIERDA */}
             {/* ============================================================ */}
             <div className="flex flex-col gap-3">
-                {/* ID Trabajador */}
-                <div>
-                    <label className="text-[9px] uppercase ml-4 text-amber-600 font-black tracking-tighter">
-                        <Briefcase size={10} className="inline mr-1" />
-                        ID Trabajador <span className="text-red-400">*</span>
-                    </label>
-                    <input
-                        name="id_trabajador"
-                        value={formData.id_trabajador}
-                        onChange={manejarCambio}
-                        type="text"
-                        placeholder="Ej: TR-01"
-                        className={`w-full border-1 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 transition-all ${
-                            errores.id_trabajador ? 'border-red-400 focus:ring-red-300' : 'border-amber-200 focus:ring-amber-300'
-                        }`}
-                    />
-                    {errores.id_trabajador && (
-                        <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.id_trabajador}</p>
-                    )}
-                </div>
-
                 {/* Nombre Completo */}
                 <div>
-                    <label className="text-[9px] uppercase ml-4 text-amber-600 font-black tracking-tighter">
+                    <label className="text-[9px] uppercase ml-4 text-indigo-600 font-black tracking-tighter">
                         <User size={10} className="inline mr-1" />
                         Nombre Completo <span className="text-red-400">*</span>
                     </label>
@@ -165,7 +140,7 @@ export const FormularioNuevoTrabajador = ({
                         type="text"
                         placeholder="Nombres y Apellidos"
                         className={`w-full border-1 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 transition-all ${
-                            errores.nombre_completo ? 'border-red-400 focus:ring-red-300' : 'border-amber-200 focus:ring-amber-300'
+                            errores.nombre_completo ? 'border-red-400 focus:ring-red-300' : 'border-indigo-200 focus:ring-indigo-300'
                         }`}
                     />
                     {errores.nombre_completo && (
@@ -175,7 +150,7 @@ export const FormularioNuevoTrabajador = ({
 
                 {/* Tipo Documento */}
                 <div>
-                    <label className="text-[9px] uppercase ml-4 text-amber-600 font-black tracking-tighter">
+                    <label className="text-[9px] uppercase ml-4 text-indigo-600 font-black tracking-tighter">
                         <CreditCard size={10} className="inline mr-1" />
                         Tipo Documento <span className="text-red-400">*</span>
                     </label>
@@ -184,7 +159,7 @@ export const FormularioNuevoTrabajador = ({
                         value={formData.tipo_documento}
                         onChange={manejarCambio}
                         className={`w-full border-1 rounded-full px-6 py-2 text-[12px] bg-white focus:outline-none focus:ring-2 cursor-pointer transition-all ${
-                            errores.tipo_documento ? 'border-red-400 focus:ring-red-300' : 'border-amber-200 focus:ring-amber-300'
+                            errores.tipo_documento ? 'border-red-400 focus:ring-red-300' : 'border-indigo-200 focus:ring-indigo-300'
                         }`}
                     >
                         <option value="">Seleccionar...</option>
@@ -200,27 +175,28 @@ export const FormularioNuevoTrabajador = ({
 
                 {/* Número Documento */}
                 <div>
-                    <label className="text-[9px] uppercase ml-4 text-amber-600 font-black tracking-tighter">
+                    <label className="text-[9px] uppercase ml-4 text-indigo-600 font-black tracking-tighter">
                         Número Documento <span className="text-red-400">*</span>
                     </label>
                     <input
-                        name="numero_documento"
-                        value={formData.numero_documento}
+                        name="num_documento"
+                        value={formData.num_documento}
                         onChange={manejarCambio}
                         type="text"
                         placeholder="Número de identificación"
                         className={`w-full border-1 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 transition-all ${
-                            errores.numero_documento ? 'border-red-400 focus:ring-red-300' : 'border-amber-200 focus:ring-amber-300'
+                            errores.num_documento ? 'border-red-400 focus:ring-red-300' : 'border-indigo-200 focus:ring-indigo-300'
                         }`}
                     />
-                    {errores.numero_documento && (
-                        <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.numero_documento}</p>
+                    {errores.num_documento && (
+                        <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.num_documento}</p>
                     )}
                 </div>
 
                 {/* Tipo de Trabajo */}
                 <div>
-                    <label className="text-[9px] uppercase ml-4 text-amber-600 font-black tracking-tighter">
+                    <label className="text-[9px] uppercase ml-4 text-indigo-600 font-black tracking-tighter">
+                        <Briefcase size={10} className="inline mr-1" />
                         Tipo de Trabajo <span className="text-red-400">*</span>
                     </label>
                     <input
@@ -230,7 +206,7 @@ export const FormularioNuevoTrabajador = ({
                         type="text"
                         placeholder="Ej: Jornalero, Veterinario..."
                         className={`w-full border-1 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 transition-all ${
-                            errores.tipo_trabajo ? 'border-red-400 focus:ring-red-300' : 'border-amber-200 focus:ring-amber-300'
+                            errores.tipo_trabajo ? 'border-red-400 focus:ring-red-300' : 'border-indigo-200 focus:ring-indigo-300'
                         }`}
                     />
                     {errores.tipo_trabajo && (
@@ -245,7 +221,7 @@ export const FormularioNuevoTrabajador = ({
             <div className="flex flex-col gap-3">
                 {/* Teléfono */}
                 <div>
-                    <label className="text-[9px] uppercase ml-4 text-amber-600 font-black tracking-tighter">
+                    <label className="text-[9px] uppercase ml-4 text-indigo-600 font-black tracking-tighter">
                         <Phone size={10} className="inline mr-1" />
                         Teléfono Personal <span className="text-red-400">*</span>
                     </label>
@@ -256,7 +232,7 @@ export const FormularioNuevoTrabajador = ({
                         type="tel"
                         placeholder="Ej: 3001234567"
                         className={`w-full border-1 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 transition-all ${
-                            errores.telefono ? 'border-red-400 focus:ring-red-300' : 'border-amber-200 focus:ring-amber-300'
+                            errores.telefono ? 'border-red-400 focus:ring-red-300' : 'border-indigo-200 focus:ring-indigo-300'
                         }`}
                     />
                     {errores.telefono && (
@@ -266,7 +242,7 @@ export const FormularioNuevoTrabajador = ({
 
                 {/* Teléfono Familiar */}
                 <div>
-                    <label className="text-[9px] uppercase ml-4 text-amber-600 font-black tracking-tighter">
+                    <label className="text-[9px] uppercase ml-4 text-indigo-600 font-black tracking-tighter">
                         <Phone size={10} className="inline mr-1" />
                         Teléfono Familiar
                     </label>
@@ -276,13 +252,13 @@ export const FormularioNuevoTrabajador = ({
                         onChange={manejarCambio}
                         type="tel"
                         placeholder="Contacto de emergencia"
-                        className="w-full border-1 border-amber-200 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-amber-300"
+                        className="w-full border-1 border-indigo-200 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-indigo-300"
                     />
                 </div>
 
                 {/* Fecha Ingreso */}
                 <div className="flex flex-col gap-1">
-                    <label className="text-[9px] uppercase ml-4 text-amber-600 font-black tracking-tighter">
+                    <label className="text-[9px] uppercase ml-4 text-indigo-600 font-black tracking-tighter">
                         <Calendar size={10} className="inline mr-1" />
                         Fecha Ingreso <span className="text-red-400">*</span>
                     </label>
@@ -292,7 +268,7 @@ export const FormularioNuevoTrabajador = ({
                         onChange={manejarCambio}
                         type="date"
                         className={`border-1 rounded-full px-6 py-2 text-[11px] focus:outline-none focus:ring-2 text-gray-500 transition-all ${
-                            errores.fecha_ingreso ? 'border-red-400 focus:ring-red-300' : 'border-amber-100 focus:ring-amber-300'
+                            errores.fecha_ingreso ? 'border-red-400 focus:ring-red-300' : 'border-indigo-100 focus:ring-indigo-300'
                         }`}
                     />
                     {errores.fecha_ingreso && (
@@ -302,14 +278,14 @@ export const FormularioNuevoTrabajador = ({
 
                 {/* Estado */}
                 <div>
-                    <label className="text-[9px] uppercase ml-4 text-amber-600 font-black tracking-tighter">
+                    <label className="text-[9px] uppercase ml-4 text-indigo-600 font-black tracking-tighter">
                         Estado Laboral
                     </label>
                     <select
                         name="estado"
                         value={formData.estado}
                         onChange={manejarCambio}
-                        className="w-full border-1 border-amber-200 rounded-full px-6 py-2 text-[12px] bg-white focus:outline-none focus:ring-2 focus:ring-amber-300 cursor-pointer"
+                        className="w-full border-1 border-indigo-200 rounded-full px-6 py-2 text-[12px] bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 cursor-pointer"
                     >
                         <option value="activo">✅ ACTIVO</option>
                         <option value="inactivo">❌ INACTIVO</option>
@@ -318,7 +294,7 @@ export const FormularioNuevoTrabajador = ({
 
                 {/* Dirección */}
                 <div>
-                    <label className="text-[9px] uppercase ml-4 text-amber-600 font-black tracking-tighter">
+                    <label className="text-[9px] uppercase ml-4 text-indigo-600 font-black tracking-tighter">
                         <MapPin size={10} className="inline mr-1" />
                         Dirección
                     </label>
@@ -328,7 +304,7 @@ export const FormularioNuevoTrabajador = ({
                         onChange={manejarCambio}
                         type="text"
                         placeholder="Dirección de residencia"
-                        className="w-full border-1 border-amber-200 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-amber-300"
+                        className="w-full border-1 border-indigo-200 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-indigo-300"
                     />
                 </div>
             </div>
@@ -337,7 +313,7 @@ export const FormularioNuevoTrabajador = ({
             {/* OBSERVACIONES */}
             {/* ============================================================ */}
             <div className="col-span-2">
-                <label className="text-[9px] uppercase ml-4 text-amber-600 font-black tracking-tighter">
+                <label className="text-[9px] uppercase ml-4 text-indigo-600 font-black tracking-tighter">
                     <FileText size={10} className="inline mr-1" />
                     Observaciones
                 </label>
@@ -347,7 +323,7 @@ export const FormularioNuevoTrabajador = ({
                     onChange={manejarCambio}
                     placeholder="Notas adicionales..."
                     rows={2}
-                    className="w-full border-1 border-amber-200 rounded-2xl px-6 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-amber-300 resize-none"
+                    className="w-full border-1 border-indigo-200 rounded-2xl px-6 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
                 />
             </div>
 
@@ -358,14 +334,14 @@ export const FormularioNuevoTrabajador = ({
                 <button
                     type="button"
                     onClick={() => ejecutarEnvio(false)}
-                    className="flex-1 bg-white border-1 border-amber-400 text-amber-500 px-6 py-3 rounded-l-full rounded-r-lg font-black text-[11px] uppercase italic shadow-sm active:scale-95 hover:bg-amber-50 transition-all"
+                    className="flex-1 bg-white border-1 border-indigo-400 text-indigo-500 px-6 py-3 rounded-l-full rounded-r-lg font-black text-[11px] uppercase italic shadow-sm active:scale-95 hover:bg-indigo-50 transition-all"
                 >
                     Guardar y Seguir
                 </button>
                 <button
                     type="button"
                     onClick={() => ejecutarEnvio(true)}
-                    className="flex-1 bg-amber-600 hover:bg-amber-700 text-white px-6 py-3 rounded-r-full rounded-l-lg font-black text-[11px] uppercase shadow-md active:scale-95 transition-all"
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-r-full rounded-l-lg font-black text-[11px] uppercase shadow-md active:scale-95 transition-all"
                 >
                     {trabajadorAEditar ? 'Guardar Cambios' : 'Vincular Trabajador'}
                 </button>

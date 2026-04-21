@@ -45,6 +45,7 @@ export const useTrabajoRealizado = () => {
         try {
             const response = await apiClient.get('/trabajadores/trabajos');
             setTrabajos(response.data);
+            console.log('✅ Trabajos cargados:', response.data.length);
         } catch (error) {
             console.error("❌ Error al cargar trabajos:", error);
         } finally {
@@ -53,13 +54,15 @@ export const useTrabajoRealizado = () => {
     };
 
     // ============================================================
-    // CARGAR TRABAJADORES ACTIVOS
+    // CARGAR TRABAJADORES ACTIVOS (CORREGIDO: acepta 'activo' y 'Activo')
     // ============================================================
     const cargarTrabajadores = async () => {
         try {
             const response = await apiClient.get('/trabajadores');
-            const activos = response.data.filter((t: any) => t.estado === 'Activo');
+            // 🔥 CORREGIDO: usa toLowerCase() para aceptar ambos formatos
+            const activos = response.data.filter((t: any) => t.estado?.toLowerCase() === 'activo');
             setTrabajadores(activos);
+            console.log('✅ Trabajadores activos cargados:', activos.length);
         } catch (error) {
             console.error("❌ Error al cargar trabajadores:", error);
         }
@@ -134,6 +137,8 @@ export const useTrabajoRealizado = () => {
                 observaciones: datos.observaciones || null,
             };
 
+            console.log('📤 Enviando a backend (Trabajo Realizado):', datosParaBackend);
+
             if (trabajoAEditar) {
                 await apiClient.put(`/trabajadores/trabajos/${trabajoAEditar.id_trabajo}`, datosParaBackend);
             } else {
@@ -146,6 +151,7 @@ export const useTrabajoRealizado = () => {
                 cerrarModal();
             } else {
                 setVista('lista');
+                setTrabajoAEditar(null);
             }
             return true;
         } catch (error: any) {
@@ -160,13 +166,26 @@ export const useTrabajoRealizado = () => {
     // ============================================================
     // ELIMINAR TRABAJO — RN.8.1.2: debe estar justificado
     // ============================================================
-    const eliminarTrabajo = async (id: number) => {
+    const eliminarTrabajo = async (id: number, justificacion?: string) => {
+        if (!justificacion?.trim()) {
+            const justificacionPrompt = prompt("Justificación para eliminar este trabajo:");
+            if (!justificacionPrompt?.trim()) {
+                alert("La justificación es obligatoria para eliminar un trabajo.");
+                return false;
+            }
+            justificacion = justificacionPrompt;
+        }
+
         try {
-            await apiClient.delete(`/trabajadores/trabajos/${id}`);
-            setTrabajos(prev => prev.filter(t => t.id_trabajo !== id));
+            await apiClient.delete(`/trabajadores/trabajos/${id}`, {
+                data: { justificacion }
+            });
+            await cargarTrabajos();
+            alert("✅ Trabajo eliminado correctamente");
             return true;
         } catch (error) {
             console.error('❌ Error al eliminar trabajo:', error);
+            alert("Error al eliminar el trabajo");
             return false;
         }
     };
@@ -183,6 +202,7 @@ export const useTrabajoRealizado = () => {
         isModalOpen,
         vista,
         trabajoAEditar,
+        setTrabajoAEditar,
         setVista,
         cambiarVista,
         stats: calcularStats(),

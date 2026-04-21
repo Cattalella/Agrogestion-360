@@ -3,6 +3,7 @@ import type { Pago } from '../hooks/useRegistrarPagos';
 import type { Trabajador } from '../hooks/useNuevoTrabajador';
 import type { TrabajoRealizado } from '../hooks/useTrabajoRealizado';
 import type { FormatoPago } from '../hooks/useGenerarPagoPDF';
+import { DollarSign, User, Calendar, FileText, AlertCircle, Download } from 'lucide-react';
 
 interface Props {
     pagoSeleccionado: Pago | null;
@@ -25,66 +26,79 @@ export const FormularioGenerarPagoPDF = ({
     onCancelar
 }: Props) => {
 
-    const [trabajadorId, setTrabajadorId] = useState<string>('');
-    const [periodo, setPeriodo] = useState<string>(() => {
-        const ahora = new Date();
-        return `${ahora.getMonth() + 1}/${ahora.getFullYear()}`;
-    });
-    const [fechaInicio, setFechaInicio] = useState<string>(() => {
-        const hoy = new Date();
-        hoy.setDate(1);
-        return hoy.toISOString().split('T')[0];
-    });
-    const [fechaFin, setFechaFin] = useState<string>(() => {
-        const hoy = new Date();
-        return hoy.toISOString().split('T')[0];
-    });
+    // Estado para mes y año seleccionados
+    const [mesSeleccionado, setMesSeleccionado] = useState<number>(() => new Date().getMonth());
+    const [anoSeleccionado, setAnoSeleccionado] = useState<number>(() => new Date().getFullYear());
     const [generando, setGenerando] = useState(false);
-    const [trabajadorSeleccionado, setTrabajadorSeleccionado] = useState<Trabajador | null>(null);
-    const [trabajosFiltrados, setTrabajosFiltrados] = useState<TrabajoRealizado[]>([]);
+    const [trabajador, setTrabajador] = useState<Trabajador | null>(null);
+    const [trabajosDelPago, setTrabajosDelPago] = useState<TrabajoRealizado[]>([]);
+    const [error, setError] = useState<string | null>(null);
 
-    // Filtrar trabajos por trabajador y período
+    // Lista de meses
+    const meses = [
+        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+
+    // Generar años (desde 2020 hasta el próximo año)
+    const anos = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 + i);
+
+    // Período formateado para mostrar
+    const periodo = `${meses[mesSeleccionado]} ${anoSeleccionado}`;
+
+    // Cargar el trabajador asociado al pago
     useEffect(() => {
-        if (!trabajadorId) {
-            setTrabajosFiltrados([]);
-            return;
+        if (pagoSeleccionado && trabajadores.length > 0) {
+            const trabajadorEncontrado = trabajadores.find(t => t.id_trabajador === pagoSeleccionado.id_trabajador);
+            setTrabajador(trabajadorEncontrado || null);
         }
+    }, [pagoSeleccionado, trabajadores]);
 
-        const filtrados = trabajosRealizados.filter(t => {
-            const fechaInicioTrabajo = new Date(t.fecha_inicio);
-            const fechaFinTrabajo = new Date(t.fecha_fin);
-            const inicio = new Date(fechaInicio);
-            const fin = new Date(fechaFin);
-            
-            return t.id_trabajador === trabajadorId &&
-                   fechaInicioTrabajo >= inicio &&
-                   fechaFinTrabajo <= fin;
-        });
-
-        setTrabajosFiltrados(filtrados);
-    }, [trabajadorId, fechaInicio, fechaFin, trabajosRealizados]);
-
-    // Obtener trabajador seleccionado
+    // Cargar los trabajos realizados asociados al pago (filtrados por mes/año)
     useEffect(() => {
-        const trabajador = trabajadores.find(t => t.id_trabajador === trabajadorId);
-        setTrabajadorSeleccionado(trabajador || null);
-    }, [trabajadorId, trabajadores]);
+        if (pagoSeleccionado && trabajosRealizados.length > 0) {
+            // Calcular fechas de inicio y fin del mes seleccionado
+            const fechaInicio = new Date(anoSeleccionado, mesSeleccionado, 1);
+            const fechaFin = new Date(anoSeleccionado, mesSeleccionado + 1, 0);
+            
+            // Si el pago tiene un trabajo específico asociado
+            if (pagoSeleccionado.id_trabajo) {
+                const trabajo = trabajosRealizados.filter(t => t.id_trabajo === pagoSeleccionado.id_trabajo);
+                setTrabajosDelPago(trabajo);
+            } else {
+                // Buscar trabajos del trabajador en el mes seleccionado
+                const trabajos = trabajosRealizados.filter(t => 
+                    t.id_trabajador === pagoSeleccionado.id_trabajador &&
+                    new Date(t.fecha_inicio) >= fechaInicio &&
+                    new Date(t.fecha_inicio) <= fechaFin
+                );
+                setTrabajosDelPago(trabajos);
+            }
+        }
+    }, [pagoSeleccionado, trabajosRealizados, mesSeleccionado, anoSeleccionado]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         
+        setError(null);
+        
         if (!pagoSeleccionado) {
-            alert("No hay un pago seleccionado para generar el formato");
+            setError("No hay un pago seleccionado para generar el formato");
             return;
         }
         
-        if (!trabajadorSeleccionado) {
-            alert("Selecciona un trabajador");
+        if (!trabajador) {
+            setError("No se encontró el trabajador asociado a este pago");
             return;
         }
         
-        if (trabajosFiltrados.length === 0) {
-            alert("No hay trabajos realizados en el período seleccionado");
+        if (trabajosDelPago.length === 0) {
+            setError(`No hay trabajos realizados en ${periodo} asociados a este pago`);
+            return;
+        }
+        
+        if (pagoSeleccionado.estado_pago === 'Pagado con firma') {
+            setError("Este pago ya está registrado como pagado con firma");
             return;
         }
         
@@ -93,184 +107,273 @@ export const FormularioGenerarPagoPDF = ({
         try {
             await onGenerarPDF(
                 pagoSeleccionado,
-                trabajadorSeleccionado,
-                trabajosFiltrados,
+                trabajador,
+                trabajosDelPago,
                 periodo
             );
-            alert("✅ Formato de pago generado correctamente");
             onCancelar();
-        } catch (error) {
-            console.error("Error al generar PDF:", error);
-            alert("❌ Error al generar el formato de pago");
+        } catch (err) {
+            console.error("Error al generar PDF:", err);
+            setError("Error al generar el formato de pago");
         } finally {
             setGenerando(false);
         }
     };
 
-    // Calcular monto total de los trabajos filtrados
-    const montoTotal = pagoSeleccionado?.monto_total || 0;
-    const totalHoras = trabajosFiltrados.reduce((sum, t) => {
-        const horas = parseInt(t.duracion_trabajo) || 0;
+    // Calcular total de horas
+    const totalHoras = trabajosDelPago.reduce((sum, t) => {
+        const horas = Number(t.duracion_horas) || 0;
         return sum + horas;
     }, 0);
 
+    // Verificar si el pago ya está pagado
+    const yaPagado = pagoSeleccionado?.estado_pago === 'Pagado con firma';
+
+    if (!pagoSeleccionado) {
+        return (
+            <div className="flex flex-col items-center justify-center p-8 text-center">
+                <AlertCircle size={48} className="text-red-400 mb-4" />
+                <p className="text-gray-500">No hay un pago seleccionado</p>
+                <button
+                    type="button"
+                    onClick={onCancelar}
+                    className="mt-4 px-6 py-2 bg-emerald-600 text-white rounded-full text-sm"
+                >
+                    Volver
+                </button>
+            </div>
+        );
+    }
+
     return (
         <form onSubmit={handleSubmit} className="flex flex-col gap-5 p-4">
+            {/* ============================================================ */}
+            {/* TÍTULO */}
+            {/* ============================================================ */}
             <div className="text-center border-b pb-3">
-                <h2 className="text-lg font-bold text-gray-700">GENERAR FORMATO DE PAGO</h2>
+                <h2 className="text-lg font-bold text-emerald-700 flex items-center justify-center gap-2">
+                    <DollarSign size={20} className="text-emerald-500" />
+                    GENERAR FORMATO DE PAGO
+                </h2>
                 <p className="text-xs text-gray-400">RF.8.1.4 - Formato para firma del trabajador</p>
             </div>
 
-            {/* Información del Pago */}
-            {pagoSeleccionado && (
-                <div className="bg-purple-50 rounded-xl p-4 border border-purple-200">
-                    <p className="text-xs font-bold text-purple-600 uppercase mb-2">Información del Pago</p>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div>
-                            <span className="text-gray-500">ID Pago:</span>
-                            <span className="font-semibold ml-2">#{pagoSeleccionado.id}</span>
+            {/* ============================================================ */}
+            {/* ERROR */}
+            {/* ============================================================ */}
+            {error && (
+                <div className="bg-red-50 rounded-2xl p-3 border border-red-200 flex items-center gap-2">
+                    <AlertCircle size={16} className="text-red-500 shrink-0" />
+                    <p className="text-xs text-red-600">{error}</p>
+                    <button
+                        type="button"
+                        onClick={() => setError(null)}
+                        className="ml-auto text-red-400 hover:text-red-600 text-xs font-bold"
+                    >
+                        ✕
+                    </button>
+                </div>
+            )}
+
+            {/* ============================================================ */}
+            {/* INDICADOR DE CARGA */}
+            {/* ============================================================ */}
+            {generando && (
+                <div className="bg-emerald-50 rounded-2xl p-4 text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto mb-2"></div>
+                    <p className="text-sm text-emerald-600">Generando PDF, por favor espera...</p>
+                    <p className="text-xs text-gray-400 mt-1">Esto puede tomar unos segundos</p>
+                </div>
+            )}
+
+            {/* ============================================================ */}
+            {/* ALERTA SI YA ESTÁ PAGADO */}
+            {/* ============================================================ */}
+            {yaPagado && (
+                <div className="bg-red-50 rounded-2xl p-4 border border-red-200 flex items-center gap-3">
+                    <AlertCircle size={20} className="text-red-500 shrink-0" />
+                    <div>
+                        <p className="text-sm font-bold text-red-600">Pago ya registrado</p>
+                        <p className="text-xs text-red-500">
+                            Este pago ya fue registrado como "Pagado con firma". No se puede generar otro formato.
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {/* ============================================================ */}
+            {/* INFORMACIÓN DEL PAGO */}
+            {/* ============================================================ */}
+            <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-200">
+                <p className="text-[10px] font-black text-emerald-600 uppercase mb-3 flex items-center gap-2">
+                    <DollarSign size={12} />
+                    INFORMACIÓN DEL PAGO
+                </p>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="bg-white rounded-full px-4 py-2">
+                        <span className="text-gray-400 text-[9px] uppercase">ID Pago</span>
+                        <p className="font-bold text-gray-700">#{pagoSeleccionado.id_pago}</p>
+                    </div>
+                    <div className="bg-white rounded-full px-4 py-2">
+                        <span className="text-gray-400 text-[9px] uppercase">Monto Total</span>
+                        <p className="font-bold text-emerald-600 text-lg">${pagoSeleccionado.monto_total.toLocaleString()}</p>
+                    </div>
+                    <div className="bg-white rounded-full px-4 py-2 col-span-2">
+                        <span className="text-gray-400 text-[9px] uppercase">Concepto</span>
+                        <p className="font-medium text-gray-700">{pagoSeleccionado.concepto}</p>
+                    </div>
+                    <div className="bg-white rounded-full px-4 py-2">
+                        <span className="text-gray-400 text-[9px] uppercase">Estado Actual</span>
+                        <p className={`inline-block px-3 py-0.5 rounded-full text-[9px] font-bold ${
+                            pagoSeleccionado.estado_pago === 'Pagado con firma' ? 'bg-green-100 text-green-600' :
+                            pagoSeleccionado.estado_pago === 'Pendiente de firma' ? 'bg-yellow-100 text-yellow-600' :
+                            'bg-red-100 text-red-600'
+                        }`}>
+                            {pagoSeleccionado.estado_pago || 'No pagado'}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            {/* ============================================================ */}
+            {/* DATOS DEL TRABAJADOR */}
+            {/* ============================================================ */}
+            {trabajador && (
+                <div className="bg-emerald-50/30 rounded-2xl p-4 border border-emerald-200">
+                    <p className="text-[10px] font-black text-emerald-600 uppercase mb-3 flex items-center gap-2">
+                        <User size={12} />
+                        DATOS DEL TRABAJADOR
+                    </p>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div className="bg-white rounded-full px-4 py-2 col-span-2">
+                            <span className="text-gray-400 text-[9px] uppercase">Nombre</span>
+                            <p className="font-bold text-gray-700">{trabajador.nombre_completo}</p>
                         </div>
-                        <div>
-                            <span className="text-gray-500">Monto Total:</span>
-                            <span className="font-bold text-green-600 ml-2">${pagoSeleccionado.monto_total.toLocaleString()}</span>
+                        <div className="bg-white rounded-full px-4 py-2">
+                            <span className="text-gray-400 text-[9px] uppercase">Documento</span>
+                            <p className="font-medium text-gray-700">{trabajador.tipo_documento} {trabajador.num_documento}</p>
                         </div>
-                        <div>
-                            <span className="text-gray-500">Concepto:</span>
-                            <span className="ml-2">{pagoSeleccionado.concepto}</span>
-                        </div>
-                        <div>
-                            <span className="text-gray-500">Estado:</span>
-                            <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] ${
-                                pagoSeleccionado.estado === 'Pagado con firma' ? 'bg-green-100 text-green-600' :
-                                pagoSeleccionado.estado === 'Pendiente de firma' ? 'bg-yellow-100 text-yellow-600' :
-                                'bg-red-100 text-red-600'
-                            }`}>
-                                {pagoSeleccionado.estado}
-                            </span>
+                        <div className="bg-white rounded-full px-4 py-2">
+                            <span className="text-gray-400 text-[9px] uppercase">Teléfono</span>
+                            <p className="font-medium text-gray-700">{trabajador.telefono || 'No registrado'}</p>
                         </div>
                     </div>
                 </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Seleccionar Trabajador */}
+            {/* ============================================================ */}
+            {/* TRABAJOS ASOCIADOS */}
+            {/* ============================================================ */}
+            <div className="bg-emerald-50/30 rounded-2xl p-4 border border-emerald-200">
+                <p className="text-[10px] font-black text-emerald-600 uppercase mb-3 flex items-center gap-2">
+                    <FileText size={12} />
+                    TRABAJOS ASOCIADOS ({trabajosDelPago.length})
+                </p>
+                
+                {trabajosDelPago.length > 0 ? (
+                    <div className="max-h-48 overflow-y-auto">
+                        <table className="w-full text-[11px]">
+                            <thead className="text-emerald-600 border-b border-emerald-200">
+                                <tr>
+                                    <th className="text-left py-2">ACTIVIDAD</th>
+                                    <th className="text-left py-2">DURACIÓN</th>
+                                    <th className="text-left py-2">FECHA</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {trabajosDelPago.map((t) => {
+                                    const fecha = t.fecha_inicio?.split('T')[0] || '';
+                                    return (
+                                        <tr key={t.id_trabajo} className="border-b border-emerald-100">
+                                            <td className="py-2 font-medium">{t.tipo_actividad}</td>
+                                            <td className="py-2">{Number(t.duracion_horas).toFixed(1)} hrs</td>
+                                            <td className="py-2 text-gray-500">{fecha}</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : (
+                    <div className="bg-white rounded-full px-4 py-3 text-center">
+                        <p className="text-[10px] text-gray-400 italic">
+                            No hay trabajos en el período seleccionado
+                        </p>
+                    </div>
+                )}
+                
+                {trabajosDelPago.length > 0 && (
+                    <div className="mt-3 pt-2 border-t border-emerald-200 flex justify-between items-center bg-white rounded-full px-4 py-2">
+                        <span className="text-[10px] font-black text-emerald-600 uppercase">Total Horas:</span>
+                        <span className="text-sm font-bold text-emerald-700">{totalHoras.toFixed(1)} horas</span>
+                    </div>
+                )}
+            </div>
+
+            {/* ============================================================ */}
+            {/* SELECTOR DE MES Y AÑO */}
+            {/* ============================================================ */}
+            <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1">
-                    <label className="text-xs font-bold text-gray-600 uppercase">
-                        Trabajador *
+                    <label className="text-[9px] uppercase ml-4 text-emerald-600 font-black tracking-tighter flex items-center gap-1">
+                        <Calendar size={10} />
+                        Mes
                     </label>
                     <select
-                        className="border rounded-lg p-2 text-sm bg-white"
-                        value={trabajadorId}
-                        onChange={(e) => setTrabajadorId(e.target.value)}
-                        required
+                        value={mesSeleccionado}
+                        onChange={(e) => setMesSeleccionado(parseInt(e.target.value))}
+                        className="border border-emerald-200 rounded-full px-6 py-3 text-[12px] bg-white focus:outline-none focus:ring-2 focus:ring-emerald-300"
                     >
-                        <option value="">Seleccionar trabajador</option>
-                        {trabajadores.map(t => (
-                            <option key={t.id} value={t.id_trabajador}>
-                                {t.nombre_completo} - {t.tipo_trabajo}
-                            </option>
+                        {meses.map((mes, idx) => (
+                            <option key={idx} value={idx}>{mes}</option>
                         ))}
                     </select>
                 </div>
 
-                {/* Período (texto) */}
                 <div className="flex flex-col gap-1">
-                    <label className="text-xs font-bold text-gray-600 uppercase">
-                        Período (Mes/Año)
+                    <label className="text-[9px] uppercase ml-4 text-emerald-600 font-black tracking-tighter flex items-center gap-1">
+                        <Calendar size={10} />
+                        Año
                     </label>
-                    <input
-                        type="text"
-                        className="border rounded-lg p-2 text-sm bg-gray-50"
-                        value={periodo}
-                        onChange={(e) => setPeriodo(e.target.value)}
-                        placeholder="Ej: Enero 2024"
-                    />
-                </div>
-
-                {/* Fecha Inicio */}
-                <div className="flex flex-col gap-1">
-                    <label className="text-xs font-bold text-gray-600 uppercase">
-                        Fecha Inicio *
-                    </label>
-                    <input
-                        type="date"
-                        className="border rounded-lg p-2 text-sm"
-                        value={fechaInicio}
-                        onChange={(e) => setFechaInicio(e.target.value)}
-                        required
-                    />
-                </div>
-
-                {/* Fecha Fin */}
-                <div className="flex flex-col gap-1">
-                    <label className="text-xs font-bold text-gray-600 uppercase">
-                        Fecha Fin *
-                    </label>
-                    <input
-                        type="date"
-                        className="border rounded-lg p-2 text-sm"
-                        value={fechaFin}
-                        onChange={(e) => setFechaFin(e.target.value)}
-                        required
-                    />
+                    <select
+                        value={anoSeleccionado}
+                        onChange={(e) => setAnoSeleccionado(parseInt(e.target.value))}
+                        className="border border-emerald-200 rounded-full px-6 py-3 text-[12px] bg-white focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                    >
+                        {anos.map((ano) => (
+                            <option key={ano} value={ano}>{ano}</option>
+                        ))}
+                    </select>
                 </div>
             </div>
 
-            {/* Resumen de Trabajos */}
-            {trabajadorSeleccionado && (
-                <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
-                    <p className="text-xs font-bold text-blue-600 uppercase mb-2">
-                        Trabajos Realizados ({trabajosFiltrados.length})
-                    </p>
-                    {trabajosFiltrados.length > 0 ? (
-                        <div className="max-h-40 overflow-y-auto">
-                            <table className="w-full text-xs">
-                                <thead className="text-gray-500 border-b">
-                                    <tr>
-                                        <th className="text-left py-1">Actividad</th>
-                                        <th className="text-left py-1">Duración</th>
-                                        <th className="text-left py-1">Fecha</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {trabajosFiltrados.map(t => (
-                                        <tr key={t.id} className="border-b border-blue-100">
-                                            <td className="py-1">{t.tipo_actividad}</td>
-                                            <td className="py-1">{t.duracion_trabajo}</td>
-                                            <td className="py-1">{t.fecha_inicio.split('T')[0]}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    ) : (
-                        <p className="text-xs text-gray-400 italic">
-                            No hay trabajos en el período seleccionado
-                        </p>
-                    )}
-                    
-                    {trabajosFiltrados.length > 0 && (
-                        <div className="mt-3 pt-2 border-t border-blue-200 flex justify-between">
-                            <span className="text-xs font-bold">Total Horas:</span>
-                            <span className="text-xs font-bold text-blue-600">{totalHoras} horas</span>
-                        </div>
-                    )}
-                </div>
-            )}
+            {/* ============================================================ */}
+            {/* NOTA INFORMATIVA */}
+            {/* ============================================================ */}
+            <div className="bg-amber-50 rounded-2xl p-3 border border-amber-200">
+                <p className="text-[9px] text-amber-700 text-center flex items-center justify-center gap-2">
+                    <AlertCircle size={12} />
+                    ⚠️ El pago en efectivo solo podrá registrarse después de que el trabajador 
+                    haya firmado este formato. El formato firmado debe ser escaneado y subido como evidencia.
+                </p>
+            </div>
 
-            {/* Botones */}
-            <div className="flex justify-end gap-3 mt-4 pt-4 border-t">
+            {/* ============================================================ */}
+            {/* BOTONES */}
+            {/* ============================================================ */}
+            <div className="flex justify-between gap-4 mt-4 pt-4 border-t">
                 <button
                     type="button"
                     onClick={onCancelar}
-                    className="px-5 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors text-sm"
+                    disabled={generando}
+                    className="flex-1 bg-white border border-emerald-400 text-emerald-600 px-6 py-3 rounded-full font-black text-[11px] uppercase italic shadow-sm active:scale-95 hover:bg-emerald-50 transition-all disabled:opacity-50"
                 >
                     Cancelar
                 </button>
                 <button
                     type="submit"
-                    disabled={generando || !trabajadorSeleccionado || trabajosFiltrados.length === 0}
-                    className="px-5 py-2 rounded-lg bg-purple-600 text-white font-medium hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm flex items-center gap-2"
+                    disabled={generando || yaPagado || !trabajador || trabajosDelPago.length === 0}
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-full font-black text-[11px] uppercase shadow-md active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                     {generando ? (
                         <>
@@ -278,15 +381,12 @@ export const FormularioGenerarPagoPDF = ({
                             Generando PDF...
                         </>
                     ) : (
-                        '📄 Generar Formato de Pago'
+                        <>
+                            <Download size={14} />
+                            Generar Formato de Pago
+                        </>
                     )}
                 </button>
-            </div>
-
-            {/* Nota informativa */}
-            <div className="text-[10px] text-gray-400 text-center border-t pt-3 mt-2">
-                ⚠️ El pago en efectivo solo podrá registrarse después de que el trabajador 
-                haya firmado este formato. El formato firmado debe ser escaneado y subido como evidencia.
             </div>
         </form>
     );

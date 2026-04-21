@@ -61,7 +61,6 @@ export const FormularioConsumoInsumos = ({
             setErrores(prev => ({ ...prev, [name]: '' }));
         }
         
-        // Validar stock al cambiar insumo o cantidad
         if (name === 'tipoInsumoId' || name === 'cantidadSolicitada') {
             validarStock(
                 name === 'tipoInsumoId' ? value : formData.tipoInsumoId,
@@ -87,6 +86,7 @@ export const FormularioConsumoInsumos = ({
                 const base64 = reader.result as string;
                 setPreview(base64);
                 setFormData(prev => ({ ...prev, evidencia_fotografica: base64 }));
+                setErrores(prev => ({ ...prev, evidencia_url: '' }));
             };
             reader.readAsDataURL(file);
         }
@@ -118,12 +118,12 @@ export const FormularioConsumoInsumos = ({
         if (!validarFormulario()) return;
 
         const datosParaBackend = {
-            actividad: formData.actividadSeleccionada,
-            fecha_consumo: formData.fechaPropuesta,
             id_insumo: formData.tipoInsumoId,
             cantidad: parseFloat(formData.cantidadSolicitada),
-            responsable: formData.responsable,
-            motivo: formData.motivo,
+            actividad: formData.actividadSeleccionada,
+            fecha_consumo: formData.fechaPropuesta,
+            id_responsable: parseInt(formData.responsable),
+            observaciones: formData.motivo,
             evidencia_fotografica: formData.evidencia_fotografica || null
         };
 
@@ -150,14 +150,14 @@ export const FormularioConsumoInsumos = ({
             <div className="flex flex-col gap-3">
                 {/* Actividad */}
                 <div>
-                    <label className="text-[9px] uppercase ml-4 text-sky-400 font-black tracking-tighter">
+                    <label className="text-[9px] uppercase ml-4 text-emerald-500 font-black tracking-tighter">
                         Actividad <span className="text-red-400">*</span>
                     </label>
                     <select
                         name="actividadSeleccionada"
                         value={formData.actividadSeleccionada}
                         onChange={manejarCambio}
-                        className="w-full border-1 border-sky-200 rounded-full px-6 py-2 text-[12px] bg-white focus:outline-none focus:ring-2 focus:ring-sky-300 text-sky-700 font-bold"
+                        className="w-full border-1 border-emerald-200 rounded-full px-6 py-2 text-[12px] bg-white focus:outline-none focus:ring-2 focus:ring-emerald-300 text-emerald-700 font-bold"
                     >
                         <option value="siembra">🌱 SIEMBRA</option>
                         <option value="mantenimiento">🔧 MANTENIMIENTO</option>
@@ -168,7 +168,7 @@ export const FormularioConsumoInsumos = ({
 
                 {/* Fecha */}
                 <div className="flex flex-col gap-1">
-                    <label className="text-[9px] uppercase ml-4 text-sky-400 font-black tracking-tighter">
+                    <label className="text-[9px] uppercase ml-4 text-emerald-500 font-black tracking-tighter">
                         <Calendar size={10} className="inline mr-1" />
                         Fecha <span className="text-red-400">*</span>
                     </label>
@@ -178,7 +178,7 @@ export const FormularioConsumoInsumos = ({
                         onChange={manejarCambio}
                         type="date"
                         className={`border-1 rounded-full px-6 py-2 text-[11px] focus:outline-none focus:ring-2 text-gray-500 transition-all ${
-                            errores.fechaPropuesta ? 'border-red-400 focus:ring-red-300' : 'border-sky-100 focus:ring-sky-300'
+                            errores.fechaPropuesta ? 'border-red-400 focus:ring-red-300' : 'border-emerald-100 focus:ring-emerald-300'
                         }`}
                     />
                     {errores.fechaPropuesta && (
@@ -188,7 +188,7 @@ export const FormularioConsumoInsumos = ({
 
                 {/* Seleccionar Insumo */}
                 <div>
-                    <label className="text-[9px] uppercase ml-4 text-sky-400 font-black tracking-tighter">
+                    <label className="text-[9px] uppercase ml-4 text-emerald-500 font-black tracking-tighter">
                         <Package size={10} className="inline mr-1" />
                         Insumo <span className="text-red-400">*</span>
                     </label>
@@ -197,7 +197,7 @@ export const FormularioConsumoInsumos = ({
                         value={formData.tipoInsumoId}
                         onChange={manejarCambio}
                         className={`w-full border-1 rounded-full px-6 py-2 text-[12px] bg-white focus:outline-none focus:ring-2 cursor-pointer transition-all ${
-                            errores.tipoInsumo ? 'border-red-400 focus:ring-red-300' : 'border-sky-200 focus:ring-sky-300'
+                            errores.tipoInsumo ? 'border-red-400 focus:ring-red-300' : 'border-emerald-200 focus:ring-emerald-300'
                         }`}
                     >
                         <option value="">-- BUSCAR EN INVENTARIO --</option>
@@ -219,7 +219,7 @@ export const FormularioConsumoInsumos = ({
             <div className="flex flex-col gap-3">
                 {/* Cantidad con unidad */}
                 <div>
-                    <label className="text-[9px] uppercase ml-4 text-sky-400 font-black tracking-tighter">
+                    <label className="text-[9px] uppercase ml-4 text-emerald-500 font-black tracking-tighter">
                         Cantidad <span className="text-red-400">*</span>
                     </label>
                     <div className="relative">
@@ -231,10 +231,10 @@ export const FormularioConsumoInsumos = ({
                             step="0.01"
                             placeholder="0"
                             className={`w-full border-1 rounded-full pl-4 pr-16 py-2 text-[12px] focus:outline-none focus:ring-2 text-right font-bold transition-all ${
-                                errores.cantidad || errorStock ? 'border-red-400 focus:ring-red-300' : 'border-sky-200 focus:ring-sky-300'
+                                errores.cantidad || errorStock ? 'border-red-400 focus:ring-red-300' : 'border-emerald-200 focus:ring-emerald-300'
                             }`}
                         />
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-bold text-sky-400 bg-white px-2">
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-bold text-emerald-500 bg-white px-2">
                             {insumoSeleccionado?.unidad || '---'}
                         </span>
                     </div>
@@ -245,7 +245,7 @@ export const FormularioConsumoInsumos = ({
 
                 {/* Responsable */}
                 <div>
-                    <label className="text-[9px] uppercase ml-4 text-sky-400 font-black tracking-tighter">
+                    <label className="text-[9px] uppercase ml-4 text-emerald-500 font-black tracking-tighter">
                         <User size={10} className="inline mr-1" />
                         Responsable <span className="text-red-400">*</span>
                     </label>
@@ -254,12 +254,12 @@ export const FormularioConsumoInsumos = ({
                         value={formData.responsable}
                         onChange={manejarCambio}
                         className={`w-full border-1 rounded-full px-6 py-2 text-[12px] bg-white focus:outline-none focus:ring-2 cursor-pointer transition-all ${
-                            errores.responsable ? 'border-red-400 focus:ring-red-300' : 'border-sky-200 focus:ring-sky-300 text-sky-700 font-bold'
+                            errores.responsable ? 'border-red-400 focus:ring-red-300' : 'border-emerald-200 focus:ring-emerald-300 text-emerald-700 font-bold'
                         }`}
                     >
                         <option value="">-- SELECCIONAR TRABAJADOR --</option>
                         {trabajadoresActivos.map(t => (
-                            <option key={t.id_trabajador} value={t.nombre_completo}>
+                            <option key={t.id_trabajador} value={t.id_trabajador}>
                                 {t.nombre_completo} ({t.tipo_trabajo})
                             </option>
                         ))}
@@ -271,7 +271,7 @@ export const FormularioConsumoInsumos = ({
 
                 {/* Motivo */}
                 <div>
-                    <label className="text-[9px] uppercase ml-4 text-sky-400 font-black tracking-tighter">
+                    <label className="text-[9px] uppercase ml-4 text-emerald-500 font-black tracking-tighter">
                         <FileText size={10} className="inline mr-1" />
                         Motivo <span className="text-red-400">*</span>
                     </label>
@@ -282,7 +282,7 @@ export const FormularioConsumoInsumos = ({
                         placeholder="Describa el motivo del consumo..."
                         rows={2}
                         className={`border-1 rounded-2xl px-6 py-2 text-[12px] focus:outline-none focus:ring-2 resize-none transition-all ${
-                            errores.motivo ? 'border-red-400 focus:ring-red-300' : 'border-sky-200 focus:ring-sky-300'
+                            errores.motivo ? 'border-red-400 focus:ring-red-300' : 'border-emerald-200 focus:ring-emerald-300'
                         }`}
                     />
                     {errores.motivo && (
@@ -292,7 +292,7 @@ export const FormularioConsumoInsumos = ({
             </div>
 
             {/* ============================================================ */}
-            {/* EVIDENCIA FOTOGRÁFICA */}
+            {/* EVIDENCIA FOTOGRÁFICA (solo preview local, no se guarda en Carrusel) */}
             {/* ============================================================ */}
             <div className="col-span-2">
                 <input
@@ -305,23 +305,23 @@ export const FormularioConsumoInsumos = ({
                 
                 <div
                     onClick={() => fileInputRef.current?.click()}
-                    className="group border-1 border-dashed rounded-[1.5rem] p-3 flex flex-col items-center justify-center gap-1 cursor-pointer transition-all min-h-[80px] relative overflow-hidden border-sky-200 hover:bg-sky-50 hover:border-sky-400"
+                    className="group border-1 border-dashed rounded-[1.5rem] p-3 flex flex-col items-center justify-center gap-1 cursor-pointer transition-all min-h-[80px] relative overflow-hidden border-emerald-200 hover:bg-emerald-50 hover:border-emerald-400"
                 >
                     {preview ? (
                         <>
                             <img src={preview} className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:scale-110 transition-transform duration-500" alt="Evidencia" />
-                            <div className="absolute inset-0 bg-sky-900/20 flex flex-col items-center justify-center backdrop-blur-[1px]">
+                            <div className="absolute inset-0 bg-emerald-900/20 flex flex-col items-center justify-center backdrop-blur-[1px]">
                                 <Camera size={18} className="text-white drop-shadow-md" />
                                 <span className="text-[8px] font-black text-white uppercase tracking-widest mt-1">Cambiar Evidencia</span>
                             </div>
                         </>
                     ) : (
                         <>
-                            <p className="text-[9px] uppercase font-black tracking-widest text-sky-600">
+                            <p className="text-[9px] uppercase font-black tracking-widest text-emerald-600">
                                 📸 EVIDENCIA FOTOGRÁFICA (OPCIONAL)
                             </p>
-                            <div className="w-8 h-8 border-1 border-sky-200 rounded-full flex items-center justify-center bg-white shadow-sm group-hover:rotate-90 transition-transform">
-                                <Camera size={14} className="text-sky-400" />
+                            <div className="w-8 h-8 border-1 border-emerald-200 rounded-full flex items-center justify-center bg-white shadow-sm group-hover:rotate-90 transition-transform">
+                                <Camera size={14} className="text-emerald-400" />
                             </div>
                         </>
                     )}
@@ -335,14 +335,14 @@ export const FormularioConsumoInsumos = ({
                 <button
                     type="button"
                     onClick={() => ejecutarEnvio(false)}
-                    className="flex-1 bg-white border-1 border-sky-400 text-sky-500 px-6 py-3 rounded-l-full rounded-r-lg font-black text-[11px] uppercase italic shadow-sm active:scale-95 hover:bg-sky-50 transition-all"
+                    className="flex-1 bg-white border-1 border-emerald-400 text-emerald-500 px-6 py-3 rounded-l-full rounded-r-lg font-black text-[11px] uppercase italic shadow-sm active:scale-95 hover:bg-emerald-50 transition-all"
                 >
                     Guardar y Seguir
                 </button>
                 <button
                     type="button"
                     onClick={() => ejecutarEnvio(true)}
-                    className="flex-1 bg-sky-600 hover:bg-sky-700 text-white px-6 py-3 rounded-r-full rounded-l-lg font-black text-[11px] uppercase shadow-md active:scale-95 transition-all"
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-r-full rounded-l-lg font-black text-[11px] uppercase shadow-md active:scale-95 transition-all"
                 >
                     Guardar y Salir
                 </button>

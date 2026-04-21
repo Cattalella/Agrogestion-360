@@ -48,6 +48,7 @@ export const useSolicitudCompra = () => {
     const [solicitudAEditar, setSolicitudAEditar] = useState<SolicitudCompra | null>(null);
     const [cargando, setCargando] = useState(false);
     const [bannerVisible, setBannerVisible] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     
     // 🆕 Estado para modal de confirmación
     const [modalConfirmacion, setModalConfirmacion] = useState<ModalConfirmacionState>({
@@ -59,12 +60,14 @@ export const useSolicitudCompra = () => {
 
     const cargarSolicitudes = async () => {
         setCargando(true);
+        setError(null);
         try {
             const respuesta = await apiClient.get('/inventario/solicitudes');
             setSolicitudes(respuesta.data);
             console.log('✅ Solicitudes cargadas:', respuesta.data.length);
         } catch (error) {
             console.error("❌ Error al cargar solicitudes:", error);
+            setError("Error al cargar las solicitudes");
         } finally {
             setCargando(false);
         }
@@ -78,6 +81,7 @@ export const useSolicitudCompra = () => {
         if (isModalOpen) {
             cargarSolicitudes();
             setBannerVisible(true);
+            setError(null);
         }
     }, [isModalOpen]);
 
@@ -85,6 +89,7 @@ export const useSolicitudCompra = () => {
         setVista('lista');
         setSolicitudAEditar(null);
         setBannerVisible(true);
+        setError(null);
         setIsModalOpen(true);
     };
 
@@ -93,6 +98,7 @@ export const useSolicitudCompra = () => {
         setSolicitudAEditar(null);
         setVista('lista');
         setBannerVisible(true);
+        setError(null);
     };
 
     const cambiarVista = (nuevaVista: Vista) => setVista(nuevaVista);
@@ -120,6 +126,7 @@ export const useSolicitudCompra = () => {
         if (!modalConfirmacion.id) return;
         
         setEliminando(true);
+        setError(null);
         try {
             await apiClient.delete(`/inventario/solicitudes/${modalConfirmacion.id}`, {
                 data: { motivo_eliminacion: `Eliminada por usuario - ${new Date().toLocaleString()}` }
@@ -130,23 +137,30 @@ export const useSolicitudCompra = () => {
             console.log('✅ Solicitud eliminada');
         } catch (error) {
             console.error('❌ Error al eliminar solicitud:', error);
-            alert('Error al eliminar la solicitud');
+            setError("Error al eliminar la solicitud");
         } finally {
             setEliminando(false);
         }
     };
 
+    // ============================================================
+    // 📝 CREAR SOLICITUD (CORREGIDO)
+    // ============================================================
     const crearSolicitud = async (datos: any, cerrar: boolean = true) => {
         setCargando(true);
+        setError(null);
         try {
+            // Determinar el tipo desde los datos
+            const tipo = datos.tipo || datos.categoria_general || tipoSeleccionado;
+            
             const payload = {
-                categoria_general: datos.tipo || tipoSeleccionado,
-                nombre_insumo: datos.tipo === 'insumo' ? datos.tipoInsumo : datos.tipoAlimento,
+                categoria_general: tipo,
+                nombre_insumo: tipo === 'insumo' ? datos.tipoInsumo : datos.tipoAlimento,
                 unidad_medida: datos.unidadMedida,
-                categoria: datos.tipo === 'insumo' ? datos.categoriaInsumo : 'alimento',
-                especie_destino: datos.especieDestino,
+                categoria: tipo === 'insumo' ? datos.categoriaInsumo : 'alimento',
+                especie_destino: datos.especieDestino || null,
                 cantidad: datos.cantidad,
-                fecha_compra_propuesta: datos.fechaPropuesta || datos.fecha_compra,
+                fecha_compra_propuesta: datos.fechaPropuesta,
                 fecha_vencimiento: datos.fechaVencimiento || null,
                 motivo: datos.motivo,
                 proveedor: datos.proveedor || null,
@@ -169,25 +183,32 @@ export const useSolicitudCompra = () => {
             return true;
         } catch (error: any) {
             console.error("❌ Error al crear solicitud:", error);
-            alert(error.response?.data?.mensaje || "Error al crear solicitud");
+            setError(error.response?.data?.mensaje || "Error al crear solicitud");
             return false;
         } finally {
             setCargando(false);
         }
     };
 
+    // ============================================================
+    // ✏️ ACTUALIZAR SOLICITUD
+    // ============================================================
     const actualizarSolicitud = async (id: number, datos: any, cerrar: boolean = true) => {
         setCargando(true);
+        setError(null);
         try {
+            const tipo = datos.tipo || solicitudAEditar?.tipo || tipoSeleccionado;
+            
             const payload = {
                 cantidad: datos.cantidad,
                 motivo: datos.motivo,
-                fecha_compra: datos.fechaPropuesta || datos.fecha_compra,
+                fecha_compra: datos.fechaPropuesta,
                 proveedor: datos.proveedor || null,
-                nombre_insumo: datos.tipo === 'insumo' ? datos.tipoInsumo : datos.tipoAlimento,
+                nombre_insumo: tipo === 'insumo' ? datos.tipoInsumo : datos.tipoAlimento,
                 unidad_medida: datos.unidadMedida,
-                categoria: datos.tipo === 'insumo' ? datos.categoriaInsumo : 'alimento',
-                especie_destino: datos.especieDestino
+                categoria: tipo === 'insumo' ? datos.categoriaInsumo : 'alimento',
+                especie_destino: datos.especieDestino || null,
+                fecha_vencimiento: datos.fechaVencimiento || null
             };
 
             console.log('✏️ Editando solicitud:', id, payload);
@@ -206,13 +227,27 @@ export const useSolicitudCompra = () => {
             return true;
         } catch (error: any) {
             console.error("❌ Error al actualizar solicitud:", error);
-            alert(error.response?.data?.mensaje || "Error al actualizar solicitud");
+            setError(error.response?.data?.mensaje || "Error al actualizar solicitud");
             return false;
         } finally {
             setCargando(false);
         }
     };
 
+    // ============================================================
+    // 🎯 GUARDAR (CREAR O ACTUALIZAR SEGÚN CORRESPONDA)
+    // ============================================================
+    const guardarSolicitud = async (datos: any, cerrar: boolean = true) => {
+        if (solicitudAEditar) {
+            return actualizarSolicitud(solicitudAEditar.id_solicitud, datos, cerrar);
+        } else {
+            return crearSolicitud(datos, cerrar);
+        }
+    };
+
+    // ============================================================
+    // FILTROS
+    // ============================================================
     const solicitudesPendientes = solicitudes.filter(s => s.estado_sol === 'Pendiente');
     const solicitudesAprobadas = solicitudes.filter(s => s.estado_sol === 'Aprobada');
     const solicitudesRechazadas = solicitudes.filter(s => s.estado_sol === 'Rechazada');
@@ -230,6 +265,7 @@ export const useSolicitudCompra = () => {
         cargando,
         loading: cargando,
         bannerVisible,
+        error,
         
         // 🆕 Modal de confirmación
         modalConfirmacion,
@@ -249,6 +285,7 @@ export const useSolicitudCompra = () => {
         
         crearSolicitud,
         actualizarSolicitud,
+        guardarSolicitud,  // 🆕 Función unificada
         recargarLista: cargarSolicitudes,
     };
 };

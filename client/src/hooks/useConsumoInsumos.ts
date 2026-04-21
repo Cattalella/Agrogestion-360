@@ -7,9 +7,13 @@ import apiClient from "../api/apiClient";
 export type ActividadConsumo = 'siembra' | 'mantenimiento' | 'alimentación' | 'vacunación';
 
 export interface InsumoInventario {
+    id_insumo: number;
     id: string;
+    nombre_insumo: string;
     nombre: string;
+    stockTotal: number;
     stock: number;
+    unidad_medida: string;
     unidad: string;
     categoria?: string;
     stock_minimo?: number;
@@ -64,8 +68,21 @@ export const useConsumoInsumos = () => {
     const cargarInventario = async () => {
         try {
             const response = await apiClient.get('/inventario');
-            setInventario(response.data);
-            console.log('✅ Inventario cargado:', response.data.length);
+            // Transformar datos para que coincidan con el formulario
+            const inventarioTransformado = response.data.map((item: any) => ({
+                id: item.id_insumo.toString(),
+                id_insumo: item.id_insumo,
+                nombre: item.nombre_insumo,
+                nombre_insumo: item.nombre_insumo,
+                stock: item.stockTotal || 0,
+                stockTotal: item.stockTotal || 0,
+                unidad: item.unidad_medida,
+                unidad_medida: item.unidad_medida,
+                categoria: item.categoria,
+                stock_minimo: item.stock_minimo || 0
+            }));
+            setInventario(inventarioTransformado);
+            console.log('✅ Inventario cargado:', inventarioTransformado.length);
         } catch (error) {
             console.error("❌ Error al cargar inventario:", error);
         }
@@ -140,24 +157,29 @@ export const useConsumoInsumos = () => {
     const cambiarVista = (v: 'lista' | 'formulario') => setVista(v);
 
     // ============================================================
-    // REGISTRAR CONSUMO
+    // REGISTRAR CONSUMO (CORREGIDO)
     // ============================================================
     const registrarConsumo = async (datos: any, cerrar: boolean = true) => {
         setCargando(true);
         try {
+            // Validar que id_insumo no sea null
+            if (!datos.id_insumo) {
+                throw new Error("Debes seleccionar un insumo");
+            }
+
             const payload = {
+                id_insumo: typeof datos.id_insumo === 'string' ? parseInt(datos.id_insumo) : datos.id_insumo,
+                cantidad: typeof datos.cantidad === 'string' ? parseFloat(datos.cantidad) : datos.cantidad,
                 actividad: datos.actividad,
-                fecha_consumo: datos.fecha_consumo,
-                id_insumo: parseInt(datos.id_insumo),
-                cantidad: datos.cantidad,
-                responsable: datos.responsable,
-                motivo: datos.motivo,
+                fecha_consumo: datos.fecha_consumo || new Date().toISOString().split('T')[0],
+                id_responsable: datos.id_responsable,
+                observaciones: datos.observaciones || datos.motivo || "",
                 evidencia_fotografica: datos.evidencia_fotografica || null
             };
 
             console.log('📤 Enviando a backend (Consumo):', payload);
             
-            await apiClient.post('/inventario/consumo', payload);
+            const response = await apiClient.post('/inventario/consumo', payload);
             
             await cargarConsumos();
             await cargarInventario();
@@ -171,7 +193,8 @@ export const useConsumoInsumos = () => {
             return true;
         } catch (error: any) {
             console.error("❌ Error al registrar consumo:", error);
-            alert(error.response?.data?.mensaje || "Error al registrar consumo");
+            const mensaje = error.response?.data?.mensaje || error.message || "Error al registrar consumo";
+            alert(mensaje);
             return false;
         } finally {
             setCargando(false);
@@ -213,21 +236,20 @@ export const useConsumoInsumos = () => {
     return {
         consumos,
         inventario,
-        insumosCriticos,  // 🆕 Para Hero2
+        insumosCriticos,
         cargando,
-        loading: cargando,  // Alias para compatibilidad
+        loading: cargando,
         isModalOpen,
         vista,
         setVista,
         
-        // 🆕 Stats para la card
         stats: calcularStats(),
         
         abrirModal,
         cerrarModal,
         cambiarVista,
         registrarConsumo,
-        guardarConsumo: registrarConsumo,  // Alias
+        guardarConsumo: registrarConsumo,
         actualizarConsumo,
         eliminarConsumo,
         recargarLista: cargarConsumos,

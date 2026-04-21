@@ -21,11 +21,25 @@ import { UsuarioActual } from '../../compartido/decoradores/usuario-actual.decor
 export class InventarioController {
   constructor(private readonly inventarioService: InventarioService) {}
 
+  // ============================================================
+  // 📌 INVENTARIO
+  // ============================================================
+
   @Get()
   @Roles('Administrador', 'Dueño')
   async obtenerInventario() {
     return this.inventarioService.obtenerInventarioActual();
   }
+
+  @Get('criticos')
+  @Roles('Administrador', 'Dueño')
+  async obtenerInsumosCriticos() {
+    return this.inventarioService.obtenerInsumosCriticos();
+  }
+
+  // ============================================================
+  // 📌 SOLICITUDES DE COMPRA
+  // ============================================================
 
   @Get('solicitudes')
   @Roles('Administrador', 'Dueño')
@@ -72,15 +86,6 @@ export class InventarioController {
     return this.inventarioService.ejecutarCompra(idAdmin, id, datosLote);
   }
 
-  // ============================================================
-  // 🆕 NUEVO ENDPOINT: EJECUTAR COMPRA REAL (con todos los datos)
-  // ============================================================
-  @Post('compras/ejecutar')
-  @Roles('Administrador', 'Dueño')
-  async ejecutarCompraReal(@Body() datosCompra: any) {
-    return this.inventarioService.ejecutarCompraReal(datosCompra);
-  }
-
   @Delete('solicitudes/:id')
   @Roles('Administrador', 'Dueño')
   async eliminarSolicitud(
@@ -90,12 +95,44 @@ export class InventarioController {
     return this.inventarioService.eliminarSolicitud(id, body.motivo_eliminacion);
   }
 
+  // ============================================================
+  // 📌 COMPRAS REALES
+  // ============================================================
+
+  @Post('compras/ejecutar')
+  @Roles('Administrador', 'Dueño')
+  async ejecutarCompraReal(@Body() datosCompra: any) {
+    return this.inventarioService.ejecutarCompraReal(datosCompra);
+  }
+
+  // ============================================================
+  // 📌 CONSUMO DE INSUMOS
+  // ============================================================
+
+  @Get('consumos')
+  @Roles('Administrador', 'Dueño')
+  async obtenerConsumos() {
+    return this.inventarioService.obtenerConsumos();
+  }
+
   @Post('consumo')
   @Roles('Administrador', 'Dueño')
-  async registrarConsumo(
-    @UsuarioActual('id_persona') idResponsable: number,
+  async registrarConsumo(@Body() datos: any) {
+    return this.inventarioService.registrarConsumo(datos);
+  }
+
+  @Put('consumo/:id')
+  @Roles('Administrador', 'Dueño')
+  async actualizarConsumo(
+    @Param('id', ParseIntPipe) id: number,
     @Body() datos: any
   ) {
-    return this.inventarioService.registrarConsumo(idResponsable, datos);
+    return this.inventarioService.actualizarConsumo(id, datos);
+  }
+
+  @Delete('consumo/:id')
+  @Roles('Administrador', 'Dueño')
+  async eliminarConsumo(@Param('id', ParseIntPipe) id: number) {
+    return this.inventarioService.eliminarConsumo(id);
   }
 }

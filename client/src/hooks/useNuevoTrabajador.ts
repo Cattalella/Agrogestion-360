@@ -69,14 +69,14 @@ export const useNuevoTrabajador = () => {
     // 🆕 CALCULAR STATS PARA LA CARD
     // ============================================================
     const calcularStats = (): TrabajadoresStats => {
-        const activos = trabajadores.filter(t => t.estado === 'Activo').length;
-        const inactivos = trabajadores.filter(t => t.estado === 'Inactivo').length;
+        const activos = trabajadores.filter(t => t.estado === 'activo').length;
+        const inactivos = trabajadores.filter(t => t.estado === 'inactivo').length;
 
         return {
             tipo1: "ACTIVOS",
             cantidad1: activos,
-            tipo2: "POR CONTRATAR",
-            cantidad2: 0  // Se puede calcular según necesidades futuras
+            tipo2: "INACTIVOS",
+            cantidad2: inactivos
         };
     };
 
@@ -98,21 +98,21 @@ export const useNuevoTrabajador = () => {
     const cambiarVista = (v: Vista) => setVista(v);
 
     // ============================================================
-    // GUARDAR TRABAJADOR
+    // GUARDAR TRABAJADOR (CORREGIDO)
     // ============================================================
     const guardarTrabajador = async (datos: any, cerrar: boolean = true) => {
         setCargando(true);
         try {
+            // 🔥 NO enviamos id_trabajador (lo genera el backend)
             const datosParaBackend = {
-                id_trabajador: datos.id_trabajador,
                 nombre_completo: datos.nombre_completo,
                 tipo_documento: datos.tipo_documento,
-                num_documento: datos.numero_documento,
+                num_documento: datos.num_documento,  // ← Cambiado de numero_documento
                 tipo_trabajo: datos.tipo_trabajo,
                 telefono: datos.telefono || null,
                 telefono_familiar: datos.telefono_familiar || null,
                 direccion: datos.direccion || null,
-                estado: datos.estado || 'Activo',
+                estado: datos.estado || 'activo',  // ← minúscula
                 fecha_ingreso: datos.fecha_ingreso,
                 observaciones: datos.observaciones || null
             };
@@ -137,7 +137,6 @@ export const useNuevoTrabajador = () => {
         } catch (error: any) {
             console.error("❌ Error al guardar trabajador:", error);
             
-            // 🆕 Manejar error de clave compuesta (documento duplicado para mismo tipo)
             if (error.response?.status === 409 || error.response?.data?.mensaje?.includes('duplicado')) {
                 alert("Ya existe un trabajador con ese tipo y número de documento.");
             } else {
@@ -193,7 +192,7 @@ export const useNuevoTrabajador = () => {
     // ============================================================
     // FILTROS
     // ============================================================
-    const trabajadoresActivos = trabajadores.filter(t => t.estado === 'Activo');
+    const trabajadoresActivos = trabajadores.filter(t => t.estado === 'activo');
     const trabajadoresVisibles = trabajadores;
 
     // ============================================================
@@ -205,7 +204,7 @@ export const useNuevoTrabajador = () => {
         trabajadoresVisibles,
         trabajadoresActivos,
         cargando,
-        loading: cargando,  // Alias para compatibilidad
+        loading: cargando,
         isModalOpen,
         vista,
         trabajadorAEditar,
@@ -213,7 +212,6 @@ export const useNuevoTrabajador = () => {
         setVista,
         cambiarVista,
         
-        // 🆕 Stats para la card
         stats: calcularStats(),
         
         abrirModal,

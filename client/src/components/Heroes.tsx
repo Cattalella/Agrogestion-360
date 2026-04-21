@@ -65,7 +65,8 @@ export const Hero2 = ({
     onRegComprasClick, 
     onRegFormatoPagoClick,
     onRegSolicitudClick,
-    onRegConsumoClick
+    onRegConsumoClick,
+    onVerInventarioClick
 }: any) => {
     const cards = [
         { titulo: "REGISTRAR PAGOS",   icono: sack,      datos: pagos,        accion: onRegPagosClick },
@@ -147,7 +148,7 @@ export const Hero2 = ({
                 </div>
 
                 {/* Solicitud 2 - VER INVENTARIO (Desnudo) */}
-                <div className="grid grid-cols-2 rounded-[1.5rem] pl-5 pr-5 p-3 gap-4 shadow-[0_4px_8px_rgba(0,0,0,0.2)] flex-1 content-center">
+                <div onClick={onVerInventarioClick} className="grid grid-cols-2 rounded-[1.5rem] pl-5 pr-5 p-3 gap-4 shadow-[0_4px_8px_rgba(0,0,0,0.2)] flex-1 content-center cursor-pointer hover:shadow-[0_8px_16px_rgba(0,0,0,0.3)] hover:scale-[1.02] transition-all duration-300">
                     <div className="col-span-2 flex flex-col items-center justify-center gap-2 border-b-[var(--color-gray)] border-b border-dashed pb-2 mb-2">
                         <img className="w-8" src={docuemento} alt="doc" />
                         <p className="text-emerald-900 text-[0.8rem]">-- VER INVENTARIO --</p>
