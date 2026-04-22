@@ -4,6 +4,13 @@
 @tailwind components;
 @tailwind utilities;
 
+/* En tu globals.css o archivo principal */
+@keyframes slide {
+  0% { transform: translateX(-30px); opacity: 0; }
+  50% { transform: translateX(15px); opacity: 0.8; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+
 /* Esto obliga a los selectores de fecha a mostrarse en mayúsculas */
 input[type="date"]::-webkit-datetime-edit {
     text-transform: uppercase;

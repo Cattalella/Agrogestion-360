@@ -7,23 +7,104 @@ export type FotoEvidencia = {
     url: string;
     fecha: string;
     like?: boolean;
-    origen?: 'consumo' | 'trabajo' | 'general';
+    origen?: 'consumo' | 'trabajo' | 'general' | 'pago_firma';
     idReferencia?: number;
 };
 
 interface SeccionEvidenciasProps {
     fotos: FotoEvidencia[];
     rol: "admin" | "boss";
+    pagosPendientes?: any[];  // 🆕 Pagos pendientes de firma
     onSubirClick?: (nueva: FotoEvidencia) => void; 
     onBorrarTodo?: () => void;
     onBorrarUnaFoto?: (idABorrar: number) => void;
     onToggleLike?: (id: number) => void;
+    onConfirmarPago?: (idPago: number) => void;  // 🆕 Confirmar pago con firma
 }
 
-export const Carrusel = ({ fotos, rol, onSubirClick, onBorrarTodo, onBorrarUnaFoto, onToggleLike }: SeccionEvidenciasProps) => {
+export const Carrusel = ({ 
+    fotos, 
+    rol, 
+    pagosPendientes = [],
+    onSubirClick, 
+    onBorrarTodo, 
+    onBorrarUnaFoto, 
+    onToggleLike,
+    onConfirmarPago 
+}: SeccionEvidenciasProps) => {
     const inputOculto = useRef<HTMLInputElement>(null);
     const [indiceActivo, setIndiceActivo] = useState(0);
     const [fotoExpandida, setFotoExpandida] = useState<string | null>(null);
+    
+    // 🆕 Estado para el selector de pago
+    const [mostrarSelectorPago, setMostrarSelectorPago] = useState(false);
+    const [pagoSeleccionadoId, setPagoSeleccionadoId] = useState<number | null>(null);
+    const [tempFotoUrl, setTempFotoUrl] = useState<string | null>(null);
+
+    // Filtrar pagos pendientes de firma (No pagado o Pendiente de firma)
+    const pagosDisponibles = pagosPendientes.filter(p => 
+        p.estado_pago === 'No pagado' || p.estado_pago === 'Pendiente de firma'
+    );
+
+    const manejarSubidaFoto = () => {
+        inputOculto.current?.click();
+    };
+
+    const manejarArchivo = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const archivo = e.target.files?.[0];
+        if (archivo) {
+            const url = URL.createObjectURL(archivo);
+            setTempFotoUrl(url);
+            
+            // Si hay pagos pendientes, mostrar selector
+            if (pagosDisponibles.length > 0 && rol === "admin") {
+                setMostrarSelectorPago(true);
+            } else {
+                // Si no hay pagos pendientes, subir como foto general
+                const evidencia: FotoEvidencia = {
+                    id: Date.now(),
+                    url: url,
+                    fecha: new Date().toLocaleDateString(),
+                    origen: 'general'
+                };
+                onSubirClick?.(evidencia);
+            }
+        }
+        e.target.value = ''; // Resetear input
+    };
+
+    const handleConfirmarAsociacion = () => {
+        if (pagoSeleccionadoId && tempFotoUrl) {
+            const evidencia: FotoEvidencia = {
+                id: Date.now(),
+                url: tempFotoUrl,
+                fecha: new Date().toLocaleDateString(),
+                origen: 'pago_firma',
+                idReferencia: pagoSeleccionadoId
+            };
+            onSubirClick?.(evidencia);
+            
+            // Confirmar el pago con firma
+            if (onConfirmarPago) {
+                onConfirmarPago(pagoSeleccionadoId);
+            }
+            
+            // Limpiar estado
+            setMostrarSelectorPago(false);
+            setTempFotoUrl(null);
+            setPagoSeleccionadoId(null);
+        }
+    };
+
+    const handleCancelarAsociacion = () => {
+        // Limpiar la URL temporal
+        if (tempFotoUrl) {
+            URL.revokeObjectURL(tempFotoUrl);
+        }
+        setMostrarSelectorPago(false);
+        setTempFotoUrl(null);
+        setPagoSeleccionadoId(null);
+    };
 
     return (
         <div className="flex flex-col gap-8 w-full mx-auto shadow-[0_3px_15px_rgba(0,0,0,0.2)] rounded-[2rem]">
@@ -40,6 +121,53 @@ export const Carrusel = ({ fotos, rol, onSubirClick, onBorrarTodo, onBorrarUnaFo
                         className="max-w-full max-h-full object-contain rounded-2xl shadow-[0_0_30px_rgba(0,0,0,0.8)]"
                         onClick={(e) => e.stopPropagation()} 
                     />
+                </div>
+            )}
+
+            {/* 🆕 Modal para seleccionar el pago al subir foto */}
+            {mostrarSelectorPago && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl animate-in zoom-in-95 duration-200">
+                        <h3 className="font-black text-gray-800 text-lg mb-2">Asociar a un pago</h3>
+                        <p className="text-xs text-gray-500 mb-4">
+                            Selecciona a qué pago corresponde esta foto del formato firmado.
+                        </p>
+                        
+                        {tempFotoUrl && (
+                            <div className="mb-4 rounded-xl overflow-hidden border border-gray-200">
+                                <img src={tempFotoUrl} alt="Vista previa" className="w-full h-32 object-cover" />
+                            </div>
+                        )}
+                        
+                        <select 
+                            className="w-full border border-gray-200 rounded-full px-4 py-3 mb-4 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                            value={pagoSeleccionadoId || ''}
+                            onChange={(e) => setPagoSeleccionadoId(Number(e.target.value))}
+                        >
+                            <option value="">-- Seleccionar pago --</option>
+                            {pagosDisponibles.map(p => (
+                                <option key={p.id_pago} value={p.id_pago}>
+                                    #{p.id_pago} - {p.Trabajador?.nombre_completo || `ID: ${p.id_trabajador}`} - ${p.monto_total?.toLocaleString()}
+                                </option>
+                            ))}
+                        </select>
+                        
+                        <div className="flex gap-3">
+                            <button 
+                                onClick={handleCancelarAsociacion} 
+                                className="flex-1 bg-gray-100 text-gray-600 py-2 rounded-full font-bold text-sm hover:bg-gray-200 transition-all"
+                            >
+                                Cancelar
+                            </button>
+                            <button 
+                                onClick={handleConfirmarAsociacion} 
+                                disabled={!pagoSeleccionadoId}
+                                className="flex-1 bg-emerald-600 text-white py-2 rounded-full font-bold text-sm hover:bg-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Asociar y subir
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -82,6 +210,11 @@ export const Carrusel = ({ fotos, rol, onSubirClick, onBorrarTodo, onBorrarUnaFo
                                                 <span className="text-xs font-bold text-gray-800">Visto</span>
                                             </div>
                                         )}
+                                        {foto.origen === 'pago_firma' && (
+                                            <div className="absolute bottom-4 left-4 z-20 bg-emerald-500/90 text-white px-2 py-1 rounded-full text-[8px] font-bold">
+                                                📄 Firma de pago #{foto.idReferencia}
+                                            </div>
+                                        )}
                                     </>
                                 )}
                                 {rol === "boss" && (
@@ -100,6 +233,11 @@ export const Carrusel = ({ fotos, rol, onSubirClick, onBorrarTodo, onBorrarUnaFo
                                     <p className="text-white font-bold uppercase tracking-[2px] text-sm">
                                         Fecha: {foto.fecha}
                                     </p>
+                                    {foto.origen === 'pago_firma' && (
+                                        <p className="text-white/80 text-[10px] mt-1">
+                                            Pago #{foto.idReferencia}
+                                        </p>
+                                    )}
                                 </div>
                             </article>
                         ))
@@ -117,19 +255,7 @@ export const Carrusel = ({ fotos, rol, onSubirClick, onBorrarTodo, onBorrarUnaFo
                     ref={inputOculto}
                     className="hidden"
                     accept="image/*"
-                    onChange={(e) => {
-                        const archivo = e.target.files?.[0];
-                        if (archivo) {
-                            const url = URL.createObjectURL(archivo);
-                            const evidencia: FotoEvidencia = {
-                                id: Date.now(),
-                                url: url,
-                                fecha: new Date().toLocaleDateString(),
-                                origen: 'general'
-                            };
-                            if(onSubirClick) onSubirClick(evidencia);
-                        }
-                    }}
+                    onChange={manejarArchivo}
                 />
 
                 {/* --- PIE DE CARRUSEL --- */}
@@ -143,11 +269,11 @@ export const Carrusel = ({ fotos, rol, onSubirClick, onBorrarTodo, onBorrarUnaFo
 
                     {rol === "admin" && (
                         <button 
-                            onClick={() => inputOculto.current?.click()}
-                            className="bg-green-800 flex gap-3 items-center tracking-[2px] hover:bg-black text-white px-8 py-3 rounded-2xl font-black text-sm transition-all shadow-[0_3px_15px_rgba(0,255,0,0.4)]
+                            onClick={manejarSubidaFoto}
+                            className="group bg-green-800 flex gap-3 items-center tracking-[2px] hover:bg-black text-white px-8 py-3 rounded-2xl font-black text-sm transition-all shadow-[0_3px_15px_rgba(0,255,0,0.4)]
                             active:scale-95 cursor-pointer hover:scale-102 hover:shadow-[0_0px_10px_rgba(0,255,0,1)]"
                         >
-                            <CircleFadingPlus className="hover:rotate-4" />
+                            <CircleFadingPlus className="group-hover:rotate-90" />
                             <span> NUEVA FOTO </span>
                         </button>
                     )}

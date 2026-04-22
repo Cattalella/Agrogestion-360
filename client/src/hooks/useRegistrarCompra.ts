@@ -14,7 +14,7 @@ export interface SolicitudCompra {
     cantidad: number;
     motivo: string;
     fecha_vencimiento?: string;
-    estado: EstadoSolicitud;
+    estado_sol: EstadoSolicitud;
     ejecutada: boolean;
     fecha_creacion: string;
     hora_creacion: string;
@@ -97,7 +97,7 @@ export const useRegistrarCompra = () => {
     }, [listaSolicitudes]);
 
     // ============================================================
-    // 🆕 CALCULAR STATS PARA LA CARD
+    // 🆕 CALCULAR STATS PARA LA CARD (CORREGIDO)
     // ============================================================
     const calcularStats = (): ComprasStats => {
         const solicitudesVisibles = listaSolicitudes.filter(s => !s.eliminada);
@@ -107,11 +107,11 @@ export const useRegistrarCompra = () => {
         
         const comprasMes = solicitudesVisibles.filter(s => {
             const fecha = new Date(s.fecha_creacion);
-            return fecha >= inicioMes && s.estado === 'Aprobada';
+            return fecha >= inicioMes && s.estado_sol === 'Aprobada';
         }).length;
 
         const pendientes = solicitudesVisibles.filter(s => 
-            s.estado === 'Pendiente'
+            s.estado_sol === 'Pendiente'
         ).length;
 
         return {
@@ -192,7 +192,6 @@ export const useRegistrarCompra = () => {
     const ejecutarCompraReal = async (datosCompra: any) => {
         setCargando(true);
         try {
-            // Transformar datos del FormularioCompra al formato que espera el backend
             const datosParaBackend = {
                 id_solicitud: datosCompra.id_solicitud,
                 fecha_compra_real: datosCompra.fecha_compra_real,
@@ -211,7 +210,6 @@ export const useRegistrarCompra = () => {
 
             console.log('📦 Ejecutando compra real:', datosParaBackend);
             
-            // Endpoint para registrar la compra real y crear el lote
             const response = await apiClient.post('/inventario/compras/ejecutar', datosParaBackend);
             
             await cargarSolicitudes();
@@ -233,7 +231,7 @@ export const useRegistrarCompra = () => {
         const solicitud = listaSolicitudes.find(s => s.id === id);
         if (!solicitud) return false;
         
-        if (solicitud.estado !== 'Aprobada') {
+        if (solicitud.estado_sol !== 'Aprobada') {
             alert("Solo puedes ejecutar una compra si la solicitud fue aprobada por el dueño.");
             return false;
         }
@@ -279,7 +277,7 @@ export const useRegistrarCompra = () => {
             });
             
             setListaSolicitudes(prev =>
-                prev.map(s => s.id === id ? { ...s, estado: nuevoEstado } : s)
+                prev.map(s => s.id === id ? { ...s, estado_sol: nuevoEstado } : s)
             );
             return true;
         } catch (error) {
@@ -292,8 +290,8 @@ export const useRegistrarCompra = () => {
     // FILTROS
     // ============================================================
     const solicitudesVisibles = listaSolicitudes.filter(s => !s.eliminada);
-    const solicitudesPendientes = solicitudesVisibles.filter(s => s.estado === 'Pendiente');
-    const solicitudesAprobadas = solicitudesVisibles.filter(s => s.estado === 'Aprobada');
+    const solicitudesPendientes = solicitudesVisibles.filter(s => s.estado_sol === 'Pendiente');
+    const solicitudesAprobadas = solicitudesVisibles.filter(s => s.estado_sol === 'Aprobada');
 
     // ============================================================
     // RETORNAR
@@ -322,7 +320,7 @@ export const useRegistrarCompra = () => {
         crearSolicitud,
         guardarCompra: crearSolicitud,
         ejecutarCompra,
-        ejecutarCompraReal,  // 🆕 Nueva función para registrar compra real
+        ejecutarCompraReal,
         eliminarSolicitud,
         cambiarEstado,
         recargarLista: cargarSolicitudes,

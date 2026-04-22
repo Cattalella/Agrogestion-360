@@ -1,37 +1,52 @@
-// src/components/Hero3.tsx
-import { useState } from "react";
 import { Carrusel, type FotoEvidencia } from "./Carrusel";
 import { ExportarButton } from "./ExportarButton";
-import { useFotosStorage } from "../utils/storage";
-import nuevoadmin from "../assets/imgs/icon_Nadmin.webp";
 
 interface Hero3Props {
-    datosExportar: any[];
+    fotos: FotoEvidencia[];
+    rol: "admin" | "boss";
+    pagosPendientes?: any[];
+    datosExportar?: any[];
+    onSubirClick?: (nueva: FotoEvidencia) => void;
+    onBorrarTodo?: () => void;
+    onBorrarUnaFoto?: (id: number) => void;
+    onConfirmarPago?: (idPago: number) => void;
 }
 
-export const Hero3 = ({ datosExportar }: Hero3Props) => {
-    const [fotosPersistentes, setFotosPersistentes] = useFotosStorage();
-
-    const manejarLike = (id: number) => {
-        const actualizadas = fotosPersistentes.map(f => f.id === id ? { ...f, like: !f.like } : f);
-        setFotosPersistentes(actualizadas);
-    };
-
+export const Hero3 = ({ 
+    fotos, 
+    rol, 
+    pagosPendientes = [],
+    datosExportar = [],
+    onSubirClick, 
+    onBorrarTodo, 
+    onBorrarUnaFoto,
+    onConfirmarPago 
+}: Hero3Props) => {
     return (
         <div className="flex mt-[5rem] w-full max-w-[80rem] mx-auto bg-white mb-20">
             <div className="flex w-full items-stretch gap-8">
                 <div className="flex-1">
-                    <Carrusel rol="boss" fotos={fotosPersistentes} onToggleLike={manejarLike} /> 
+                    <Carrusel 
+                        rol={rol} 
+                        fotos={fotos} 
+                        pagosPendientes={pagosPendientes}
+                        onSubirClick={onSubirClick}
+                        onBorrarTodo={onBorrarTodo}
+                        onBorrarUnaFoto={onBorrarUnaFoto}
+                        onConfirmarPago={onConfirmarPago}
+                    /> 
                 </div>
-                <div className="flex flex-col bg-white shadow-[0_3px_15px_rgba(0,0,0,0.2)] p-5 justify-center rounded-[2rem] gap-10">
-                    <div className="flex flex-col mx-auto">
-                        <p className="text-amber-800 text-[0.7rem] font-bold tracking-widest mb-4 uppercase">
-                            Generar Reporte Oficial
-                        </p>
-                        <ExportarButton datosFiltrados={datosExportar} targetId="boss-report" />
+                {rol === "boss" && (
+                    <div className="flex flex-col bg-white shadow-[0_3px_15px_rgba(0,0,0,0.2)] p-5 justify-center rounded-[2rem] gap-10">
+                        <div className="flex flex-col mx-auto">
+                            <p className="text-amber-800 text-[0.7rem] font-bold tracking-widest mb-4 uppercase">
+                                Generar Reporte Oficial
+                            </p>
+                            <ExportarButton datosFiltrados={datosExportar} targetId="boss-report" />
+                        </div>
+                        <img className="w-50 bg-amber-100 mx-auto" src="/src/assets/imgs/icon_Nadmin.webp" alt="" />
                     </div>
-                    <img className="w-50 bg-amber-100 mx-auto" src={nuevoadmin} alt="" />
-                </div>
+                )}
             </div>
         </div>
     );

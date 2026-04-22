@@ -171,15 +171,25 @@ export const Hero2 = ({
 // ─────────────────────────────────────────
 // HERO 3 — EVIDENCIAS FOTOGRÁFICAS
 // ─────────────────────────────────────────
-export const Hero3 = ({ fotos, rol, onSubirClick, onBorrarTodo, onBorrarUnaFoto }: any) => {
+export const Hero3 = ({ 
+    fotos, 
+    rol, 
+    pagosPendientes = [], 
+    onSubirClick, 
+    onBorrarTodo, 
+    onBorrarUnaFoto,
+    onConfirmarPago 
+}: any) => {
     return (
         <section className="w-full max-w-[80rem] mx-auto mt-[5rem]">
             <Carrusel
                 fotos={fotos}
                 rol={rol}
+                pagosPendientes={pagosPendientes}
                 onSubirClick={onSubirClick}
                 onBorrarTodo={onBorrarTodo}
                 onBorrarUnaFoto={onBorrarUnaFoto}
+                onConfirmarPago={onConfirmarPago}
             />
         </section>
     );

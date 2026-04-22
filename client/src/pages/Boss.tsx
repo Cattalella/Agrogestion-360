@@ -121,7 +121,7 @@ export const Boss = () => {
                 trabajadoresactivos={dashboard.trabajadoresActivos}
             />
             
-            <Hero3 datosExportar={datosParaArchivo} />
+            <Hero3 datosExportar={datosParaArchivo} fotos={[]} rol="boss" />
         </div>
     );
 };

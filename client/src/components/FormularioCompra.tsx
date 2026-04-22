@@ -18,7 +18,7 @@ interface Props {
     setTipoSeleccionado: (tipo: CategoriaGeneral) => void;
     onGuardar: (datos: any, cerrar: boolean) => void;
     onCancelar: () => void;
-    solicitudesAprobadas?: SolicitudAprobada[]; // Lista de solicitudes aprobadas por el dueño
+    solicitudesAprobadas?: SolicitudAprobada[];
 }
 
 export const FormularioCompra = ({ 
@@ -29,12 +29,24 @@ export const FormularioCompra = ({
     solicitudesAprobadas = []
 }: Props) => {
     
+    // ============================================================
+    // FUNCIONES DE FORMATEO DE MONTOS (COP - Puntos para miles)
+    // ============================================================
+    const formatearMontoCOP = (valor: string): string => {
+        // Limpiar todo lo que no sea número
+        const numeros = valor.replace(/\D/g, '');
+        if (!numeros) return '';
+        // Convertir a número y formatear con puntos
+        return new Intl.NumberFormat('es-CO').format(parseInt(numeros));
+    };
+
+    const limpiarFormateoMonto = (valor: string): number => {
+        return parseInt(valor.replace(/\D/g, '')) || 0;
+    };
+
     const estadoInicial = {
-        // Selección de solicitud aprobada
         id_solicitud: "",
         solicitudSeleccionada: null as SolicitudAprobada | null,
-        
-        // Datos reales de compra (para LoteInv)
         fecha_compra_real: new Date().toISOString().split('T')[0],
         numero_lote: "",
         cantidad_real: "",
@@ -44,8 +56,6 @@ export const FormularioCompra = ({
         fecha_vencimiento: "",
         proveedor_real: "",
         observaciones: "",
-        
-        // Datos del producto (se autocompletan al seleccionar solicitud)
         categoria_general: tipoSeleccionado,
         nombre_producto: "",
         unidad_medida: "",
@@ -64,7 +74,6 @@ export const FormularioCompra = ({
             setErrores(prev => ({ ...prev, [name]: '' }));
         }
         
-        // Calcular precio total automáticamente
         if (name === 'cantidad_real' || name === 'precio_unitario') {
             const cantidad = name === 'cantidad_real' ? parseFloat(value) : parseFloat(formData.cantidad_real);
             const precioUnit = name === 'precio_unitario' ? parseFloat(value) : parseFloat(formData.precio_unitario);
@@ -77,25 +86,41 @@ export const FormularioCompra = ({
 
     const manejarCambioNumerico = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
-        if (value === '' || /^\d*\.?\d*$/.test(value)) {
-            setFormData(prev => ({ ...prev, [name]: value }));
-            if (value && parseFloat(value) > 0) {
-                setErrores(prev => ({ ...prev, [name]: '' }));
-            }
+        if (name === 'precio_unitario') {
+            // Para el precio unitario, usamos el formateo automático
+            const valorLimpio = limpiarFormateoMonto(value);
+            setFormData(prev => ({ ...prev, precio_unitario: valorLimpio.toString() }));
+            if (valorLimpio > 0) setErrores(prev => ({ ...prev, precio_unitario: '' }));
             
             // Recalcular precio total
-            if (name === 'cantidad_real' || name === 'precio_unitario') {
-                const cantidad = name === 'cantidad_real' ? parseFloat(value) : parseFloat(formData.cantidad_real);
-                const precioUnit = name === 'precio_unitario' ? parseFloat(value) : parseFloat(formData.precio_unitario);
-                if (!isNaN(cantidad) && !isNaN(precioUnit)) {
+            const cantidad = parseFloat(formData.cantidad_real);
+            if (!isNaN(cantidad) && cantidad > 0 && valorLimpio > 0) {
+                const total = cantidad * valorLimpio;
+                setFormData(prev => ({ ...prev, precio_total: total.toFixed(2) }));
+            }
+        } else if (name === 'cantidad_real') {
+            if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                setFormData(prev => ({ ...prev, [name]: value }));
+                if (value && parseFloat(value) > 0) setErrores(prev => ({ ...prev, [name]: '' }));
+                
+                // Recalcular precio total
+                const precioUnit = limpiarFormateoMonto(formData.precio_unitario);
+                const cantidad = parseFloat(value);
+                if (!isNaN(cantidad) && cantidad > 0 && precioUnit > 0) {
                     const total = cantidad * precioUnit;
                     setFormData(prev => ({ ...prev, precio_total: total.toFixed(2) }));
+                }
+            }
+        } else {
+            if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                setFormData(prev => ({ ...prev, [name]: value }));
+                if (value && parseFloat(value) > 0) {
+                    setErrores(prev => ({ ...prev, [name]: '' }));
                 }
             }
         }
     };
 
-    // Seleccionar solicitud aprobada
     const seleccionarSolicitud = (id_solicitud: string) => {
         const solicitud = solicitudesAprobadas.find(s => s.id_solicitud.toString() === id_solicitud);
         if (solicitud) {
@@ -123,7 +148,9 @@ export const FormularioCompra = ({
         if (!formData.cantidad_real || parseFloat(formData.cantidad_real) <= 0) {
             nuevosErrores.cantidad_real = 'La cantidad real debe ser mayor a 0';
         }
-        if (!formData.precio_unitario || parseFloat(formData.precio_unitario) <= 0) {
+        
+        const precioUnitarioNum = limpiarFormateoMonto(formData.precio_unitario);
+        if (!formData.precio_unitario || precioUnitarioNum <= 0) {
             nuevosErrores.precio_unitario = 'El precio unitario es obligatorio';
         }
         if (!formData.proveedor_real.trim()) nuevosErrores.proveedor_real = 'El proveedor es obligatorio';
@@ -143,7 +170,7 @@ export const FormularioCompra = ({
             fecha_compra_real: formData.fecha_compra_real,
             numero_lote: formData.numero_lote,
             cantidad_real: parseFloat(formData.cantidad_real),
-            precio_unitario: parseFloat(formData.precio_unitario),
+            precio_unitario: limpiarFormateoMonto(formData.precio_unitario),
             precio_total: parseFloat(formData.precio_total || '0'),
             factura: formData.factura,
             fecha_vencimiento: formData.fecha_vencimiento || null,
@@ -163,9 +190,11 @@ export const FormularioCompra = ({
         }
     };
 
-    // ============================================================
-    // RENDER
-    // ============================================================
+    // Obtener el precio unitario formateado para mostrar
+    const precioUnitarioFormateado = formData.precio_unitario 
+        ? formatearMontoCOP(formData.precio_unitario.toString()) 
+        : '';
+
     return (
         <form className="flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-500 p-2">
             {/* ============================================================ */}
@@ -313,42 +342,48 @@ export const FormularioCompra = ({
                         )}
                     </div>
 
-                    {/* Precio Unitario */}
+                    {/* Precio Unitario (con formateo de miles) */}
                     <div className="flex flex-col gap-1">
                         <label className="text-[9px] uppercase ml-4 text-orange-500 font-black tracking-tighter">
                             <DollarSign size={10} className="inline mr-1" />
                             Precio Unitario <span className="text-red-400">*</span>
                         </label>
-                        <input
-                            name="precio_unitario"
-                            value={formData.precio_unitario}
-                            onChange={manejarCambioNumerico}
-                            type="text"
-                            inputMode="decimal"
-                            placeholder="$0.00"
-                            className={`border-1 rounded-full px-6 py-2 text-[11px] focus:outline-none focus:ring-2 text-right font-bold transition-all ${
-                                errores.precio_unitario ? 'border-red-400 focus:ring-red-300' : 'border-orange-200 focus:ring-orange-300'
-                            }`}
-                        />
+                        <div className="relative">
+                            <input
+                                name="precio_unitario"
+                                value={precioUnitarioFormateado}
+                                onChange={manejarCambioNumerico}
+                                type="text"
+                                inputMode="numeric"
+                                placeholder="$0"
+                                className={`w-full border-1 rounded-full pl-4 pr-12 py-2 text-[11px] focus:outline-none focus:ring-2 text-right font-bold transition-all ${
+                                    errores.precio_unitario ? 'border-red-400 focus:ring-red-300' : 'border-orange-200 focus:ring-orange-300'
+                                }`}
+                            />
+                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-bold text-orange-500">$</span>
+                        </div>
                         {errores.precio_unitario && (
                             <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.precio_unitario}</p>
                         )}
                     </div>
 
-                    {/* Precio Total (automático) */}
+                    {/* Precio Total (automático - con formateo de miles) */}
                     <div className="flex flex-col gap-1">
                         <label className="text-[9px] uppercase ml-4 text-orange-500 font-black tracking-tighter">
                             <DollarSign size={10} className="inline mr-1" />
                             Precio Total
                         </label>
-                        <input
-                            name="precio_total"
-                            value={formData.precio_total}
-                            readOnly
-                            type="text"
-                            placeholder="$0.00"
-                            className="border-1 border-orange-200 rounded-full px-6 py-2 text-[11px] bg-orange-50 text-right font-bold text-orange-700"
-                        />
+                        <div className="relative">
+                            <input
+                                name="precio_total"
+                                value={formData.precio_total ? new Intl.NumberFormat('es-CO').format(parseFloat(formData.precio_total)) : ''}
+                                readOnly
+                                type="text"
+                                placeholder="$0"
+                                className="w-full border-1 border-orange-200 rounded-full pl-4 pr-12 py-2 text-[11px] bg-orange-50 text-right font-bold text-orange-700"
+                            />
+                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-bold text-orange-500">$</span>
+                        </div>
                     </div>
 
                     {/* Número de Factura */}

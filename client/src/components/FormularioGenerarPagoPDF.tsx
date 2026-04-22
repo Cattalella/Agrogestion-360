@@ -3,7 +3,7 @@ import type { Pago } from '../hooks/useRegistrarPagos';
 import type { Trabajador } from '../hooks/useNuevoTrabajador';
 import type { TrabajoRealizado } from '../hooks/useTrabajoRealizado';
 import type { FormatoPago } from '../hooks/useGenerarPagoPDF';
-import { DollarSign, User, Calendar, FileText, AlertCircle, Download } from 'lucide-react';
+import { DollarSign, User, Calendar, FileText, AlertCircle, Download, Eye } from 'lucide-react';
 
 interface Props {
     pagoSeleccionado: Pago | null;
@@ -16,6 +16,15 @@ interface Props {
         periodo: string
     ) => Promise<FormatoPago>;
     onCancelar: () => void;
+    pdfPreviewUrl?: string | null;
+    generandoPDF?: boolean;
+    onPrevisualizar?: (
+        pago: Pago,
+        trabajador: Trabajador,
+        trabajos: TrabajoRealizado[],
+        periodo: string
+    ) => Promise<void>;
+    onDescargar?: () => void;
 }
 
 export const FormularioGenerarPagoPDF = ({
@@ -23,8 +32,23 @@ export const FormularioGenerarPagoPDF = ({
     trabajadores,
     trabajosRealizados,
     onGenerarPDF,
-    onCancelar
+    onCancelar,
+    pdfPreviewUrl,
+    generandoPDF = false,
+    onPrevisualizar,
+    onDescargar
 }: Props) => {
+
+    // ============================================================
+    // FUNCIONES DE FORMATEO DE MONEDA (COP - Puntos para miles)
+    // ============================================================
+    const formatearMoneda = (valor: number): string => {
+        if (isNaN(valor)) return '0';
+        return new Intl.NumberFormat('es-CO', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        }).format(valor);
+    };
 
     // Estado para mes y año seleccionados
     const [mesSeleccionado, setMesSeleccionado] = useState<number>(() => new Date().getMonth());
@@ -33,6 +57,7 @@ export const FormularioGenerarPagoPDF = ({
     const [trabajador, setTrabajador] = useState<Trabajador | null>(null);
     const [trabajosDelPago, setTrabajosDelPago] = useState<TrabajoRealizado[]>([]);
     const [error, setError] = useState<string | null>(null);
+    const [mostrarVistaPrevia, setMostrarVistaPrevia] = useState(false);
 
     // Lista de meses
     const meses = [
@@ -57,16 +82,13 @@ export const FormularioGenerarPagoPDF = ({
     // Cargar los trabajos realizados asociados al pago (filtrados por mes/año)
     useEffect(() => {
         if (pagoSeleccionado && trabajosRealizados.length > 0) {
-            // Calcular fechas de inicio y fin del mes seleccionado
             const fechaInicio = new Date(anoSeleccionado, mesSeleccionado, 1);
             const fechaFin = new Date(anoSeleccionado, mesSeleccionado + 1, 0);
             
-            // Si el pago tiene un trabajo específico asociado
             if (pagoSeleccionado.id_trabajo) {
                 const trabajo = trabajosRealizados.filter(t => t.id_trabajo === pagoSeleccionado.id_trabajo);
                 setTrabajosDelPago(trabajo);
             } else {
-                // Buscar trabajos del trabajador en el mes seleccionado
                 const trabajos = trabajosRealizados.filter(t => 
                     t.id_trabajador === pagoSeleccionado.id_trabajador &&
                     new Date(t.fecha_inicio) >= fechaInicio &&
@@ -77,57 +99,45 @@ export const FormularioGenerarPagoPDF = ({
         }
     }, [pagoSeleccionado, trabajosRealizados, mesSeleccionado, anoSeleccionado]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        
-        setError(null);
-        
-        if (!pagoSeleccionado) {
-            setError("No hay un pago seleccionado para generar el formato");
+    const handlePrevisualizar = async () => {
+        if (!pagoSeleccionado || !trabajador || trabajosDelPago.length === 0) {
+            setError("Faltan datos para generar la vista previa");
             return;
         }
         
-        if (!trabajador) {
-            setError("No se encontró el trabajador asociado a este pago");
-            return;
+        if (onPrevisualizar) {
+            setGenerando(true);
+            await onPrevisualizar(pagoSeleccionado, trabajador, trabajosDelPago, periodo);
+            setGenerando(false);
+            setMostrarVistaPrevia(true);
         }
-        
-        if (trabajosDelPago.length === 0) {
-            setError(`No hay trabajos realizados en ${periodo} asociados a este pago`);
-            return;
+    };
+
+    const handleDescargar = () => {
+        if (onDescargar) {
+            onDescargar();
         }
-        
-        if (pagoSeleccionado.estado_pago === 'Pagado con firma') {
-            setError("Este pago ya está registrado como pagado con firma");
+    };
+
+    const handleGenerarDirecto = async () => {
+        if (!pagoSeleccionado || !trabajador || trabajosDelPago.length === 0) {
+            setError("Faltan datos para generar el PDF");
             return;
         }
         
         setGenerando(true);
-        
-        try {
-            await onGenerarPDF(
-                pagoSeleccionado,
-                trabajador,
-                trabajosDelPago,
-                periodo
-            );
-            onCancelar();
-        } catch (err) {
-            console.error("Error al generar PDF:", err);
-            setError("Error al generar el formato de pago");
-        } finally {
-            setGenerando(false);
-        }
+        await onGenerarPDF(pagoSeleccionado, trabajador, trabajosDelPago, periodo);
+        setGenerando(false);
+        onCancelar();
     };
 
-    // Calcular total de horas
-    const totalHoras = trabajosDelPago.reduce((sum, t) => {
-        const horas = Number(t.duracion_horas) || 0;
-        return sum + horas;
-    }, 0);
+    const handleCerrarVistaPrevia = () => {
+        setMostrarVistaPrevia(false);
+        onCancelar();
+    };
 
-    // Verificar si el pago ya está pagado
     const yaPagado = pagoSeleccionado?.estado_pago === 'Pagado con firma';
+    const totalHoras = trabajosDelPago.reduce((sum, t) => sum + (Number(t.duracion_horas) || 0), 0);
 
     if (!pagoSeleccionado) {
         return (
@@ -137,7 +147,7 @@ export const FormularioGenerarPagoPDF = ({
                 <button
                     type="button"
                     onClick={onCancelar}
-                    className="mt-4 px-6 py-2 bg-emerald-600 text-white rounded-full text-sm"
+                    className="mt-4 px-6 py-2 bg-emerald-600 text-white text-sm"
                 >
                     Volver
                 </button>
@@ -145,8 +155,46 @@ export const FormularioGenerarPagoPDF = ({
         );
     }
 
+    // Vista previa del PDF
+    if (mostrarVistaPrevia && pdfPreviewUrl) {
+        return (
+            <div className="flex flex-col gap-4 p-4">
+                <div className="bg-emerald-50 rounded-2xl p-3 text-center">
+                    <p className="text-sm font-bold text-emerald-700">Vista previa del formato de pago</p>
+                    <p className="text-xs text-gray-500">Revisa el documento antes de descargar</p>
+                </div>
+                
+                <div className="border border-gray-200 rounded-2xl overflow-hidden border-b-2 border-gray-400">
+                    <iframe 
+                        src={pdfPreviewUrl} 
+                        className="w-full h-[500px]"
+                        title="Vista previa del formato de pago"
+                    />
+                </div>
+                
+                <div className="flex justify-between gap-4 mt-2">
+                    <button
+                        type="button"
+                        onClick={handleCerrarVistaPrevia}
+                        className="flex-1 bg-gray-200 text-gray-700 px-6 py-3 font-black text-[11px] uppercase hover:bg-gray-300 transition-all"
+                    >
+                        Cerrar
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleDescargar}
+                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 font-black text-[11px] uppercase shadow-md flex items-center justify-center gap-2"
+                    >
+                        <Download size={14} />
+                        Descargar PDF
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5 p-4">
+        <form onSubmit={(e) => { e.preventDefault(); handleGenerarDirecto(); }} className="flex flex-col gap-5 p-4">
             {/* ============================================================ */}
             {/* TÍTULO */}
             {/* ============================================================ */}
@@ -178,10 +226,10 @@ export const FormularioGenerarPagoPDF = ({
             {/* ============================================================ */}
             {/* INDICADOR DE CARGA */}
             {/* ============================================================ */}
-            {generando && (
+            {(generando || generandoPDF) && (
                 <div className="bg-emerald-50 rounded-2xl p-4 text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto mb-2"></div>
-                    <p className="text-sm text-emerald-600">Generando PDF, por favor espera...</p>
+                    <div className="animate-spin h-8 w-8 border-b-2 border-emerald-600 mx-auto mb-2"></div>
+                    <p className="text-sm text-emerald-800">Generando PDF, por favor espera...</p>
                     <p className="text-xs text-gray-400 mt-1">Esto puede tomar unos segundos</p>
                 </div>
             )}
@@ -202,29 +250,29 @@ export const FormularioGenerarPagoPDF = ({
             )}
 
             {/* ============================================================ */}
-            {/* INFORMACIÓN DEL PAGO */}
+            {/* INFORMACIÓN DEL PAGO (CON MONEDA FORMATEADA) */}
             {/* ============================================================ */}
-            <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-200">
-                <p className="text-[10px] font-black text-emerald-600 uppercase mb-3 flex items-center gap-2">
+            <div className="rounded-2xl p-4 border border-emerald-200">
+                <p className="text-[10px] font-black text-emerald-800 uppercase mb-3 flex items-center gap-2">
                     <DollarSign size={12} />
                     INFORMACIÓN DEL PAGO
                 </p>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div className="bg-white rounded-full px-4 py-2">
-                        <span className="text-gray-400 text-[9px] uppercase">ID Pago</span>
+                <div className="grid grid-cols-2 gap-5 text-sm">
+                    <div className="border-b-2 border-gray-400 px-4 py-2 border-b-2 border-gray-400">
+                        <span className="text-gray-400 text-[10px] uppercase">ID Pago</span>
                         <p className="font-bold text-gray-700">#{pagoSeleccionado.id_pago}</p>
                     </div>
-                    <div className="bg-white rounded-full px-4 py-2">
-                        <span className="text-gray-400 text-[9px] uppercase">Monto Total</span>
-                        <p className="font-bold text-emerald-600 text-lg">${pagoSeleccionado.monto_total.toLocaleString()}</p>
+                    <div className="border-b-2 border-gray-400 px-4 py-2 border-b-2 border-gray-400">
+                        <span className="text-gray-400 text-[10px] uppercase">Monto Total</span>
+                        <p className="font-bold text-emerald-800 text-lg">${formatearMoneda(pagoSeleccionado.monto_total)}</p>
                     </div>
-                    <div className="bg-white rounded-full px-4 py-2 col-span-2">
-                        <span className="text-gray-400 text-[9px] uppercase">Concepto</span>
-                        <p className="font-medium text-gray-700">{pagoSeleccionado.concepto}</p>
+                    <div className="border-b-2 border-gray-400 px-4 py-2 col-span-2 border-b-2 border-gray-400">
+                        <span className="text-gray-400 text-[10px] uppercase">Concepto</span>
+                        <p className="font-medium text-gray-700 uppercase">{pagoSeleccionado.concepto}</p>
                     </div>
-                    <div className="bg-white rounded-full px-4 py-2">
-                        <span className="text-gray-400 text-[9px] uppercase">Estado Actual</span>
-                        <p className={`inline-block px-3 py-0.5 rounded-full text-[9px] font-bold ${
+                    <div className="border-b-2 border-gray-400 px-4 py-2 border-b-2 border-gray-400 gap-6 flex items-center">
+                        <span className="text-gray-400 text-[10px] uppercase">Estado Actual</span>
+                        <p className={`inline-block px-3 py-0.5 text-[10px] font-bold uppercase tracking-[1px] ${
                             pagoSeleccionado.estado_pago === 'Pagado con firma' ? 'bg-green-100 text-green-600' :
                             pagoSeleccionado.estado_pago === 'Pendiente de firma' ? 'bg-yellow-100 text-yellow-600' :
                             'bg-red-100 text-red-600'
@@ -239,22 +287,22 @@ export const FormularioGenerarPagoPDF = ({
             {/* DATOS DEL TRABAJADOR */}
             {/* ============================================================ */}
             {trabajador && (
-                <div className="bg-emerald-50/30 rounded-2xl p-4 border border-emerald-200">
-                    <p className="text-[10px] font-black text-emerald-600 uppercase mb-3 flex items-center gap-2">
-                        <User size={12} />
+                <div className="rounded-2xl p-4 border border-emerald-200">
+                    <p className="text-[13px] font-black text-emerald-800 uppercase mb-3 flex items-center gap-2">
+                        <User size={20} />
                         DATOS DEL TRABAJADOR
                     </p>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                        <div className="bg-white rounded-full px-4 py-2 col-span-2">
-                            <span className="text-gray-400 text-[9px] uppercase">Nombre</span>
-                            <p className="font-bold text-gray-700">{trabajador.nombre_completo}</p>
+                    <div className="grid grid-cols-2 gap-5 text-sm">
+                        <div className="px-4 py-2 col-span-2 border-b-2 border-gray-400">
+                            <span className="text-gray-400 text-[10px] uppercase">Nombre</span>
+                            <p className="font-bold text-gray-700 uppercase">{trabajador.nombre_completo}</p>
                         </div>
-                        <div className="bg-white rounded-full px-4 py-2">
-                            <span className="text-gray-400 text-[9px] uppercase">Documento</span>
+                        <div className="border-b-2 border-gray-400 px-4 py-2">
+                            <span className="text-gray-400 text-[10px] uppercase">Documento</span>
                             <p className="font-medium text-gray-700">{trabajador.tipo_documento} {trabajador.num_documento}</p>
                         </div>
-                        <div className="bg-white rounded-full px-4 py-2">
-                            <span className="text-gray-400 text-[9px] uppercase">Teléfono</span>
+                        <div className="border-b-2 border-gray-400 px-4 py-2">
+                            <span className="text-gray-400 text-[10px] uppercase">Teléfono</span>
                             <p className="font-medium text-gray-700">{trabajador.telefono || 'No registrado'}</p>
                         </div>
                     </div>
@@ -265,7 +313,7 @@ export const FormularioGenerarPagoPDF = ({
             {/* TRABAJOS ASOCIADOS */}
             {/* ============================================================ */}
             <div className="bg-emerald-50/30 rounded-2xl p-4 border border-emerald-200">
-                <p className="text-[10px] font-black text-emerald-600 uppercase mb-3 flex items-center gap-2">
+                <p className="text-[10px] font-black text-emerald-800 uppercase mb-3 flex items-center gap-2">
                     <FileText size={12} />
                     TRABAJOS ASOCIADOS ({trabajosDelPago.length})
                 </p>
@@ -273,7 +321,7 @@ export const FormularioGenerarPagoPDF = ({
                 {trabajosDelPago.length > 0 ? (
                     <div className="max-h-48 overflow-y-auto">
                         <table className="w-full text-[11px]">
-                            <thead className="text-emerald-600 border-b border-emerald-200">
+                            <thead className="text-emerald-800 border-b border-emerald-200">
                                 <tr>
                                     <th className="text-left py-2">ACTIVIDAD</th>
                                     <th className="text-left py-2">DURACIÓN</th>
@@ -295,7 +343,7 @@ export const FormularioGenerarPagoPDF = ({
                         </table>
                     </div>
                 ) : (
-                    <div className="bg-white rounded-full px-4 py-3 text-center">
+                    <div className="border-b-2 border-gray-400 px-4 py-3 text-center">
                         <p className="text-[10px] text-gray-400 italic">
                             No hay trabajos en el período seleccionado
                         </p>
@@ -303,8 +351,8 @@ export const FormularioGenerarPagoPDF = ({
                 )}
                 
                 {trabajosDelPago.length > 0 && (
-                    <div className="mt-3 pt-2 border-t border-emerald-200 flex justify-between items-center bg-white rounded-full px-4 py-2">
-                        <span className="text-[10px] font-black text-emerald-600 uppercase">Total Horas:</span>
+                    <div className="mt-3 pt-2 border-t border-emerald-200 flex justify-between items-center border-b-2 border-gray-400 px-4 py-2">
+                        <span className="text-[10px] font-black text-emerald-800 uppercase">Total Horas:</span>
                         <span className="text-sm font-bold text-emerald-700">{totalHoras.toFixed(1)} horas</span>
                     </div>
                 )}
@@ -313,16 +361,16 @@ export const FormularioGenerarPagoPDF = ({
             {/* ============================================================ */}
             {/* SELECTOR DE MES Y AÑO */}
             {/* ============================================================ */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-5">
                 <div className="flex flex-col gap-1">
-                    <label className="text-[9px] uppercase ml-4 text-emerald-600 font-black tracking-tighter flex items-center gap-1">
+                    <label className="text-[10px] uppercase ml-4 text-emerald-800 font-black tracking-[1px] flex items-center gap-1">
                         <Calendar size={10} />
                         Mes
                     </label>
                     <select
                         value={mesSeleccionado}
                         onChange={(e) => setMesSeleccionado(parseInt(e.target.value))}
-                        className="border border-emerald-200 rounded-full px-6 py-3 text-[12px] bg-white focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                        className="px-6 py-3 text-[12px] border-b-2 border-gray-400 focus:outline-none uppercase hover:border-emerald-500 transition-all"
                     >
                         {meses.map((mes, idx) => (
                             <option key={idx} value={idx}>{mes}</option>
@@ -331,14 +379,14 @@ export const FormularioGenerarPagoPDF = ({
                 </div>
 
                 <div className="flex flex-col gap-1">
-                    <label className="text-[9px] uppercase ml-4 text-emerald-600 font-black tracking-tighter flex items-center gap-1">
+                    <label className="text-[10px] uppercase ml-4 text-emerald-800 font-black tracking-[1px] flex items-center gap-1">
                         <Calendar size={10} />
                         Año
                     </label>
                     <select
                         value={anoSeleccionado}
                         onChange={(e) => setAnoSeleccionado(parseInt(e.target.value))}
-                        className="border border-emerald-200 rounded-full px-6 py-3 text-[12px] bg-white focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                        className="border-b-2 border-gray-400 px-6 py-3 text-[12px] border-b-2 border-gray-400 focus:outline-none hover:border-emerald-500 transition-all"
                     >
                         {anos.map((ano) => (
                             <option key={ano} value={ano}>{ano}</option>
@@ -351,7 +399,7 @@ export const FormularioGenerarPagoPDF = ({
             {/* NOTA INFORMATIVA */}
             {/* ============================================================ */}
             <div className="bg-amber-50 rounded-2xl p-3 border border-amber-200">
-                <p className="text-[9px] text-amber-700 text-center flex items-center justify-center gap-2">
+                <p className="text-[10px] text-amber-700 text-center flex items-center justify-center gap-2">
                     <AlertCircle size={12} />
                     ⚠️ El pago en efectivo solo podrá registrarse después de que el trabajador 
                     haya firmado este formato. El formato firmado debe ser escaneado y subido como evidencia.
@@ -365,27 +413,31 @@ export const FormularioGenerarPagoPDF = ({
                 <button
                     type="button"
                     onClick={onCancelar}
-                    disabled={generando}
-                    className="flex-1 bg-white border border-emerald-400 text-emerald-600 px-6 py-3 rounded-full font-black text-[11px] uppercase italic shadow-sm active:scale-95 hover:bg-emerald-50 transition-all disabled:opacity-50"
+                    disabled={generando || generandoPDF}
+                    className="flex-1 border-b-2 border-gray-400 border border-emerald-400 text-emerald-800 px-6 py-3 font-black text-[11px] uppercase italic 
+                    shadow-sm active:scale-95 hover:bg-emerald-50 transition-all disabled:opacity-50 rounded-full"
                 >
                     Cancelar
                 </button>
+                {onPrevisualizar && (
+                    <button
+                        type="button"
+                        onClick={handlePrevisualizar}
+                        disabled={generando || generandoPDF || yaPagado || !trabajador || trabajosDelPago.length === 0}
+                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 font-black text-[11px] uppercase shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                        <Eye size={14} />
+                        Previsualizar
+                    </button>
+                )}
                 <button
                     type="submit"
-                    disabled={generando || yaPagado || !trabajador || trabajosDelPago.length === 0}
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-full font-black text-[11px] uppercase shadow-md active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    disabled={generando || generandoPDF || yaPagado || !trabajador || trabajosDelPago.length === 0}
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 font-black text-[11px] uppercase shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2
+                    rounded-full"
                 >
-                    {generando ? (
-                        <>
-                            <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            Generando PDF...
-                        </>
-                    ) : (
-                        <>
-                            <Download size={14} />
-                            Generar Formato de Pago
-                        </>
-                    )}
+                    <Download size={14} />
+                    Descargar PDF
                 </button>
             </div>
         </form>

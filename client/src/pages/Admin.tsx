@@ -64,7 +64,7 @@ export const Admin = () => {
     const inventario = useInventario() as any;
 
     // ============================================================
-    // HOOK DE FOTOS (reemplaza el anterior)
+    // HOOK DE FOTOS
     // ============================================================
     const { 
         fotos: todasLasFotos, 
@@ -90,12 +90,34 @@ export const Admin = () => {
         setIsInventarioOpen(true);
     };
 
+    // 🆕 Función para confirmar pago con firma (cuando se sube la foto)
+    const handleConfirmarPagoConFirma = async (idPago: number) => {
+        try {
+            // Buscar el pago en la lista
+            const pago = pagos.listaPagos?.find((p: any) => p.id_pago === idPago);
+            if (pago && pago.estado_pago !== 'Pagado con firma') {
+                // Actualizar el estado del pago
+                await pagos.guardarPago({
+                    ...pago,
+                    estado_pago: 'Pagado con firma',
+                    accion: 'actualizar'
+                }, true);
+                console.log(`✅ Pago ${idPago} marcado como Pagado con firma`);
+                // Recargar la lista de pagos
+                await pagos.recargarLista();
+            }
+        } catch (error) {
+            console.error("Error al confirmar pago:", error);
+        }
+    };
+
     // ============================================================
     // MODAL DE CONFIRMACIÓN (BORRAR FOTOS)
     // ============================================================
     const [modalConfig, setModalConfig] = useState({ abierto: false, mensaje: "", accion: () => {} });
 
     const manejarSubida = (nuevaFoto: FotoEvidencia) => {
+        console.log("📸 Nueva foto subida:", nuevaFoto);
         agregarFoto(nuevaFoto);
     };
 
@@ -194,14 +216,16 @@ export const Admin = () => {
             />
 
             {/* ============================================================ */}
-            {/* HERO 3 — EVIDENCIAS (SOLO TRABAJOS) */}
+            {/* HERO 3 — EVIDENCIAS */}
             {/* ============================================================ */}
             <Hero3
                 fotos={fotosTrabajo}
                 rol="admin"
+                pagosPendientes={pagos.listaPagos || []}
                 onSubirClick={manejarSubida}
                 onBorrarTodo={abrirModalBorrarTodo}
                 onBorrarUnaFoto={abrirModalBorrarUna}
+                onConfirmarPago={handleConfirmarPagoConFirma}
             />
 
         </div>

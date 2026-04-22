@@ -234,7 +234,6 @@ export const useSolicitudCompra = () => {
         }
     };
 
-<<<<<<< HEAD
     // ============================================================
     // 🎯 GUARDAR (CREAR O ACTUALIZAR SEGÚN CORRESPONDA)
     // ============================================================
@@ -249,7 +248,6 @@ export const useSolicitudCompra = () => {
     // ============================================================
     // FILTROS
     // ============================================================
-=======
     // 🆕 Función para cambiar estado de solicitud
 const cambiarEstadoSolicitud = async (id: number, estado: 'Aprobada' | 'Rechazada') => {
     try {
@@ -264,7 +262,6 @@ const cambiarEstadoSolicitud = async (id: number, estado: 'Aprobada' | 'Rechazad
     }
 };
 
->>>>>>> ac7679975803c595b63f608fa8a316af01e4af0b
     const solicitudesPendientes = solicitudes.filter(s => s.estado_sol === 'Pendiente');
     const solicitudesAprobadas = solicitudes.filter(s => s.estado_sol === 'Aprobada');
     const solicitudesRechazadas = solicitudes.filter(s => s.estado_sol === 'Rechazada');

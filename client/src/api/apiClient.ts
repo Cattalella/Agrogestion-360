@@ -43,10 +43,10 @@ apiClient.interceptors.response.use(
             localStorage.removeItem('usuario');
 
             // Redirigir al login en caso del error de datos inválidos
-            const enLogin = window.location.pathname === '/start';
+            const enLogin = window.location.pathname === '/star';
             if (!enLogin) {
                 console.warn('🔐 Sesión inválida, redirigiendo al login...');
-                window.location.href = '/start';
+                window.location.href = '/star';
             }
         }
 

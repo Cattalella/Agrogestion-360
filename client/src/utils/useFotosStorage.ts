@@ -8,7 +8,7 @@ export type FotoEvidencia = {
     url: string;
     fecha: string;
     like?: boolean;
-    origen?: 'consumo' | 'trabajo' | 'general';
+    origen?: 'consumo' | 'trabajo' | 'general' | 'pago_firma';
     idReferencia?: number;
 };
 
@@ -49,7 +49,7 @@ export const agregarFotoGlobal = (nuevaFoto: FotoEvidencia) => {
 // Función para agregar foto desde base64
 export const agregarFotoDesdeBase64Global = (
     base64: string,
-    origen: 'consumo' | 'trabajo' | 'general' = 'general',
+    origen: 'consumo' | 'trabajo' | 'general' | 'pago_firma' = 'general',
     idReferencia?: number
 ) => {
     const nuevaFoto: FotoEvidencia = {
@@ -119,7 +119,7 @@ export const useFotosStorage = () => {
 
     const agregarFotoDesdeBase64 = (
         base64: string,
-        origen: 'consumo' | 'trabajo' | 'general' = 'general',
+        origen: 'consumo' | 'trabajo' | 'general' | 'pago_firma' = 'general',
         idReferencia?: number
     ) => {
         agregarFotoDesdeBase64Global(base64, origen, idReferencia);
@@ -145,7 +145,7 @@ export const useFotosStorage = () => {
         eliminarFoto,
         eliminarTodasFotos,
         toggleLike,
-        getFotosPorOrigen: (origen: 'consumo' | 'trabajo' | 'general') => {
+        getFotosPorOrigen: (origen: 'consumo' | 'trabajo' | 'general' | 'pago_firma') => {
             return fotos.filter(f => f.origen === origen);
         },
         recargar: () => {

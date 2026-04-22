@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect } from "react";
 import { X, Plus } from "lucide-react";
+import logo from '../assets/imgs/isoNG.svg';
 import { useScrollPersonalizado } from "../hooks/useScrollPersonalizado";  // 🆕 Importar
 
 interface ModalGenericoProps {
@@ -66,15 +67,15 @@ export const ModalGenerico = ({
                 
                 <button 
                     onClick={onClose} 
-                    className="absolute top-6 right-8 text-gray-300 hover:text-red-500 transition-all cursor-pointer active:scale-90 z-10"
+                    className="absolute top-6 right-8 text-gray-300 hover:text-red-500 transition-all hover:rotate-90 cursor-pointer active:scale-90 z-10"
                 >
                     <X size={28} strokeWidth={2.5} />
                 </button>
 
                 {/* Encabezado - Fijo */}
                 <div className="flex flex-col items-center mb-4 flex-shrink-0">
-                    <div className="w-14 h-14 rounded-full border-2 border-blue-400 flex items-center justify-center mb-3 shadow-sm">
-                        <Plus className="text-blue-500 w-6 h-6" /> 
+                    <div className="w-14 h-14 rounded-full bg-black/5 flex items-center border border-gray-300 justify-center mb-3 animate-[slide_0.6s_ease-out]" style={{ animationName: 'slide' }}>
+                        <img className="w-7" src={logo} alt="isotipo de agrogestión360" /> 
                     </div>
                     
                     <h2 className="text-[1.1rem] font-black uppercase tracking-[3px] text-gray-600 text-center leading-tight">

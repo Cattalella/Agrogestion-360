@@ -45,7 +45,6 @@ model Persona {
   wallpaper_url   String?
   
   auditorias      Auditoria[]
-  ConsumoInsumo   ConsumoInsumo[]
   estado          EstadoPers          @relation(fields: [id_estado], references: [id_estado])
   rol             Rol                 @relation(fields: [id_rol], references: [id_rol])
   tipo_doc        CatalogoDoc         @relation(fields: [id_tipo_doc], references: [id_tipo_doc])
@@ -205,14 +204,14 @@ model Recordatorio {
 model ConsumoInsumo {
   id_consumo     Int        @id @default(autoincrement())
   id_insumo      Int
-  id_responsable Int
+  id_trabajador  Int
   actividad      String     @db.VarChar(50)
   cantidad       Decimal    @db.Decimal(10, 2)
   fecha_consumo  DateTime   @default(now())
   observaciones  String?
   createdAt      DateTime   @default(now())
   CatInsumos     CatInsumos @relation(fields: [id_insumo], references: [id_insumo])
-  Persona        Persona    @relation(fields: [id_responsable], references: [id_persona])
+  Trabajador     Trabajador @relation(fields: [id_trabajador], references: [id_trabajador])
 }
 
 model PagoTrabajador {
@@ -247,6 +246,7 @@ model Trabajador {
   updatedAt         DateTime
   PagoTrabajador    PagoTrabajador[]
   TrabajoRealizado  TrabajoRealizado[]
+  ConsumoInsumo     ConsumoInsumo[]
 }
 
 model TrabajoRealizado {

@@ -10,6 +10,7 @@ interface ModalConfirmacionProps {
     subtitulo?: string;
     loading?: boolean;
     tipo?: 'eliminar' | 'advertencia' | 'peligro';
+    children?: React.ReactNode;  // ✅ AGREGAR ESTA LÍNEA
 }
 
 export const ModalConfirmacion = ({
@@ -20,7 +21,8 @@ export const ModalConfirmacion = ({
     mensaje,
     subtitulo,
     loading = false,
-    tipo = 'eliminar'
+    tipo = 'eliminar',
+    children  // ✅ AGREGAR ESTA LÍNEA
 }: ModalConfirmacionProps) => {
     
     // Cerrar con tecla ESC
@@ -102,6 +104,7 @@ export const ModalConfirmacion = ({
                             {subtitulo}
                         </p>
                     )}
+                    {children}  {/* ✅ AGREGAR ESTA LÍNEA */}
                 </div>
                 
                 {/* Footer */}

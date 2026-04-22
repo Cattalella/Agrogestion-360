@@ -242,11 +242,8 @@ const ModalPerfil = ({ onClose }: { onClose: () => void }) => {
     const [email, setEmail] = useState("");
     const [telefono, setTelefono] = useState("");
     const [nombre, setNombre] = useState("");
-<<<<<<< HEAD
-    const navigate = useNavigate();
-=======
     const navigate = useNavigate()
->>>>>>> ac7679975803c595b63f608fa8a316af01e4af0b
+
 
     // Cargar perfil del backend
     useEffect(() => {
@@ -403,17 +400,11 @@ const ModalPerfil = ({ onClose }: { onClose: () => void }) => {
             </div>
 
             <hr className="border-gray-300 my-1" />
-            
-<<<<<<< HEAD
-            <button onClick={() => navigate('/cambiar-contrasena')} className="text-[10px] uppercase font-bold text-left hover:text-gray-600 transition-colors underline">
-                [ Cambiar contraseña ]
-=======
             <button 
             onClick={() => navigate("/contrasena")}
             className="text-[10px] uppercase font-bold text-left hover:text-gray-600 transition-colors underline"
             >
             [ Cambiar contraseña ]
->>>>>>> ac7679975803c595b63f608fa8a316af01e4af0b
             </button>
         </div>
     );

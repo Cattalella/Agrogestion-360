@@ -68,6 +68,22 @@ export const FormularioPagos = ({
     const [trabajosFiltrados, setTrabajosFiltrados] = useState<TrabajoRealizado[]>([]);
 
     // ============================================================
+    // FUNCIONES DE FORMATEO DE MONTOS (COP - Puntos para miles)
+    // ============================================================
+    const formatearMontoCOP = (valor: string): string => {
+        // Limpiar todo lo que no sea número
+        const numeros = valor.replace(/\D/g, '');
+        if (!numeros) return '';
+        
+        // Convertir a número y formatear con puntos
+        return new Intl.NumberFormat('es-CO').format(parseInt(numeros));
+    };
+
+    const limpiarFormateoMonto = (valor: string): number => {
+        return parseInt(valor.replace(/\D/g, '')) || 0;
+    };
+
+    // ============================================================
     // GUARDIA: Pago ya anulado — solo lectura
     // ============================================================
     const estaAnulado = Boolean(pagoAEditar?.justificacion_anulacion || pagoAEditar?.estado_pago === 'Anulado');
@@ -136,10 +152,17 @@ export const FormularioPagos = ({
 
     const manejarCambioNumerico = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
-        if (value === '' || /^\d*\.?\d*$/.test(value)) {
-            setFormData(prev => ({ ...prev, [name]: value }));
-            if (value && parseFloat(value) > 0) {
-                setErrores(prev => ({ ...prev, [name]: '' }));
+        if (name === 'monto_total') {
+            // Para el monto, usamos el formateo automático
+            const valorLimpio = limpiarFormateoMonto(value);
+            setFormData(prev => ({ ...prev, monto_total: valorLimpio.toString() }));
+            if (valorLimpio > 0) setErrores(prev => ({ ...prev, monto_total: '' }));
+        } else {
+            if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                setFormData(prev => ({ ...prev, [name]: value }));
+                if (value && parseFloat(value) > 0) {
+                    setErrores(prev => ({ ...prev, [name]: '' }));
+                }
             }
         }
     };
@@ -152,7 +175,9 @@ export const FormularioPagos = ({
 
         if (!formData.id_trabajador) nuevosErrores.id_trabajador = 'Selecciona un trabajador';
         if (!formData.fecha_pago) nuevosErrores.fecha_pago = 'La fecha es obligatoria';
-        if (!formData.monto_total || parseFloat(formData.monto_total) <= 0) {
+        
+        const montoNum = limpiarFormateoMonto(formData.monto_total);
+        if (!formData.monto_total || montoNum <= 0) {
             nuevosErrores.monto_total = 'El monto debe ser mayor a 0';
         }
         if (!formData.concepto.trim()) nuevosErrores.concepto = 'El concepto es obligatorio';
@@ -179,7 +204,7 @@ export const FormularioPagos = ({
             id_trabajador: parseInt(formData.id_trabajador),
             id_trabajo: formData.id_trabajo ? parseInt(formData.id_trabajo) : null,
             fecha_pago: formData.fecha_pago,
-            monto_total: parseFloat(formData.monto_total),
+            monto_total: limpiarFormateoMonto(formData.monto_total),
             concepto: formData.concepto,
             estado_pago: formData.estado_pago,
         };
@@ -228,7 +253,7 @@ export const FormularioPagos = ({
                     <div className="bg-gray-50 rounded-2xl p-3">
                         <p className="text-[9px] uppercase text-gray-400 font-black">Monto</p>
                         <p className="text-[12px] font-bold text-gray-700 mt-1">
-                            ${pagoAEditar?.monto_total?.toLocaleString() || '0'}
+                            ${pagoAEditar?.monto_total?.toLocaleString('es-CO') || '0'}
                         </p>
                     </div>
                     <div className="bg-gray-50 rounded-2xl p-3 col-span-2">
@@ -279,7 +304,7 @@ export const FormularioPagos = ({
                         } ${pagoAEditar ? 'opacity-60 cursor-not-allowed' : ''}`}
                     >
                         <option value="">SELECCIONAR TRABAJADOR *</option>
-                        {listaTrabajadores.filter(t => t.estado === 'activo').map(t => (
+                        {listaTrabajadores.filter(t => t.estado?.toLowerCase() === 'activo').map(t => (
                             <option key={t.id_trabajador} value={t.id_trabajador}>
                                 {t.nombre_completo} - {t.tipo_trabajo}
                             </option>
@@ -358,7 +383,7 @@ export const FormularioPagos = ({
             {/* ============================================================ */}
             <div className="flex flex-col gap-3">
 
-                {/* Monto Total */}
+                {/* Monto Total con formateo COP */}
                 <div>
                     <label className="text-[9px] uppercase ml-4 text-purple-600 font-black tracking-tighter">
                         <DollarSign size={10} className="inline mr-1" />
@@ -367,10 +392,10 @@ export const FormularioPagos = ({
                     <div className="relative">
                         <input
                             name="monto_total"
-                            value={formData.monto_total}
+                            value={formData.monto_total ? formatearMontoCOP(formData.monto_total.toString()) : ''}
                             onChange={manejarCambioNumerico}
                             type="text"
-                            inputMode="decimal"
+                            inputMode="numeric"
                             placeholder="0"
                             className={`w-full border-1 rounded-full pl-4 pr-12 py-2 text-[12px] focus:outline-none focus:ring-2 text-right font-bold transition-all ${
                                 errores.monto_total ? 'border-red-400 focus:ring-red-300' : 'border-purple-200 focus:ring-purple-300'

@@ -14,6 +14,16 @@ export class AuditoriaService {
     rol: string;
   }) {
     try {
+      // Verificar si el usuario existe antes de crear la auditoría
+      const usuarioExiste = await this.prisma.persona.findUnique({
+        where: { id_persona: datos.id_usuario }
+      });
+
+      if (!usuarioExiste) {
+        console.warn(`⚠️ Usuario con id ${datos.id_usuario} no encontrado. Auditoría no registrada.`);
+        return null;
+      }
+
       return await this.prisma.auditoria.create({
         data: {
           id_usuario: datos.id_usuario,
@@ -28,6 +38,7 @@ export class AuditoriaService {
     } catch (error) {
       console.error('❌ Error al registrar auditoría:', error);
       // No lanzamos error para no bloquear la acción principal
+      return null;
     }
   }
 

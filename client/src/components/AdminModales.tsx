@@ -241,6 +241,18 @@ export const AdminModales = ({
 }: Props) => {
 
     const [pagoSeleccionado, setPagoSeleccionado] = useState<any | null>(null);
+    // Estado para el modal de anulación de pagos
+    const [modalAnularPago, setModalAnularPago] = useState<{
+        isOpen: boolean;
+        id: number | null;
+        justificacion: string;
+        loading: boolean;
+    }>({
+        isOpen: false,
+        id: null,
+        justificacion: '',
+        loading: false
+    });
     const inventarioHook = useInventario();
 
     return (
@@ -655,12 +667,12 @@ export const AdminModales = ({
                                                             </button>
                                                             <button
                                                                 onClick={() => {
-                                                                    if (window.confirm('¿Anular este pago? Se requerirá justificación.')) {
-                                                                        const justificacion = prompt('Motivo de la anulación:');
-                                                                        if (justificacion) {
-                                                                            pagos?.anularPago?.(p.id_pago, justificacion);
-                                                                        }
-                                                                    }
+                                                                    setModalAnularPago({
+                                                                        isOpen: true,
+                                                                        id: p.id_pago,
+                                                                        justificacion: '',
+                                                                        loading: false
+                                                                    });
                                                                 }}
                                                                 className="text-red-500 hover:text-red-700 text-[10px] font-bold px-2 py-1 rounded-full hover:bg-red-50 transition-all"
                                                             >
@@ -1399,6 +1411,43 @@ export const AdminModales = ({
                 }
                 tipo="eliminar"
             />
+
+            {/* ============================================================ */}
+            {/* MODAL DE CONFIRMACIÓN PARA ANULAR PAGO */}
+            {/* ============================================================ */}
+            <ModalConfirmacion
+                isOpen={modalAnularPago.isOpen}
+                onClose={() => setModalAnularPago(prev => ({ ...prev, isOpen: false, justificacion: '' }))}
+                onConfirm={async () => {
+                    if (!modalAnularPago.justificacion.trim()) {
+                        alert("Debes ingresar una justificación para anular el pago");
+                        return;
+                    }
+                    setModalAnularPago(prev => ({ ...prev, loading: true }));
+                    await pagos?.anularPago?.(modalAnularPago.id!, modalAnularPago.justificacion);
+                    setModalAnularPago({ isOpen: false, id: null, justificacion: '', loading: false });
+                }}
+                titulo="ANULAR PAGO"
+                mensaje="¿Estás seguro de que deseas anular este pago?"
+                subtitulo="Esta acción no se puede deshacer. Se conservará el historial."
+                loading={modalAnularPago.loading}
+                tipo="peligro"
+            >
+                {/* Campo para justificación */}
+                <div className="mt-4">
+                    <label className="text-[10px] font-bold text-gray-600 uppercase block mb-2">
+                        Motivo de la anulación *
+                    </label>
+                    <textarea
+                        value={modalAnularPago.justificacion}
+                        onChange={(e) => setModalAnularPago(prev => ({ ...prev, justificacion: e.target.value }))}
+                        placeholder="Describe el motivo por el cual se anula este pago..."
+                        rows={3}
+                        className="w-full border border-gray-200 rounded-2xl px-4 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-red-300 resize-none"
+                        autoFocus
+                    />
+                </div>
+            </ModalConfirmacion>
         </>
     );
 };
