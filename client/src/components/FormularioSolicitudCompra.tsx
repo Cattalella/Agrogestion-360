@@ -397,9 +397,7 @@ export const FormularioSolicitudCompra = ({
                             >
                                 <option value="">Seleccionar especie</option>
                                 <option value="cerdos">🐷 Cerdos</option>
-                                <option value="peces">🐟 Peces</option>
                                 <option value="ganado">🐮 Ganado</option>
-                                <option value="gallinas">🐔 Gallinas</option>
                             </select>
                             {errores.especieDestino && (
                                 <p className="text-[9px] text-red-500 ml-4 mt-1">{errores.especieDestino}</p>

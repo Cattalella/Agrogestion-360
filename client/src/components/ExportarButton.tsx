@@ -1,20 +1,18 @@
 import { useState } from "react";
 import { Download, FileText, X, CheckCircle2 } from "lucide-react";
 import { jsPDF } from "jspdf";
-import html2canvas from "html2canvas";
+import html2canvas from "html2canvas-pro";
 
 // --- 1. COMPONENTE MODAL DE VISTA PREVIA ---
 const ModalPreview = ({ isOpen, onClose, onConfirm, titulo, tipo, children }: any) => {
     if (!isOpen) return null;
 
     return (
-        /* El onClick en este div detecta el clic afuera */
         <div 
             onClick={onClose}
             className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
         >
             <div 
-                /* stopPropagation evita que el clic adentro cierre el modal */
                 onClick={(e) => e.stopPropagation()}
                 className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in duration-300"
             >
@@ -79,21 +77,65 @@ export const ExportarButton = ({ datosFiltrados, targetId }: { datosFiltrados: a
         link.href = url;
         link.download = `Datos_AgroGestion_${new Date().toLocaleDateString()}.csv`;
         link.click();
+        URL.revokeObjectURL(url);
         setModalCSV(false);
     };
 
     const ejecutarDescargaPDF = async () => {
-        const elemento = document.getElementById(targetId);
-        if (!elemento) return;
-        const canvas = await html2canvas(elemento, { scale: 2, useCORS: true });
+    const elemento = document.getElementById(targetId);
+    if (!elemento) {
+        alert("No se encontró el elemento para generar el PDF");
+        return;
+    }
+    
+    // Mostrar indicador de carga
+    const loadingToast = document.createElement('div');
+    loadingToast.className = 'fixed bottom-4 right-4 bg-emerald-600 text-white px-4 py-2 rounded-full text-sm z-[10001] shadow-lg';
+    loadingToast.innerText = 'Generando PDF...';
+    document.body.appendChild(loadingToast);
+    
+    try {
+        // Clonar el elemento para no afectar la UI
+        const clon = elemento.cloneNode(true) as HTMLElement;
+        
+        // Mantener posición para clonar
+        clon.style.position = 'absolute';
+        clon.style.left = '-9999px';
+        clon.style.top = '0';
+        clon.style.width = `${elemento.offsetWidth}px`;
+        
+        // NO forzar fondo blanco - mantener colores originales
+        // NO eliminar estilos - mantener diseño original
+        
+        document.body.appendChild(clon);
+        
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        const canvas = await html2canvas(clon, { 
+            scale: 1.5, 
+            logging: false,
+            useCORS: true,
+            allowTaint: false
+        });
+        
+        // Limpiar el clon
+        document.body.removeChild(clon);
+        
         const imgData = canvas.toDataURL("image/png");
         const pdf = new jsPDF("p", "mm", "a4");
         const anchoPdf = pdf.internal.pageSize.getWidth();
         const altoPdf = (canvas.height * anchoPdf) / canvas.width;
         pdf.addImage(imgData, "PNG", 0, 0, anchoPdf, altoPdf);
-        pdf.save("Informe_Visual_AgroGestion.pdf");
+        pdf.save(`Dashboard_AgroGestion_${new Date().toISOString().split('T')[0]}.pdf`);
+        
+    } catch (error) {
+        console.error("Error al generar PDF:", error);
+        alert("Error al generar el PDF. Intenta de nuevo o actualiza la página.");
+    } finally {
+        loadingToast.remove();
         setModalPDF(false);
-    };
+    }
+};
 
     return (
         <>

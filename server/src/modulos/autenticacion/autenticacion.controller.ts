@@ -1,4 +1,3 @@
-// src/modulos/autenticacion/autenticacion.controller.ts
 import {
   Controller,
   Post,
@@ -11,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { AutenticacionService } from './autenticacion.service';
 import { LoginDto } from './dto/login.dto';
-import { RecuperarContrasenaDto } from './dto/recuperar-contrasena.dto';
+import { RecuperarContrasenaDto, SolicitarRecuperacionDto, RestablecerContrasenaDto } from './dto/recuperar-contrasena.dto';
 import { CambiarContrasenaDto } from './dto/cambiar-contrasena.dto';
 import { AutenticacionGuardia } from '../../compartido/guardias/autenticacion.guardia';
 import { RolesGuardia } from '../../compartido/guardias/roles.guardia';
@@ -32,18 +31,44 @@ export class AutenticacionController {
   }
 
   // ============================================================
+  // 🆕 POST /api/autenticacion/solicitar-recuperacion (PASO 1 - Solo email)
+  // ============================================================
+  @Post('solicitar-recuperacion')
+  @HttpCode(HttpStatus.OK)
+  async solicitarRecuperacion(@Body() body: any) {
+    console.log('📧 solicitud recibida:', body);
+    return this.autenticacionService.solicitarRecuperacion(body.email);
+  }
+
+  // ============================================================
+  // 🆕 POST /api/autenticacion/restablecer-contrasena (PASO 2 - Con token)
+  // ============================================================
+  @Post('restablecer-contrasena')
+  @HttpCode(HttpStatus.OK)
+  async restablecerContrasena(@Body() body: any) {
+    console.log('🔑 Restableciendo contraseña:', { email: body.email, token: body.token });
+    return this.autenticacionService.restablecerContrasena(
+      body.email,
+      body.token,
+      body.nueva_contrasena,
+    );
+  }
+
+  // ============================================================
+  // (MANTENIDO PARA COMPATIBILIDAD CON VERSIONES ANTERIORES)
   // POST /api/autenticacion/recuperar-contrasena
   // ============================================================
   @Post('recuperar-contrasena')
   @HttpCode(HttpStatus.OK)
   async recuperarContrasena(@Body() recuperarDto: RecuperarContrasenaDto) {
-    return this.autenticacionService.solicitarRecuperacion(
+    return this.autenticacionService.solicitarRecuperacionOld(
       recuperarDto.email,
       recuperarDto.nueva_contrasena,
     );
   }
 
   // ============================================================
+  // (MANTENIDO PARA COMPATIBILIDAD CON VERSIONES ANTERIORES)
   // GET /api/autenticacion/confirmar-reset
   // ============================================================
   @Get('confirmar-reset')
@@ -55,7 +80,7 @@ export class AutenticacionController {
   }
 
   // ============================================================
-  // POST /api/autenticacion/cambiar-contrasena
+  // POST /api/autenticacion/cambiar-contrasena (Usuario logueado)
   // ============================================================
   @Post('cambiar-contrasena')
   @UseGuards(AutenticacionGuardia)
@@ -91,7 +116,7 @@ export class AutenticacionController {
   }
 
   // ============================================================
-  // POST /api/autenticacion/registrar-administrador (RF.1.1.1)
+  // POST /api/autenticacion/registrar-administrador
   // ============================================================
   @Post('registrar-administrador')
   @UseGuards(AutenticacionGuardia, RolesGuardia)

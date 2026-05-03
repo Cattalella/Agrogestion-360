@@ -643,7 +643,7 @@ export const AdminModales = ({
                                     {pagos?.listaPagos?.length > 0 ? pagos.listaPagos.map((p: any) => (
                                         <tr key={p.id_pago || p.id} className="border-t border-purple-50 hover:bg-purple-50/30 transition-all group">
                                             <td className="p-3 font-bold">{p.Trabajador?.nombre_completo || p.id_trabajador || '—'}</td>
-                                            <td className="p-3">${p.monto_total?.toLocaleString() || '0'}</td>
+                                            <td className="p-3">${p.monto_total ? `${Number(p.monto_total).toLocaleString('es-CO')}` : '$0'}</td>
                                             <td className="p-3">{p.fecha_pago?.split('T')[0] || '—'}</td>
                                             <td className="p-3">
                                                 <span className={`px-2 py-1 rounded-full text-[9px] ${
@@ -871,7 +871,7 @@ export const AdminModales = ({
                                 </thead>
                                 <tbody>
                                     {compras?.solicitudesVisibles?.length > 0 ? compras.solicitudesVisibles.map((s: any) => (
-                                        <tr key={s.id} className="border-t border-amber-50">
+                                        <tr key={s.id_solicitud} className="border-t border-amber-50">
                                             <td className="p-3 font-bold">{s.categoria_general || '—'}</td>
                                             <td className="p-3">{s.tipo_insumo || s.tipo_alimento || '—'}</td>
                                             <td className="p-3">{s.cantidad || 0}</td>
@@ -905,10 +905,22 @@ export const AdminModales = ({
                     </div>
                 ) : (
                     <FormularioCompra 
-                        tipoSeleccionado={compras?.tipoSeleccionado ?? 'insumo'} 
-                        setTipoSeleccionado={compras?.setTipoSeleccionado ?? (() => {})} 
-                        onGuardar={(datos: any, cerrar: boolean) => compras?.crearSolicitud?.(datos, cerrar)} 
-                        onCancelar={() => compras?.cambiarVista?.('lista')} 
+                        tipoSeleccionado={registrarCompra?.tipoSeleccionado ?? 'insumo'}
+                        setTipoSeleccionado={registrarCompra?.setTipoSeleccionado ?? (() => {})}
+                        onGuardar={async (datos: any, cerrar: boolean) => {
+                            console.log('Ejecutar compra real:', datos);
+                            await registrarCompra?.ejecutarCompraReal?.(datos);
+        
+                            // 🆕 Recargar inventario después de comprar
+                            if (inventarioHook?.recargar) {
+                                await inventarioHook.recargar();
+                                console.log('✅ Inventario recargado después de compra');
+                            }
+        
+                            if (cerrar) registrarCompra?.cerrarModal?.();
+                        }}
+                        onCancelar={() => registrarCompra?.cambiarVista?.('lista')}
+                        solicitudesAprobadas={registrarCompra?.solicitudesAprobadas ?? []}
                     />
                 )}
             </ModalGenerico>
@@ -971,7 +983,12 @@ export const AdminModales = ({
                                         }}
                                     >
                                         <option value="">-- Selecciona un pago --</option>
-                                        {pagos?.listaPagos?.map((p: any) => (
+                                        {pagos?.listaPagos
+                                        ?.filter((p: any) =>
+                                        p.estado_pago !== 'pagado con firma' &&
+                                        p.estado_pago !== 'Anulado'
+                                    )
+                                        ?.map((p: any) => (
                                             <option key={p.id_pago || p.id} value={p.id_pago || p.id}>
                                                 #{p.id_pago || p.id} - {p.Trabajador?.nombre_completo || p.id_trabajador} - ${p.monto_total?.toLocaleString()}
                                             </option>

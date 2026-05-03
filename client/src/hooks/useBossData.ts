@@ -1,42 +1,55 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import apiClient from "../api/apiClient";
 
 const normalizarFiltro = (filtro: string): string => {
   const mapa: Record<string, string> = {
-    "ESTE MES":     "este_mes",
-    "SEIS MESES":   "seis_meses",
-    "UN AÑO ATRAS": "un_ano_atras",
-    "FECHA ACTUAL": "fecha_actual",
+    "ESTE_MES": "este_mes",
+    "MES_PASADO": "mes_pasado",
+    "SEIS_MESES": "seis_meses",
+    "UN_ANO_ATRAS": "un_ano_atras",
   };
   return mapa[filtro] ?? "este_mes";
 };
 
 export const useBossData = () => {
-    const [data, setData] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-    const fetchData = async (filtro?: string) => {
-        setLoading(true);
-        setError(null);
-        
-        try {
-            const params = filtro && filtro !== "RESETEAR" 
-                ? { filtro: normalizarFiltro(filtro) } 
-                : { filtro: "este_mes" };
-            const response = await apiClient.get("/analiticas/dashboard", { params });
-            setData(response.data);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : "Error al cargar datos");
-            console.error("Error fetching boss data:", err);
-        } finally {
-            setLoading(false);
-        }
-    };
+  const fetchData = useCallback(async (filtro?: string, fechaInicio?: Date, fechaFin?: Date) => {
+    setLoading(true);
+    setError(null);
 
-    useEffect(() => {
-        fetchData();
-    }, []);
+    let params: any = {};
 
-    return { data, loading, error, refetch: fetchData };
+    if (filtro === "RANGO_PERSONALIZADO" && fechaInicio && fechaFin) {
+      params.fecha_inicio = fechaInicio.toISOString();
+      params.fecha_fin = fechaFin.toISOString();
+      params.es_rango = "true";
+    } else if (filtro) {
+      // Normalizar el filtro rápido a minúsculas con guión bajo
+      params.filtro = normalizarFiltro(filtro);
+    } else {
+      params.filtro = "este_mes";
+    }
+
+    console.log("📡 Parámetros enviados:", params);
+
+    try {
+      const response = await apiClient.get("/analiticas/dashboard", { params });
+      console.log("✅ Datos recibidos:", response.data);
+      setData(response.data);
+    } catch (err) {
+      console.error("❌ Error:", err);
+      setError(err instanceof Error ? err.message : "Error al cargar datos");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  return { data, loading, error, refetch: fetchData };
 };

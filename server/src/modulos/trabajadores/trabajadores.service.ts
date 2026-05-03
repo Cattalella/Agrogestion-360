@@ -32,7 +32,6 @@ export class TrabajadoresService {
       throw new BadRequestException('Ya existe un trabajador con ese tipo y número de documento');
     }
 
-    // Normalizar estado a minúscula
     const estadoNormalizado = datos.estado?.toLowerCase() === 'activo' ? 'activo' : 'inactivo';
 
     return this.prisma.trabajador.create({
@@ -61,7 +60,6 @@ export class TrabajadoresService {
       throw new NotFoundException('Trabajador no encontrado');
     }
 
-    // Normalizar estado a minúscula si viene
     let estadoNormalizado = datos.estado;
     if (estadoNormalizado) {
       estadoNormalizado = estadoNormalizado.toLowerCase() === 'activo' ? 'activo' : 'inactivo';
@@ -123,7 +121,6 @@ export class TrabajadoresService {
       where: { id_trabajador: parseInt(datos.id_trabajador) }
     });
 
-    // Validar trabajador activo (acepta 'activo' y 'Activo')
     if (!trabajador || trabajador.estado.toLowerCase() !== 'activo') {
       throw new BadRequestException('Solo trabajadores activos pueden registrar trabajo');
     }
@@ -245,7 +242,6 @@ export class TrabajadoresService {
       throw new BadRequestException('Trabajador no encontrado');
     }
 
-    // 🔥 VALIDACIÓN CORREGIDA: acepta 'activo' y 'Activo'
     if (trabajador.estado.toLowerCase() !== 'activo') {
       throw new BadRequestException('Solo se puede pagar a trabajadores activos');
     }
@@ -375,16 +371,6 @@ export class TrabajadoresService {
     return pagoAnulado;
   }
 
-  async obtenerPagosPendientes() {
-    return this.prisma.pagoTrabajador.findMany({
-      where: { estado_pago: 'Pendiente de firma' },
-      include: {
-        Trabajador: { select: { nombre_completo: true } }
-      },
-      orderBy: { fecha_pago: 'asc' }
-    });
-  }
-
   async confirmarPagoConFirma(id: number, firma_url: string) {
     const pago = await this.prisma.pagoTrabajador.findUnique({
       where: { id_pago: id }
@@ -405,7 +391,42 @@ export class TrabajadoresService {
   }
 
   // ============================================================
-  // 📌 DASHBOARD — SUPERVISIÓN (Hero2)
+  // 📌 SINCRONIZACIÓN FIRMA DESDE CARRUSEL (AÑADIDO)
+  // ============================================================
+
+  async sincronizarFirmaDesdeFoto(idTrabajo: number, estadoPago: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const pagoAsociado = await tx.pagoTrabajador.findFirst({
+        where: { id_trabajo: idTrabajo }
+      });
+
+      if (!pagoAsociado) {
+        throw new NotFoundException('No se encontró un pago vinculado a este trabajo');
+      }
+
+      const pagoActualizado = await tx.pagoTrabajador.update({
+        where: { id_pago: pagoAsociado.id_pago },
+        data: { 
+          estado_pago: estadoPago,
+          updatedAt: new Date()
+        }
+      });
+
+      await this.auditoria.registrar({
+        id_usuario: 5,
+        accion: 'SINCRONIZACION_LIKE',
+        descripcion: `Pago #${pagoAsociado.id_pago} actualizado a ${estadoPago} vía carrusel`,
+        entidad: 'PagoTrabajador',
+        id_entidad: pagoAsociado.id_pago,
+        rol: 'Administrador'
+      });
+
+      return pagoActualizado;
+    });
+  }
+
+  // ============================================================
+  // 📌 DASHBOARD — SUPERVISIÓN
   // ============================================================
 
   async contarTrabajadoresActivos(): Promise<number> {

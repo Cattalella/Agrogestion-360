@@ -81,6 +81,15 @@ export class TrabajadoresController {
     return this.trabajadoresService.eliminarTrabajo(id, justificacion);
   }
 
+  // NUEVO: ENDPOINT PARA SINCRONIZACIÓN DESDE CARRUSEL
+  @Put('trabajos/:id/firmar-con-like')
+  async firmarTrabajoConLike(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('estado_pago') estado_pago: string
+  ) {
+    return this.trabajadoresService.sincronizarFirmaDesdeFoto(id, estado_pago);
+  }
+
   // ============================================================
   // 📌 ENDPOINTS PAGOS — RF.8.1.1
   // ============================================================
@@ -88,6 +97,11 @@ export class TrabajadoresController {
   @Get('pagos')
   async listarPagos() {
     return this.trabajadoresService.listarPagos();
+  }
+
+  @Get('pagos/resumen')
+  async resumenPagos() {
+    return this.trabajadoresService.resumenPagos();
   }
 
   @Get('pagos/:id')
@@ -100,7 +114,6 @@ export class TrabajadoresController {
     return this.trabajadoresService.registrarPago(datos);
   }
 
-  // RN.8.1.1: Solo editable si NO está anulado
   @Put('pagos/:id')
   async actualizarPago(
     @Param('id', ParseIntPipe) id: number,
@@ -109,7 +122,6 @@ export class TrabajadoresController {
     return this.trabajadoresService.actualizarPago(id, datos);
   }
 
-  // RN.8.1.1: Anular con justificación — conserva historial
   @Patch('pagos/:id/anular')
   async anularPago(
     @Param('id', ParseIntPipe) id: number,
@@ -127,7 +139,7 @@ export class TrabajadoresController {
   }
 
   // ============================================================
-  // 📌 ENDPOINTS DASHBOARD — SUPERVISIÓN (Hero2)
+  // 📌 ENDPOINTS DASHBOARD — SUPERVISIÓN
   // ============================================================
 
   @Get('activos/count')
@@ -138,11 +150,6 @@ export class TrabajadoresController {
   @Get('activos/lista')
   async listarActivos() {
     return this.trabajadoresService.listarTrabajadoresActivos();
-  }
-
-  @Get('pagos/resumen')
-  async resumenPagos() {
-    return this.trabajadoresService.resumenPagos();
   }
 
   @Get('insumos/criticos/count')

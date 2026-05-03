@@ -1,5 +1,4 @@
-// src/pages/Boss.tsx
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Encabezado } from "../components/Encabezado";
 import { useNavigate } from "react-router-dom";
 import { BarraFiltros } from "../components/BarraFiltros";
@@ -7,22 +6,15 @@ import { Hero1 } from "../components/Hero1";
 import { Hero2 } from "../components/Hero2";
 import { Hero3 } from "../components/Hero3";
 import { useBossData } from "../hooks/useBossData";
+import { useEvidencias } from "../hooks/useEvidencias";
 import toro from "../assets/imgs/TORO_IMG.webp";
 
-// ============================================================
-// 📌 DATOS DE EJEMPLO (MOCK) - SIEMPRE DISPONIBLES
-// ============================================================
-const MOCK_GASTOS_SECTOR = [
-    { name: "PORCICULTURA", valor: 2, color: "#10b981", detalle: "Ene: 1M | Feb: 1M" },
-    { name: "GANADERÍA", valor: 2, color: "#8b5cf6", detalle: "Ene: 1M | Feb: 1M" },
-    { name: "INVENTARIO", valor: 2, color: "#f43f5e", detalle: "Ene: 1M | Feb: 1M" },
-];
-
-const MOCK_FILTROS = ["ESTE MES", "SEIS MESES", "UN AÑO ATRÁS"];
+const MOCK_FILTROS = ["ESTE MES", "MES PASADO", "SEIS MESES", "UN AÑO ATRÁS"];
 
 export const Boss = () => {
     const navigate = useNavigate();
     const { data, loading, error, refetch } = useBossData();
+    const { listasFotos: todasLasFotos, toggleLike } = useEvidencias();
     
     useEffect(() => {
         const token = localStorage.getItem("token");
@@ -31,7 +23,17 @@ export const Boss = () => {
         }
     }, [navigate]);
 
-    // Datos seguros: siempre tienen las propiedades necesarias (Uso de ?. para evitar crashes)
+    const formatearCOPcsv = (valor: number): string => {
+        if (valor === 0) return '0';
+        return new Intl.NumberFormat('es-CO', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+        }).format(valor);
+    };
+
+    const gastosPorSector = data?.gastos_por_sector || [];
+    const datosGraficaBarras = data?.grafica_ganancias || [];
+
     const dashboard = {
         ganancias: { 
             tipo1: "TOTAL VENTAS", 
@@ -41,43 +43,48 @@ export const Boss = () => {
             tipo1: "TOTAL INVERSIÓN", 
             cantidad1: data?.ganancias?.total_inversion || 0 
         },
-        gastosPorSector: Array.isArray(data?.gastos_por_sector) 
-            ? data.gastos_por_sector.map((item: any) => ({
-                name: item.sector?.toUpperCase() || "SIN NOMBRE",
-                valor: item.total || 0,
-                color: item.sector?.toUpperCase() === "PORCICULTURA" ? "#10b981" : 
-                        item.sector?.toUpperCase() === "GANADERÍA" ? "#8b5cf6" : "#f43f5e",
-                detalle: `Acumulado: ${item.total || 0}`
-            }))
-            : MOCK_GASTOS_SECTOR,
+        gastosPorSector: gastosPorSector,
         insumosCriticos: {
             dias: data?.supervision?.insumos_criticos || 0,
             titulo: "Insumos Críticos",
             lista: []
         },
         pagosTrabajadores: {
-            titulo: `Pagado: $${data?.supervision?.pagos_trabajadores?.total_pagado || 0}`,
+            titulo: `Pagado: ${formatearCOPcsv(data?.supervision?.pagos_trabajadores?.total_pagado || 0)}`,
             lista: new Array(data?.supervision?.pagos_trabajadores?.num_pagos || 0).fill("")
         },
         trabajadoresActivos: {
             titulo: "Trabajadores",
-            lista: new Array(data?.supervision?.trabajadores_activos || 0).fill("")
+            lista: data?.supervision?.trabajadores_activos?.lista || []
         },
         filtrosDisponibles: Array.isArray(data?.filtrosDisponibles) ? data.filtrosDisponibles : MOCK_FILTROS,
     };
 
-    // Datos para el reporte exportable
     const datosParaArchivo = [
-        { item: "Ganancias Netas", valor: dashboard.ganancias.cantidad1 },
-        { item: "Inversión Total", valor: dashboard.inversion.cantidad1 },
-        { item: "Total Trabajadores", valor: dashboard.trabajadoresActivos.lista.length },
-        { item: "Insumos Críticos", valor: dashboard.insumosCriticos.dias }
+        { fecha: new Date().toLocaleDateString(), categoria: "FINANCIERO", concepto: "TOTAL VENTAS", valor: formatearCOPcsv(dashboard.ganancias.cantidad1), notas: "Ganancias del período" },
+        { fecha: new Date().toLocaleDateString(), categoria: "FINANCIERO", concepto: "TOTAL INVERSIÓN", valor: formatearCOPcsv(dashboard.inversion.cantidad1), notas: "Gastos del período" },
+        { fecha: new Date().toLocaleDateString(), categoria: "FINANCIERO", concepto: "BALANCE NETO", valor: formatearCOPcsv(dashboard.ganancias.cantidad1 - dashboard.inversion.cantidad1), notas: "Ganancia - Inversión" },
+        ...(Array.isArray(dashboard.gastosPorSector) ? dashboard.gastosPorSector.map(sector => ({
+            fecha: new Date().toLocaleDateString(),
+            categoria: "GASTO POR SECTOR",
+            concepto: sector?.name || "Sector sin nombre",
+            valor: formatearCOPcsv(sector?.valor || 0),
+            notas: sector?.detalle || ""
+        })) : []),
+        { fecha: new Date().toLocaleDateString(), categoria: "SUPERVISIÓN", concepto: "Insumos Críticos", valor: dashboard.insumosCriticos.dias.toString(), notas: "Insumos por debajo del mínimo" },
+        { fecha: new Date().toLocaleDateString(), categoria: "SUPERVISIÓN", concepto: "Total Pagado a Trabajadores", valor: formatearCOPcsv(data?.supervision?.pagos_trabajadores?.total_pagado || 0), notas: "Pagos realizados en el período" },
+        { fecha: new Date().toLocaleDateString(), categoria: "SUPERVISIÓN", concepto: "Trabajadores Activos", valor: dashboard.trabajadoresActivos.lista.length.toString(), notas: "Personal actualmente activo" },
     ];
 
-    const handleFiltrar = (filtro: string) => {
-        console.log("Filtrar por:", filtro);
-        if (filtro === "RESETEAR") {
-            refetch();
+    const handleFiltrar = (filtro: string, fechaInicio?: Date, fechaFin?: Date) => {
+        console.log("Filtrar por:", filtro, fechaInicio, fechaFin);
+        
+        if (filtro === "RANGO_PERSONALIZADO" && fechaInicio && fechaFin) {
+            const inicio = new Date(fechaInicio);
+            inicio.setHours(0, 0, 0, 0);
+            const fin = new Date(fechaFin);
+            fin.setHours(23, 59, 59, 999);
+            refetch(filtro, inicio, fin);
         } else {
             refetch(filtro);
         }
@@ -99,29 +106,33 @@ export const Boss = () => {
     }
 
     return (
-        <div id="boss-report" className="font-[texto] bg-[#fafafa] min-h-screen">
+        <div id="boss-report" className="font-[texto] bg-[#ffffff] min-h-screen">
             <Encabezado estilos="" titulo="PROPIETARIO" id="boss" subtitulo="AQUÍ TIENES EL PULSO DE TU FINCA HOY...">
                 <img src={toro} alt="Fondo Toro" className="w-full h-full block object-center object-cover" />
             </Encabezado>
             
-            <BarraFiltros 
-                onFiltrar={handleFiltrar}
-                filtrosDisponibles={dashboard.filtrosDisponibles}
-            />
+            <BarraFiltros onFiltrar={handleFiltrar} />
             
             <Hero1 
                 ganancias={dashboard.ganancias}
                 inversion={dashboard.inversion}
                 gastosPorSector={dashboard.gastosPorSector}
+                datosGrafica={datosGraficaBarras}
             />
             
             <Hero2 
                 insumos={dashboard.insumosCriticos}
                 pagos={dashboard.pagosTrabajadores}
                 trabajadoresactivos={dashboard.trabajadoresActivos}
+                esBoss={true}
             />
             
-            <Hero3 datosExportar={datosParaArchivo} fotos={[]} rol="boss" />
+            <Hero3 
+                datosExportar={datosParaArchivo} 
+                fotos={todasLasFotos}
+                rol="boss"
+                onToggleLike={toggleLike}
+            />
         </div>
     );
 };

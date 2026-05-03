@@ -13,25 +13,36 @@ export type FotoEvidencia = {
 };
 
 // ============================================================
-// 📌 UTILIDADES DE LOCALSTORAGE
+// 📌 UTILIDADES DE LOCALSTORAGE (CON FILTRO DE PESO)
 // ============================================================
 
 const STORAGE_KEY = 'fotos_evidencias';
 
 export const obtenerFotos = (): FotoEvidencia[] => {
-    const fotos = localStorage.getItem(STORAGE_KEY);
-    return fotos ? JSON.parse(fotos) : [];
+    try {
+        const fotos = localStorage.getItem(STORAGE_KEY);
+        return fotos ? JSON.parse(fotos) : [];
+    } catch (e) {
+        return [];
+    }
 };
 
 export const guardarFotos = (fotos: FotoEvidencia[]) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(fotos));
+    try {
+        // 🚨 SOLUCIÓN AL QUOTA EXCEEDED:
+        // Solo guardamos en el disco duro las URLs que ya están en la nube (http).
+        // Las fotos en Base64 son demasiado pesadas para el localStorage.
+        const fotosLivianas = fotos.filter(f => f.url.startsWith('http'));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(fotosLivianas));
+    } catch (e) {
+        console.error("Error al guardar en localStorage:", e);
+    }
 };
 
 // ============================================================
 // 📌 ESTADO GLOBAL (SINGLETON)
 // ============================================================
 
-// Variable global para almacenar las fotos fuera del hook
 let fotosGlobal: FotoEvidencia[] = [];
 let suscriptores: ((fotos: FotoEvidencia[]) => void)[] = [];
 
@@ -39,14 +50,52 @@ const notificarCambio = () => {
     suscriptores.forEach(callback => callback([...fotosGlobal]));
 };
 
-// Función para agregar foto globalmente
+// --- FUNCIÓN DE SINCRONIZACIÓN CON EL BACKEND (CORREGIDA) ---
+export const sincronizarFotosDesdeBackend = (fotosBackend: any[]) => {
+    if (!fotosBackend || !Array.isArray(fotosBackend)) return;
+
+    const fotosFormateadas: FotoEvidencia[] = fotosBackend
+        .filter(f => f.evidencia_url)
+        .map(f => ({
+            id: f.id_trabajo || Date.now(),
+            url: f.evidencia_url,
+            fecha: f.fecha_inicio || new Date().toLocaleDateString(),
+            origen: 'trabajo' as const,
+            like: false
+        }));
+
+    // 🔧 CORREGIDO: Agregar sin duplicados, no reemplazar
+    const nuevasFotos = fotosFormateadas.filter(f =>
+        !fotosGlobal.some(existente => existente.url === f.url)
+    );
+
+    if (nuevasFotos.length > 0) {
+        fotosGlobal = [...nuevasFotos, ...fotosGlobal];
+        guardarFotos(fotosGlobal);
+        notificarCambio();
+        console.log(`📸 [Sync] ${nuevasFotos.length} nuevas fotos agregadas al carrusel`);
+    }
+};
+
+// --- AGREGAR FOTO (RAM + DISCO SI ES URL) ---
 export const agregarFotoGlobal = (nuevaFoto: FotoEvidencia) => {
+    // Evitar duplicados por URL
+    if (nuevaFoto.url.startsWith('http') && fotosGlobal.some(f => f.url === nuevaFoto.url)) {
+        console.log("📸 [Sync] Foto ya existe, omitiendo duplicado");
+        return;
+    }
+
     fotosGlobal = [nuevaFoto, ...fotosGlobal];
-    guardarFotos(fotosGlobal);
+
+    // Si la foto ya es una URL de internet, la guardamos para que no se pierda al recargar
+    if (nuevaFoto.url.startsWith('http')) {
+        guardarFotos(fotosGlobal);
+    }
+
     notificarCambio();
 };
 
-// Función para agregar foto desde base64
+// --- AGREGAR DESDE COMPUTADORA (SOLO RAM) ---
 export const agregarFotoDesdeBase64Global = (
     base64: string,
     origen: 'consumo' | 'trabajo' | 'general' | 'pago_firma' = 'general',
@@ -60,30 +109,73 @@ export const agregarFotoDesdeBase64Global = (
         origen,
         idReferencia
     };
+
     agregarFotoGlobal(nuevaFoto);
 };
 
-// Función para eliminar foto globalmente
+// --- ELIMINAR ---
 export const eliminarFotoGlobal = (id: number) => {
     fotosGlobal = fotosGlobal.filter(f => f.id !== id);
     guardarFotos(fotosGlobal);
     notificarCambio();
 };
 
-// Función para eliminar todas las fotos
 export const eliminarTodasFotosGlobal = () => {
     fotosGlobal = [];
     guardarFotos(fotosGlobal);
     notificarCambio();
 };
 
-// Función para toggle like
-export const toggleLikeGlobal = (id: number) => {
+// ============================================================
+// 📌 TOGGLE LIKE — Lógica central de aprobación de pagos
+// ============================================================
+
+export const toggleLikeGlobal = async (id: number) => {
+    const foto = fotosGlobal.find(f => f.id === id);
+    if (!foto) return;
+
+    const nuevoLike = !foto.like;
+
+    // 1. Actualizar estado local inmediatamente (optimistic update)
     fotosGlobal = fotosGlobal.map(f =>
-        f.id === id ? { ...f, like: !f.like } : f
+        f.id === id ? { ...f, like: nuevoLike } : f
     );
     guardarFotos(fotosGlobal);
     notificarCambio();
+
+    // 2. Si la foto está vinculada a un pago con firma, sincronizar con el backend
+    if (foto.origen === 'pago_firma' && foto.idReferencia) {
+        try {
+            const { default: apiClient } = await import('../api/apiClient');
+
+            if (nuevoLike) {
+                // ✅ Boss aprueba → marcar como "Pagado con firma"
+                await apiClient.put(`/trabajadores/pagos/${foto.idReferencia}`, {
+                    estado_pago: 'Pagado con firma'
+                });
+                console.log(`✅ Pago #${foto.idReferencia} → "Pagado con firma"`);
+            } else {
+                // ↩️ Boss quita like → revertir a "Pendiente de firma"
+                await apiClient.put(`/trabajadores/pagos/${foto.idReferencia}`, {
+                    estado_pago: 'Pendiente de firma'
+                });
+                console.log(`↩️ Pago #${foto.idReferencia} → "Pendiente de firma"`);
+            }
+
+            // 3. Notificar a useRegistrarPagos para que recargue las cards del admin
+            window.dispatchEvent(new CustomEvent('recargar-pagos'));
+
+        } catch (error) {
+            console.error('❌ Error al actualizar estado del pago:', error);
+
+            // Revertir el like en local si el backend falló
+            fotosGlobal = fotosGlobal.map(f =>
+                f.id === id ? { ...f, like: foto.like } : f
+            );
+            guardarFotos(fotosGlobal);
+            notificarCambio();
+        }
+    }
 };
 
 // ============================================================
@@ -93,7 +185,6 @@ export const toggleLikeGlobal = (id: number) => {
 export const useFotosStorage = () => {
     const [fotos, setFotos] = useState<FotoEvidencia[]>(fotosGlobal);
 
-    // Cargar fotos al iniciar si están vacías
     useEffect(() => {
         if (fotosGlobal.length === 0) {
             fotosGlobal = obtenerFotos();
@@ -101,7 +192,6 @@ export const useFotosStorage = () => {
         setFotos(fotosGlobal);
     }, []);
 
-    // Suscribirse a cambios globales
     useEffect(() => {
         const callback = (nuevasFotos: FotoEvidencia[]) => {
             setFotos(nuevasFotos);
@@ -112,39 +202,15 @@ export const useFotosStorage = () => {
         };
     }, []);
 
-    // Funciones que usan las globales
-    const agregarFoto = (nuevaFoto: FotoEvidencia) => {
-        agregarFotoGlobal(nuevaFoto);
-    };
-
-    const agregarFotoDesdeBase64 = (
-        base64: string,
-        origen: 'consumo' | 'trabajo' | 'general' | 'pago_firma' = 'general',
-        idReferencia?: number
-    ) => {
-        agregarFotoDesdeBase64Global(base64, origen, idReferencia);
-    };
-
-    const eliminarFoto = (id: number) => {
-        eliminarFotoGlobal(id);
-    };
-
-    const eliminarTodasFotos = () => {
-        eliminarTodasFotosGlobal();
-    };
-
-    const toggleLike = (id: number) => {
-        toggleLikeGlobal(id);
-    };
-
     return {
         fotos,
         cargando: false,
-        agregarFoto,
-        agregarFotoDesdeBase64,
-        eliminarFoto,
-        eliminarTodasFotos,
-        toggleLike,
+        agregarFoto: agregarFotoGlobal,
+        agregarFotoDesdeBase64: agregarFotoDesdeBase64Global,
+        eliminarFoto: eliminarFotoGlobal,
+        eliminarTodasFotos: eliminarTodasFotosGlobal,
+        toggleLike: toggleLikeGlobal,
+        sincronizarConServidor: sincronizarFotosDesdeBackend,
         getFotosPorOrigen: (origen: 'consumo' | 'trabajo' | 'general' | 'pago_firma') => {
             return fotos.filter(f => f.origen === origen);
         },

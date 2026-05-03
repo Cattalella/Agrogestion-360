@@ -50,7 +50,6 @@ export const FormularioGenerarPagoPDF = ({
         }).format(valor);
     };
 
-    // Estado para mes y año seleccionados
     const [mesSeleccionado, setMesSeleccionado] = useState<number>(() => new Date().getMonth());
     const [anoSeleccionado, setAnoSeleccionado] = useState<number>(() => new Date().getFullYear());
     const [generando, setGenerando] = useState(false);
@@ -59,19 +58,14 @@ export const FormularioGenerarPagoPDF = ({
     const [error, setError] = useState<string | null>(null);
     const [mostrarVistaPrevia, setMostrarVistaPrevia] = useState(false);
 
-    // Lista de meses
     const meses = [
         'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
         'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
     ];
 
-    // Generar años (desde 2020 hasta el próximo año)
     const anos = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 + i);
-
-    // Período formateado para mostrar
     const periodo = `${meses[mesSeleccionado]} ${anoSeleccionado}`;
 
-    // Cargar el trabajador asociado al pago
     useEffect(() => {
         if (pagoSeleccionado && trabajadores.length > 0) {
             const trabajadorEncontrado = trabajadores.find(t => t.id_trabajador === pagoSeleccionado.id_trabajador);
@@ -79,17 +73,16 @@ export const FormularioGenerarPagoPDF = ({
         }
     }, [pagoSeleccionado, trabajadores]);
 
-    // Cargar los trabajos realizados asociados al pago (filtrados por mes/año)
     useEffect(() => {
         if (pagoSeleccionado && trabajosRealizados.length > 0) {
             const fechaInicio = new Date(anoSeleccionado, mesSeleccionado, 1);
             const fechaFin = new Date(anoSeleccionado, mesSeleccionado + 1, 0);
-            
+
             if (pagoSeleccionado.id_trabajo) {
                 const trabajo = trabajosRealizados.filter(t => t.id_trabajo === pagoSeleccionado.id_trabajo);
                 setTrabajosDelPago(trabajo);
             } else {
-                const trabajos = trabajosRealizados.filter(t => 
+                const trabajos = trabajosRealizados.filter(t =>
                     t.id_trabajador === pagoSeleccionado.id_trabajador &&
                     new Date(t.fecha_inicio) >= fechaInicio &&
                     new Date(t.fecha_inicio) <= fechaFin
@@ -104,7 +97,6 @@ export const FormularioGenerarPagoPDF = ({
             setError("Faltan datos para generar la vista previa");
             return;
         }
-        
         if (onPrevisualizar) {
             setGenerando(true);
             await onPrevisualizar(pagoSeleccionado, trabajador, trabajosDelPago, periodo);
@@ -124,7 +116,6 @@ export const FormularioGenerarPagoPDF = ({
             setError("Faltan datos para generar el PDF");
             return;
         }
-        
         setGenerando(true);
         await onGenerarPDF(pagoSeleccionado, trabajador, trabajosDelPago, periodo);
         setGenerando(false);
@@ -136,6 +127,7 @@ export const FormularioGenerarPagoPDF = ({
         onCancelar();
     };
 
+    // 🔧 yaPagado solo es informativo, ya no bloquea nada
     const yaPagado = pagoSeleccionado?.estado_pago === 'Pagado con firma';
     const totalHoras = trabajosDelPago.reduce((sum, t) => sum + (Number(t.duracion_horas) || 0), 0);
 
@@ -163,15 +155,15 @@ export const FormularioGenerarPagoPDF = ({
                     <p className="text-sm font-bold text-emerald-700">Vista previa del formato de pago</p>
                     <p className="text-xs text-gray-500">Revisa el documento antes de descargar</p>
                 </div>
-                
+
                 <div className="border border-gray-200 rounded-2xl overflow-hidden border-b-2 border-gray-400">
-                    <iframe 
-                        src={pdfPreviewUrl} 
+                    <iframe
+                        src={pdfPreviewUrl}
                         className="w-full h-[500px]"
                         title="Vista previa del formato de pago"
                     />
                 </div>
-                
+
                 <div className="flex justify-between gap-4 mt-2">
                     <button
                         type="button"
@@ -195,9 +187,8 @@ export const FormularioGenerarPagoPDF = ({
 
     return (
         <form onSubmit={(e) => { e.preventDefault(); handleGenerarDirecto(); }} className="flex flex-col gap-5 p-4">
-            {/* ============================================================ */}
+
             {/* TÍTULO */}
-            {/* ============================================================ */}
             <div className="text-center border-b pb-3">
                 <h2 className="text-lg font-bold text-emerald-700 flex items-center justify-center gap-2">
                     <DollarSign size={20} className="text-emerald-500" />
@@ -206,9 +197,7 @@ export const FormularioGenerarPagoPDF = ({
                 <p className="text-xs text-gray-400">RF.8.1.4 - Formato para firma del trabajador</p>
             </div>
 
-            {/* ============================================================ */}
             {/* ERROR */}
-            {/* ============================================================ */}
             {error && (
                 <div className="bg-red-50 rounded-2xl p-3 border border-red-200 flex items-center gap-2">
                     <AlertCircle size={16} className="text-red-500 shrink-0" />
@@ -223,9 +212,7 @@ export const FormularioGenerarPagoPDF = ({
                 </div>
             )}
 
-            {/* ============================================================ */}
             {/* INDICADOR DE CARGA */}
-            {/* ============================================================ */}
             {(generando || generandoPDF) && (
                 <div className="bg-emerald-50 rounded-2xl p-4 text-center">
                     <div className="animate-spin h-8 w-8 border-b-2 border-emerald-600 mx-auto mb-2"></div>
@@ -234,43 +221,39 @@ export const FormularioGenerarPagoPDF = ({
                 </div>
             )}
 
-            {/* ============================================================ */}
-            {/* ALERTA SI YA ESTÁ PAGADO */}
-            {/* ============================================================ */}
+            {/* 🔧 CORREGIDO: Mensaje informativo, ya NO bloquea ni es rojo */}
             {yaPagado && (
-                <div className="bg-red-50 rounded-2xl p-4 border border-red-200 flex items-center gap-3">
-                    <AlertCircle size={20} className="text-red-500 shrink-0" />
+                <div className="bg-amber-50 rounded-2xl p-4 border border-amber-200 flex items-center gap-3">
+                    <AlertCircle size={20} className="text-amber-500 shrink-0" />
                     <div>
-                        <p className="text-sm font-bold text-red-600">Pago ya registrado</p>
-                        <p className="text-xs text-red-500">
-                            Este pago ya fue registrado como "Pagado con firma". No se puede generar otro formato.
+                        <p className="text-sm font-bold text-amber-600">Pago ya aprobado por el dueño</p>
+                        <p className="text-xs text-amber-500">
+                            Este pago fue aprobado con firma. Puedes generar el PDF como comprobante.
                         </p>
                     </div>
                 </div>
             )}
 
-            {/* ============================================================ */}
-            {/* INFORMACIÓN DEL PAGO (CON MONEDA FORMATEADA) */}
-            {/* ============================================================ */}
+            {/* INFORMACIÓN DEL PAGO */}
             <div className="rounded-2xl p-4 border border-emerald-200">
                 <p className="text-[10px] font-black text-emerald-800 uppercase mb-3 flex items-center gap-2">
                     <DollarSign size={12} />
                     INFORMACIÓN DEL PAGO
                 </p>
                 <div className="grid grid-cols-2 gap-5 text-sm">
-                    <div className="border-b-2 border-gray-400 px-4 py-2 border-b-2 border-gray-400">
+                    <div className="border-b-2 border-gray-400 px-4 py-2">
                         <span className="text-gray-400 text-[10px] uppercase">ID Pago</span>
                         <p className="font-bold text-gray-700">#{pagoSeleccionado.id_pago}</p>
                     </div>
-                    <div className="border-b-2 border-gray-400 px-4 py-2 border-b-2 border-gray-400">
+                    <div className="border-b-2 border-gray-400 px-4 py-2">
                         <span className="text-gray-400 text-[10px] uppercase">Monto Total</span>
                         <p className="font-bold text-emerald-800 text-lg">${formatearMoneda(pagoSeleccionado.monto_total)}</p>
                     </div>
-                    <div className="border-b-2 border-gray-400 px-4 py-2 col-span-2 border-b-2 border-gray-400">
+                    <div className="border-b-2 border-gray-400 px-4 py-2 col-span-2">
                         <span className="text-gray-400 text-[10px] uppercase">Concepto</span>
                         <p className="font-medium text-gray-700 uppercase">{pagoSeleccionado.concepto}</p>
                     </div>
-                    <div className="border-b-2 border-gray-400 px-4 py-2 border-b-2 border-gray-400 gap-6 flex items-center">
+                    <div className="border-b-2 border-gray-400 px-4 py-2 gap-6 flex items-center">
                         <span className="text-gray-400 text-[10px] uppercase">Estado Actual</span>
                         <p className={`inline-block px-3 py-0.5 text-[10px] font-bold uppercase tracking-[1px] ${
                             pagoSeleccionado.estado_pago === 'Pagado con firma' ? 'bg-green-100 text-green-600' :
@@ -283,9 +266,7 @@ export const FormularioGenerarPagoPDF = ({
                 </div>
             </div>
 
-            {/* ============================================================ */}
             {/* DATOS DEL TRABAJADOR */}
-            {/* ============================================================ */}
             {trabajador && (
                 <div className="rounded-2xl p-4 border border-emerald-200">
                     <p className="text-[13px] font-black text-emerald-800 uppercase mb-3 flex items-center gap-2">
@@ -309,15 +290,13 @@ export const FormularioGenerarPagoPDF = ({
                 </div>
             )}
 
-            {/* ============================================================ */}
             {/* TRABAJOS ASOCIADOS */}
-            {/* ============================================================ */}
             <div className="bg-emerald-50/30 rounded-2xl p-4 border border-emerald-200">
                 <p className="text-[10px] font-black text-emerald-800 uppercase mb-3 flex items-center gap-2">
                     <FileText size={12} />
                     TRABAJOS ASOCIADOS ({trabajosDelPago.length})
                 </p>
-                
+
                 {trabajosDelPago.length > 0 ? (
                     <div className="max-h-48 overflow-y-auto">
                         <table className="w-full text-[11px]">
@@ -349,7 +328,7 @@ export const FormularioGenerarPagoPDF = ({
                         </p>
                     </div>
                 )}
-                
+
                 {trabajosDelPago.length > 0 && (
                     <div className="mt-3 pt-2 border-t border-emerald-200 flex justify-between items-center border-b-2 border-gray-400 px-4 py-2">
                         <span className="text-[10px] font-black text-emerald-800 uppercase">Total Horas:</span>
@@ -358,9 +337,7 @@ export const FormularioGenerarPagoPDF = ({
                 )}
             </div>
 
-            {/* ============================================================ */}
             {/* SELECTOR DE MES Y AÑO */}
-            {/* ============================================================ */}
             <div className="grid grid-cols-2 gap-5">
                 <div className="flex flex-col gap-1">
                     <label className="text-[10px] uppercase ml-4 text-emerald-800 font-black tracking-[1px] flex items-center gap-1">
@@ -386,7 +363,7 @@ export const FormularioGenerarPagoPDF = ({
                     <select
                         value={anoSeleccionado}
                         onChange={(e) => setAnoSeleccionado(parseInt(e.target.value))}
-                        className="border-b-2 border-gray-400 px-6 py-3 text-[12px] border-b-2 border-gray-400 focus:outline-none hover:border-emerald-500 transition-all"
+                        className="border-b-2 border-gray-400 px-6 py-3 text-[12px] focus:outline-none hover:border-emerald-500 transition-all"
                     >
                         {anos.map((ano) => (
                             <option key={ano} value={ano}>{ano}</option>
@@ -395,26 +372,23 @@ export const FormularioGenerarPagoPDF = ({
                 </div>
             </div>
 
-            {/* ============================================================ */}
             {/* NOTA INFORMATIVA */}
-            {/* ============================================================ */}
             <div className="bg-amber-50 rounded-2xl p-3 border border-amber-200">
                 <p className="text-[10px] text-amber-700 text-center flex items-center justify-center gap-2">
                     <AlertCircle size={12} />
-                    ⚠️ El pago en efectivo solo podrá registrarse después de que el trabajador 
+                    ⚠️ El pago en efectivo solo podrá registrarse después de que el trabajador
                     haya firmado este formato. El formato firmado debe ser escaneado y subido como evidencia.
                 </p>
             </div>
 
-            {/* ============================================================ */}
             {/* BOTONES */}
-            {/* ============================================================ */}
+            {/* 🔧 CORREGIDO: yaPagado eliminado del disabled — el PDF siempre se puede generar */}
             <div className="flex justify-between gap-4 mt-4 pt-4 border-t">
                 <button
                     type="button"
                     onClick={onCancelar}
                     disabled={generando || generandoPDF}
-                    className="flex-1 border-b-2 border-gray-400 border border-emerald-400 text-emerald-800 px-6 py-3 font-black text-[11px] uppercase italic 
+                    className="flex-1 border border-emerald-400 text-emerald-800 px-6 py-3 font-black text-[11px] uppercase italic 
                     shadow-sm active:scale-95 hover:bg-emerald-50 transition-all disabled:opacity-50 rounded-full"
                 >
                     Cancelar
@@ -423,8 +397,9 @@ export const FormularioGenerarPagoPDF = ({
                     <button
                         type="button"
                         onClick={handlePrevisualizar}
-                        disabled={generando || generandoPDF || yaPagado || !trabajador || trabajosDelPago.length === 0}
-                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 font-black text-[11px] uppercase shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        disabled={generando || generandoPDF || !trabajador || trabajosDelPago.length === 0}
+                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 font-black text-[11px] uppercase shadow-md 
+                        disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 rounded-full"
                     >
                         <Eye size={14} />
                         Previsualizar
@@ -432,9 +407,9 @@ export const FormularioGenerarPagoPDF = ({
                 )}
                 <button
                     type="submit"
-                    disabled={generando || generandoPDF || yaPagado || !trabajador || trabajosDelPago.length === 0}
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 font-black text-[11px] uppercase shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2
-                    rounded-full"
+                    disabled={generando || generandoPDF || !trabajador || trabajosDelPago.length === 0}
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 font-black text-[11px] uppercase shadow-md 
+                    disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 rounded-full"
                 >
                     <Download size={14} />
                     Descargar PDF

@@ -22,7 +22,6 @@ export class AutenticacionService {
     private jwtService: JwtService,
     private auditoria: AuditoriaService,
   ) {
-    // Inicializar Supabase
     this.supabase = createClient(
       process.env.SUPABASE_URL || '',
       process.env.SUPABASE_ANON_KEY || '',
@@ -30,21 +29,88 @@ export class AutenticacionService {
   }
 
   // ============================================================
-  // CONFIGURACIÓN DE NODEMAILER (MANTENIDO PARA COMPATIBILIDAD)
+  // ✅ CONFIGURACIÓN DE NODEMAILER PARA BREVO (CORREGIDA)
   // ============================================================
   private crearTransportador() {
-    return nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
+  
+
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT), // 👈 Línea corregida
+    secure: false,
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+}
+
+  // ============================================================
+  // ENVIAR CORREO DE RESTABLECIMIENTO (CON VERIFICACIÓN)
+  // ============================================================
+  private async enviarCorreoRestablecimiento(email: string, link: string) {
+    console.log('📧 [EMAIL] Preparando envío a:', email);
+    console.log('📧 [EMAIL] Link:', link);
+
+    const transporter = this.crearTransportador();
+    
+    // Verificar conexión SMTP
+    try {
+      await transporter.verify();
+      console.log('✅ [EMAIL] Conexión SMTP verificada correctamente');
+    } catch (verifyError) {
+      console.error('❌ [EMAIL] Error de verificación SMTP:', verifyError);
+      throw new BadRequestException('Error en la configuración del servidor de correo');
+    }
+
+    const mailOptions = {
+      from: `"Agrogestion 360" <${process.env.EMAIL_USER || 'a9be9b001@smtp-brevo.com'}>`,
+      to: email,
+      subject: 'Restablece tu contraseña',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: auto; padding: 32px; border: 1px solid #e5e7eb; border-radius: 12px;">
+          <h2 style="color: #15803d; text-align: center;">🌾 Agrogestion 360</h2>
+          <p style="color: #374151;">Recibimos una solicitud para restablecer tu contraseña.</p>
+          <p style="color: #374151;">Haz clic en el botón para continuar:</p>
+
+          <div style="text-align: center; margin: 32px 0;">
+            <a href="${link}"
+              style="background-color: #15803d; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 14px; letter-spacing: 1px;">
+              RESTABLECER CONTRASEÑA
+            </a>
+          </div>
+
+          <p style="color: #6b7280; font-size: 13px;">Este link expira en <strong>1 hora</strong>.</p>
+          <p style="color: #6b7280; font-size: 13px;">Si no solicitaste este cambio, ignora este correo.</p>
+          <hr style="margin: 20px 0; border-color: #e5e7eb;">
+          <p style="color: #9ca3af; font-size: 11px;">Este mensaje es automático, por favor no responder.</p>
+        </div>
+      `,
+    };
+
+    try {
+      const info = await transporter.sendMail(mailOptions);
+      console.log('✅ [EMAIL] Correo enviado exitosamente a:', email);
+      console.log('  Message ID:', info.messageId);
+      console.log('  Response:', info.response);
+      return info;
+    } catch (error) {
+      console.error('❌ [EMAIL] Error al enviar correo:');
+      console.error('  Error:', error.message);
+      console.error('  Code:', error.code);
+      console.error('  Command:', error.command);
+      throw new BadRequestException('No se pudo enviar el correo de recuperación');
+    }
   }
 
+  // ============================================================
+  // ENVIAR CORREO DE RECUPERACIÓN (MANTENIDO PARA COMPATIBILIDAD)
+  // ============================================================
   private async enviarCorreoRecuperacion(email: string, link: string) {
+    console.log('📧 [EMAIL-OLD] Preparando envío a:', email);
+    
     const transporter = this.crearTransportador();
-
+    
     await transporter.sendMail({
       from: `"Agrogestion 360" <${process.env.EMAIL_USER}>`,
       to: email,
@@ -67,6 +133,7 @@ export class AutenticacionService {
         </div>
       `,
     });
+    console.log(`✅ [EMAIL-OLD] Correo de recuperación enviado a: ${email}`);
   }
 
   // ============================================================
@@ -129,9 +196,142 @@ export class AutenticacionService {
   }
 
   // ============================================================
-  // RECUPERAR CONTRASEÑA CON NODEMAILER (MANTENIDO)
+  // 🆕 SOLICITAR RECUPERACIÓN (PASO 1) - Solo email, no revela existencia
   // ============================================================
-  async solicitarRecuperacion(email: string, nuevaContrasena: string) {
+  async solicitarRecuperacion(email: string) {
+    console.log('🔍 [SOLICITAR] Verificando email:', email);
+    
+    // Buscar usuario (silenciosamente)
+    const persona = await this.prisma.persona.findUnique({
+      where: { email },
+      include: { rol: true }
+    });
+
+    // Siempre respondemos igual por seguridad
+    const respuesta = {
+      mensaje: 'Si el correo está registrado, recibirás un enlace para restablecer tu contraseña'
+    };
+
+    // Solo si existe el usuario, procesamos
+    if (persona) {
+      console.log('✅ [SOLICITAR] Usuario encontrado, generando token...');
+      
+      // Marcar tokens anteriores como usados
+      await this.prisma.recuperacionClave.updateMany({
+        where: {
+          id_persona: persona.id_persona,
+          usado: false,
+        },
+        data: { usado: true },
+      });
+
+      const token = crypto.randomBytes(32).toString('hex');
+      const tokenHash = await bcrypt.hash(token, 10);
+
+      const expiracion = new Date();
+      expiracion.setHours(expiracion.getHours() + 1);
+
+      // Guardamos el token (sin contraseña aún)
+      await this.prisma.recuperacionClave.create({
+        data: {
+          id_persona: persona.id_persona,
+          token_hash: tokenHash,
+          nueva_contrasena_hash: null,
+          fecha_expiracion: expiracion,
+        },
+      });
+
+      const urlBase = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const linkRestablecimiento = `${urlBase}/contrasena?token=${token}&email=${encodeURIComponent(email)}`;
+
+      try {
+        await this.enviarCorreoRestablecimiento(email, linkRestablecimiento);
+        console.log(`📧 [SOLICITAR] Correo enviado exitosamente a: ${email}`);
+      } catch (mailError) {
+        console.error(`❌ [SOLICITAR] Error al enviar correo a ${email}:`, mailError);
+        // No lanzamos error para no revelar información
+      }
+    } else {
+      console.log(`⚠️ [SOLICITAR] Email no encontrado: ${email}`);
+    }
+
+    return respuesta;
+  }
+
+  // ============================================================
+  // 🆕 RESTABLECER CONTRASEÑA (PASO 2) - Con token y nueva contraseña
+  // ============================================================
+  async restablecerContrasena(email: string, token: string, nuevaContrasena: string) {
+    console.log('🔑 [RESTABLECER] Intentando restablecer para:', email);
+    
+    // Validar contraseña
+    if (!nuevaContrasena || nuevaContrasena.length < 6) {
+      throw new BadRequestException('La contraseña debe tener al menos 6 caracteres');
+    }
+
+    const persona = await this.prisma.persona.findUnique({
+      where: { email },
+      include: { 
+        tokens: {
+          where: { 
+            usado: false,
+            fecha_expiracion: { gt: new Date() }
+          }
+        },
+        rol: true
+      }
+    });
+
+    if (!persona || persona.tokens.length === 0) {
+      throw new BadRequestException('El enlace de restablecimiento es inválido o ha expirado');
+    }
+
+    // Buscar token válido
+    let tokenValido: any = null;
+    for (const t of persona.tokens) {
+      const esCorrecto = await bcrypt.compare(token, t.token_hash);
+      if (esCorrecto) {
+        tokenValido = t;
+        break;
+      }
+    }
+
+    if (!tokenValido) {
+      throw new BadRequestException('El enlace de restablecimiento es inválido o ha expirado');
+    }
+
+    const nuevaClaveHash = await bcrypt.hash(nuevaContrasena, 10);
+
+    await this.prisma.$transaction([
+      this.prisma.persona.update({
+        where: { id_persona: persona.id_persona },
+        data: { contrasena_hash: nuevaClaveHash },
+      }),
+      this.prisma.recuperacionClave.update({
+        where: { id_token: tokenValido.id_token },
+        data: { usado: true },
+      }),
+    ]);
+
+    await this.auditoria.registrar({
+      id_usuario: persona.id_persona,
+      accion: 'RESTABLECER_CONTRASENA',
+      descripcion: 'Contraseña restablecida vía correo',
+      entidad: 'Autenticacion',
+      rol: persona.rol?.nombre_rol || 'Usuario',
+    });
+
+    console.log('✅ [RESTABLECER] Contraseña actualizada exitosamente para:', email);
+
+    return {
+      mensaje: '¡Contraseña restablecida con éxito! Ya puedes iniciar sesión.',
+    };
+  }
+
+  // ============================================================
+  // RECUPERAR CONTRASEÑA CON NODEMAILER (MANTENIDO PARA COMPATIBILIDAD)
+  // ============================================================
+  async solicitarRecuperacionOld(email: string, nuevaContrasena: string) {
     const persona = await this.prisma.persona.findUnique({
       where: { email },
       include: { rol: true }
@@ -141,15 +341,12 @@ export class AutenticacionService {
       throw new BadRequestException('El correo electrónico no está registrado');
     }
 
-    // Marcar tokens anteriores como usados
     await this.prisma.recuperacionClave.updateMany({
       where: {
         id_persona: persona.id_persona,
         usado: false,
       },
-      data: {
-        usado: true,
-      },
+      data: { usado: true },
     });
 
     const token = crypto.randomBytes(32).toString('hex');
@@ -181,7 +378,7 @@ export class AutenticacionService {
   }
 
   // ============================================================
-  // CONFIRMAR CAMBIO DE CONTRASEÑA CON NODEMAILER (MANTENIDO)
+  // CONFIRMAR CAMBIO DE CONTRASEÑA (MANTENIDO PARA COMPATIBILIDAD)
   // ============================================================
   async confirmarRecuperacion(email: string, token: string) {
     const persona = await this.prisma.persona.findUnique({
@@ -238,7 +435,7 @@ export class AutenticacionService {
   }
 
   // ============================================================
-  // CAMBIAR CONTRASEÑA (MÚLTIPLES VECES AL DÍA)
+  // CAMBIAR CONTRASEÑA (USUARIO LOGUEADO)
   // ============================================================
   async cambiarContrasena(
     idUsuario: number,
@@ -397,10 +594,9 @@ export class AutenticacionService {
   }
 
   // ============================================================
-  // RECUPERAR CONTRASEÑA CON SUPABASE (NUEVO)
+  // RECUPERAR CONTRASEÑA CON SUPABASE
   // ============================================================
   async solicitarRecuperacionSupabase(email: string) {
-    // 1. Verificar que el email existe en tu BD (Prisma)
     const persona = await this.prisma.persona.findUnique({
       where: { email },
       include: { rol: true }
@@ -410,7 +606,6 @@ export class AutenticacionService {
       throw new BadRequestException('El correo electrónico no está registrado');
     }
 
-    // 2. Usar Supabase para enviar el correo de restablecimiento
     const redirectUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/actualizar-contrasena`;
     
     const { error } = await this.supabase.auth.resetPasswordForEmail(email, {
@@ -435,57 +630,53 @@ export class AutenticacionService {
   }
 
   // ============================================================
-// ACTUALIZAR CONTRASEÑA CON SUPABASE (VERSIÓN CON ACCESS TOKEN)
-// ============================================================
-async actualizarContrasenaSupabase(accessToken: string, nuevaContrasena: string) {
-  // 1. Establecer la sesión con el accessToken
-  const { data: { user }, error: sessionError } = await this.supabase.auth.setSession({
-    access_token: accessToken,
-    refresh_token: '', // No es necesario para este caso
-  });
-
-  if (sessionError) {
-    throw new BadRequestException('Error al establecer sesión: ' + sessionError.message);
-  }
-
-  // 2. Actualizar la contraseña en Supabase
-  const { error: updateError } = await this.supabase.auth.updateUser({
-    password: nuevaContrasena
-  });
-
-  if (updateError) {
-    throw new BadRequestException('Error al actualizar contraseña: ' + updateError.message);
-  }
-
-  // 3. También actualizar la contraseña en tu BD local (Prisma)
-  if (user?.email) {
-    const nuevaClaveHash = await bcrypt.hash(nuevaContrasena, 10);
-    await this.prisma.persona.updateMany({
-      where: { email: user.email },
-      data: { contrasena_hash: nuevaClaveHash }
-    });
-  }
-
-  // 4. Registrar en auditoría
-  if (user?.email) {
-    const persona = await this.prisma.persona.findUnique({
-      where: { email: user.email },
-      include: { rol: true }
+  // ACTUALIZAR CONTRASEÑA CON SUPABASE
+  // ============================================================
+  async actualizarContrasenaSupabase(accessToken: string, nuevaContrasena: string) {
+    const { data: { user }, error: sessionError } = await this.supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: '',
     });
 
-    if (persona) {
-      await this.auditoria.registrar({
-        id_usuario: persona.id_persona,
-        accion: 'ACTUALIZAR_CONTRASENA_SUPABASE',
-        descripcion: 'Contraseña actualizada vía Supabase',
-        entidad: 'Autenticacion',
-        rol: persona.rol?.nombre_rol || 'Usuario',
+    if (sessionError) {
+      throw new BadRequestException('Error al establecer sesión: ' + sessionError.message);
+    }
+
+    const { error: updateError } = await this.supabase.auth.updateUser({
+      password: nuevaContrasena
+    });
+
+    if (updateError) {
+      throw new BadRequestException('Error al actualizar contraseña: ' + updateError.message);
+    }
+
+    if (user?.email) {
+      const nuevaClaveHash = await bcrypt.hash(nuevaContrasena, 10);
+      await this.prisma.persona.updateMany({
+        where: { email: user.email },
+        data: { contrasena_hash: nuevaClaveHash }
       });
     }
-  }
 
-  return {
-    mensaje: 'Contraseña actualizada correctamente',
-  };
-}
+    if (user?.email) {
+      const persona = await this.prisma.persona.findUnique({
+        where: { email: user.email },
+        include: { rol: true }
+      });
+
+      if (persona) {
+        await this.auditoria.registrar({
+          id_usuario: persona.id_persona,
+          accion: 'ACTUALIZAR_CONTRASENA_SUPABASE',
+          descripcion: 'Contraseña actualizada vía Supabase',
+          entidad: 'Autenticacion',
+          rol: persona.rol?.nombre_rol || 'Usuario',
+        });
+      }
+    }
+
+    return {
+      mensaje: 'Contraseña actualizada correctamente',
+    };
+  }
 }

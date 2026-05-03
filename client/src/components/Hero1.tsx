@@ -16,14 +16,13 @@ interface Hero1Props {
         cantidad1: number;
     };
     gastosPorSector?: any[];
+    datosGrafica?: any[];
 }
 
-export const Hero1 = ({ ganancias, inversion, gastosPorSector }: Hero1Props) => {
-    const datosGastosSector = gastosPorSector || [
-        { name: "PORCICULTURA", valor: 2, color: "#10b981", detalle: "Ene: 1M | Feb: 1M" },
-        { name: "GANADERÍA", valor: 2, color: "#8b5cf6", detalle: "Ene: 1M | Feb: 1M" },
-        { name: "INSUMOS", valor: 2, color: "#f43f5e", detalle: "Ene: 1M | Feb: 1M" },
-    ];
+export const Hero1 = ({ ganancias, inversion, gastosPorSector, datosGrafica }: Hero1Props) => {
+    const datosGastosSector = gastosPorSector && gastosPorSector.length > 0 
+        ? gastosPorSector 
+        : [{ name: "Sin gastos", valor: 1, color: "#e5e7eb", detalle: "No hay registros de gastos" }];
 
     return (
         <div className="flex mt-[5rem] bg-white text-gray-500 w-full max-w-[80rem] mx-auto rounded-4xl justify-between">
@@ -44,7 +43,7 @@ export const Hero1 = ({ ganancias, inversion, gastosPorSector }: Hero1Props) => 
                             estilos="text-[0.8rem] flex-col !w-38 gap-8 h-37" 
                         />
                     </div>
-                    <Grafica />
+                    <Grafica datos={datosGrafica} />
                 </div>
             </div>
             <div className="flex flex-col gap-4 justify-between">

@@ -13,7 +13,7 @@ const DEFAULT_IMG = "https://cdn-icons-png.flaticon.com/512/1144/1144760.png";
 // ============================================================
 interface Solicitud {
     id?: string | number;
-    id_solicitud?: string | number; // 🆕 agregar este campo
+    id_solicitud?: string | number;
     usuario?: string;
     fotoUsuario?: string;
     tipo?: string;
@@ -23,7 +23,6 @@ interface Solicitud {
     unidadMedida?: string;
     motivo?: string;
 }
-
 
 export const Solicitudes = () => {
     const { solicitudesPendientes, cambiarEstadoSolicitud } = useSolicitudCompra();
@@ -49,7 +48,6 @@ export const Solicitudes = () => {
     // RESETEAR ÍNDICE CUANDO CAMBIA EL TOTAL
     // ============================================================
     useEffect(() => {
-        // Solo resetear si el total cambió
         if (totalRef.current !== total) {
             totalRef.current = total;
             setConAnimacion(false);
@@ -107,15 +105,14 @@ export const Solicitudes = () => {
     // ============================================================
     // MANEJAR ACCIÓN (APROBAR/RECHAZAR)
     // ============================================================
-const manejarAccion = (estado: 'Aprobada' | 'Rechazada') => {
-    if (seleccionado) {
-        // Intentar con id_solicitud primero, luego id como fallback
-        const id = (seleccionado as any).id_solicitud || seleccionado.id;
-        console.log('ID a procesar:', id, seleccionado); // para verificar
-        cambiarEstadoSolicitud(Number(id), estado);
-        cerrarModal();
-    }
-};
+    const manejarAccion = (estado: 'Aprobada' | 'Rechazada') => {
+        if (seleccionado) {
+            const id = (seleccionado as any).id_solicitud || seleccionado.id;
+            console.log('ID a procesar:', id, seleccionado);
+            cambiarEstadoSolicitud(Number(id), estado);
+            cerrarModal();
+        }
+    };
 
     // ============================================================
     // FORMATEAR DETALLE
@@ -125,6 +122,11 @@ const manejarAccion = (estado: 'Aprobada' | 'Rechazada') => {
         
         const tipo = solicitud.tipoInsumo || solicitud.tipoAlimento || solicitud.tipo || 'insumo';
         return `Solicitud para compra de ${solicitud.cantidad} ${solicitud.unidadMedida} de ${tipo}.`;
+    };
+
+    // Obtener el nombre del producto (insumo o alimento)
+    const getNombreProducto = (solicitud: Solicitud): string => {
+        return solicitud.tipoInsumo || solicitud.tipoAlimento || solicitud.tipo || 'Producto';
     };
 
     // ============================================================
@@ -213,7 +215,7 @@ const manejarAccion = (estado: 'Aprobada' | 'Rechazada') => {
             </p>
 
             {/* ============================================================ */}
-            {/* MODAL */}
+            {/* MODAL CORREGIDO - AHORA MUESTRA EL NOMBRE DEL PRODUCTO */}
             {/* ============================================================ */}
             {modalAbierto && seleccionado && createPortal(
                 <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
@@ -239,11 +241,22 @@ const manejarAccion = (estado: 'Aprobada' | 'Rechazada') => {
                             ID: #{seleccionado.id}
                         </p>
                         
-                        <p className="text-emerald-700 font-black text-xs uppercase mb-2">
-                            TIPO: {seleccionado.tipo} ({seleccionado.cantidad} {seleccionado.unidadMedida})
+                        {/* ✅ CORREGIDO: Muestra el nombre del producto, no solo "insumo" */}
+                        <p className="text-emerald-700 font-black text-xs uppercase mb-1">
+                            PRODUCTO: {getNombreProducto(seleccionado)}
                         </p>
                         
-                        <p className="text-gray-500 text-xs font-medium leading-relaxed mb-8 bg-gray-50 p-3 rounded-xl italic">
+                        <p className="text-gray-500 text-xs mb-3">
+                            CANTIDAD: {seleccionado.cantidad} {seleccionado.unidadMedida || 'unidades'}
+                        </p>
+                        
+                        {seleccionado.motivo && (
+                            <p className="text-gray-400 text-[10px] italic mb-3">
+                                Motivo: {seleccionado.motivo}
+                            </p>
+                        )}
+                        
+                        <p className="text-gray-500 text-xs font-medium leading-relaxed mb-6 bg-gray-50 p-3 rounded-xl italic">
                             "{formatearDetalle(seleccionado)}"
                         </p>
 

@@ -42,7 +42,7 @@ export const Hero = ({ ganado, cerdos, vacunas, ventas, onRegGanadoClick, onRegC
                 {cards.map((card, idx) => (
                     <CardRegistro
                         key={idx}
-                        estilo={`border-[var(--color-gray)] pl-5 pr-5 !w-[16rem] ${card.accion ? 'hover:animate-pulse hover:scale-103 transition-all hover:shadow-[0_0_8px_rgba(120,0,139,0.8)]' : ''}`}
+                        estilo={`border-[var(--color-gray)] pl-5 pr-5 !w-[16rem] ${card.accion ? 'hover:animate-pulse transition-all hover:shadow-[0_0_8px_rgba(10,0,100,1)]' : ''}`}
                         titulo={card.titulo}
                         icono={card.icono}
                         datos={card.datos}
@@ -69,11 +69,15 @@ export const Hero2 = ({
     onVerInventarioClick
 }: any) => {
     const cards = [
-        { titulo: "REGISTRAR PAGOS",   icono: sack,      datos: pagos,        accion: onRegPagosClick },
+        { 
+            titulo: "REGISTRAR PAGOS", 
+            icono: sack, 
+            datos: pagos,
+            accion: onRegPagosClick 
+        },
         { titulo: "TRABAJO REALIZADO", icono: martillo,  datos: trabajo,      accion: onRegTrabajoClick },
         { titulo: "NUEVO TRABAJADOR",  icono: trabajador,datos: trabajadores, accion: onRegTrabajadoresClick },
         { titulo: "REGISTRAR COMPRA",  icono: compra,    datos: compras,      accion: onRegComprasClick },
-        // Card SOLICITUDES ELIMINADA
     ];
 
     return (
@@ -94,7 +98,7 @@ export const Hero2 = ({
             </div>
 
             {/* Panel de Informes */}
-            <div onClick={onRegFormatoPagoClick} className="flex flex-col gap-5 w-fit rounded-[2rem] shadow-[0_4px_8px_rgba(0,0,0,0.2)] pl-15 pr-15 p-10 h-full min-h-[38rem] cursor-pointer">
+            <div onClick={onRegFormatoPagoClick} className="flex flex-col gap-5 w-fit rounded-[2rem] shadow-[0_4px_8px_rgba(0,0,0,0.2)] pl-15 pr-15 p-10 h-full min-h-[38rem] cursor-pointer hover:-translate-y-2 transition-all">
                 <p className="text-[0.8rem] text-emerald-700">-- MÓDULO DE INFORMES --</p>
                 <p className="text-[1.2rem] text-emerald-900 border-l-2 border-emerald-900 pl-3 text-[1.5rem]">
                     INFORME DE <br /> PAGOS <br /> REALIZADOS A LOS <br /> TRABAJADORES
@@ -112,7 +116,7 @@ export const Hero2 = ({
                 {/* Solicitud 1 - AHORA CLICKEABLE */}
                 <div 
                     onClick={onRegSolicitudClick}
-                    className="grid grid-cols-2 rounded-[1.5rem] pl-5 pr-5 p-3 shadow-[0_4px_8px_rgba(0,0,0,0.2)] flex-1 content-center cursor-pointer hover:shadow-[0_8px_16px_rgba(0,0,0,0.3)] hover:scale-[1.02] transition-all duration-300"
+                    className="grid grid-cols-2 rounded-[1.5rem] pl-5 pr-5 p-3 shadow-[0_4px_8px_rgba(0,0,0,0.2)] flex-1 content-center cursor-pointer hover:shadow-[0_8px_16px_rgba(0,0,0,0.3)] hover:translate-x-2 transition-all duration-300"
                 >
                     <div className="col-span-2 flex flex-col items-center justify-center gap-2 border-b-[var(--color-gray)] border-b border-dashed pb-2 mb-2">
                         <img className="w-8" src={docuemento} alt="doc" />
@@ -131,7 +135,7 @@ export const Hero2 = ({
                 {/* Consumos e Insumos */}
                 <div 
                     onClick={onRegConsumoClick}
-                    className="grid grid-cols-1 rounded-[1.5rem] pl-5 pr-5 p-3 gap-4 shadow-[0_4px_8px_rgba(0,0,0,0.2)] flex-1 content-center cursor-pointer hover:shadow-[0_8px_16px_rgba(0,0,0,0.3)] hover:scale-[1.02] transition-all duration-300"
+                    className="grid grid-cols-1 rounded-[1.5rem] pl-5 pr-5 p-3 gap-4 shadow-[0_4px_8px_rgba(0,0,0,0.2)] flex-1 content-center cursor-pointer hover:shadow-[0_8px_16px_rgba(0,0,0,0.3)] hover:translate-x-2 transition-all duration-300"
                 >
                     <div className="col-span-1 flex flex-col items-center justify-center gap-2 border-b-[var(--color-gray)] border-b border-dashed pb-2 mb-2">
                         <img className="w-8" src={insumo} alt="insumo" />
@@ -148,7 +152,7 @@ export const Hero2 = ({
                 </div>
 
                 {/* Solicitud 2 - VER INVENTARIO (Desnudo) */}
-                <div onClick={onVerInventarioClick} className="grid grid-cols-2 rounded-[1.5rem] pl-5 pr-5 p-3 gap-4 shadow-[0_4px_8px_rgba(0,0,0,0.2)] flex-1 content-center cursor-pointer hover:shadow-[0_8px_16px_rgba(0,0,0,0.3)] hover:scale-[1.02] transition-all duration-300">
+                <div onClick={onVerInventarioClick} className="grid grid-cols-2 rounded-[1.5rem] pl-5 pr-5 p-3 gap-4 shadow-[0_4px_8px_rgba(0,0,0,0.2)] flex-1 content-center cursor-pointer hover:shadow-[0_8px_16px_rgba(0,0,0,0.3)] hover:translate-x-2 transition-all duration-100">
                     <div className="col-span-2 flex flex-col items-center justify-center gap-2 border-b-[var(--color-gray)] border-b border-dashed pb-2 mb-2">
                         <img className="w-8" src={docuemento} alt="doc" />
                         <p className="text-emerald-900 text-[0.8rem]">-- VER INVENTARIO --</p>

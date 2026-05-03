@@ -22,7 +22,7 @@ export const TarjetasMetricas = ({
     tamanoIcono = "w-10" 
 }: TarjetasMetricasProps) => {
     return (
-        <div className={`flex shadow-[0_4px_10px_rgba(0,0,0,0.3)] rounded-[0.5rem] bg-white p-4 min-h-[8rem] justify-center w-fit ${estilos}`}>
+        <div className={`flex shadow-[0_4px_10px_rgba(0,0,0,0.3)] rounded-[0.5rem] bg-[#ffffff] p-4 min-h-[8rem] justify-center w-fit ${estilos}`}>
             <img src={icono} alt={titulo} className={`shrink-0 object-contain ${tamanoIcono}`} />
             <div className="flex flex-col ml-2">
                 {titulo && <p className="font-bold text-[0.7rem]"> {titulo} </p>}

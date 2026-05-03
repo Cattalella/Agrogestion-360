@@ -1,10 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
+// ✅ Una sola interfaz, bien exportada
+export interface GastoPorSector {
+  sector: string;
+  total: number;
+}
+
 @Injectable()
 export class ReportesService {
   constructor(private prisma: PrismaService) {}
 
+  // ============================================================
+  // RESUMEN FINANCIERO
+  // ============================================================
   async obtenerResumenFinanciero(fechaInicio: Date, fechaFin: Date) {
     const [ventas, pagos] = await Promise.all([
       this.prisma.venta.aggregate({
@@ -38,6 +47,9 @@ export class ReportesService {
     };
   }
 
+  // ============================================================
+  // INVENTARIO CRÍTICO
+  // ============================================================
   async obtenerInventarioCritico() {
     const insumos = await this.prisma.catInsumos.findMany({
       include: {
@@ -61,6 +73,9 @@ export class ReportesService {
     return criticos;
   }
 
+  // ============================================================
+  // ACTIVIDAD TRABAJADORES
+  // ============================================================
   async obtenerActividadTrabajadores(fechaInicio: Date, fechaFin: Date) {
     const actividades = await this.prisma.trabajoRealizado.findMany({
       where: {
@@ -78,35 +93,139 @@ export class ReportesService {
     return actividades;
   }
 
-  async obtenerDashboard(fechaInicio: Date, fechaFin: Date) {
-    const [financiero, criticos, personal] = await Promise.all([
+  // ============================================================
+  // OBTENER VENTAS AGRUPADAS POR BIMESTRE
+  // ============================================================
+  async obtenerVentasPorBimestre(fechaInicio: Date, fechaFin: Date) {
+    const bimestres = [
+      { nombre: 'Ene-Feb', meses: [0, 1], nombres: ['Ene', 'Feb'] },
+      { nombre: 'Mar-Abr', meses: [2, 3], nombres: ['Mar', 'Abr'] },
+      { nombre: 'May-Jun', meses: [4, 5], nombres: ['May', 'Jun'] },
+      { nombre: 'Jul-Ago', meses: [6, 7], nombres: ['Jul', 'Ago'] },
+      { nombre: 'Sep-Oct', meses: [8, 9], nombres: ['Sep', 'Oct'] },
+      { nombre: 'Nov-Dic', meses: [10, 11], nombres: ['Nov', 'Dic'] },
+    ];
+
+    const ventas = await this.prisma.venta.findMany({
+      where: {
+        fecha_venta: { gte: fechaInicio, lte: fechaFin },
+      },
+      select: {
+        precio_total: true,
+        fecha_venta: true,
+      },
+    });
+
+    const resultados = bimestres.map(bimestre => {
+      let m1 = 0;
+      let m2 = 0;
+
+      ventas.forEach(venta => {
+        const mesVenta = new Date(venta.fecha_venta).getMonth();
+        const valor = Number(venta.precio_total);
+
+        if (mesVenta === bimestre.meses[0]) {
+          m1 += valor;
+        } else if (mesVenta === bimestre.meses[1]) {
+          m2 += valor;
+        }
+      });
+
+      return {
+        name: bimestre.nombre,
+        m1: Math.round(m1 / 1000000),
+        m2: Math.round(m2 / 1000000),
+        n1: bimestre.nombres[0],
+        n2: bimestre.nombres[1],
+      };
+    });
+
+    return resultados;
+  }
+
+  // ============================================================
+  // OBTENER GASTOS POR SECTOR
+  // ============================================================
+  async obtenerGastosPorSector(fechaInicio: Date, fechaFin: Date): Promise<GastoPorSector[]> {
+    const pagosPersonal = await this.prisma.pagoTrabajador.aggregate({
+      where: {
+        fecha_pago: { gte: fechaInicio, lte: fechaFin },
+        estado_pago: { not: 'Anulado' },
+      },
+      _sum: { monto_total: true },
+    });
+
+    const compras = await this.prisma.solicitud.findMany({
+      where: {
+        fecha_compra: { gte: fechaInicio, lte: fechaFin },
+        estado_sol: 'Aprobada',
+      },
+      include: { insumo: true },
+    });
+
+    let alimentacion = 0;
+    let mantenimiento = 0;
+    let inventario = 0;
+
+    compras.forEach(compra => {
+      const monto = Number(compra.cantidad);
+      const categoria = compra.insumo?.categoria?.toUpperCase() || '';
+
+      if (categoria.includes('ALIMENTO') || categoria.includes('COMIDA')) {
+        alimentacion += monto;
+      } else if (categoria.includes('MANTENIMIENTO') || categoria.includes('EQUIPO')) {
+        mantenimiento += monto;
+      } else {
+        inventario += monto;
+      }
+    });
+
+    const personal = Number(pagosPersonal._sum.monto_total || 0);
+    const sectores: GastoPorSector[] = [];
+
+    if (personal > 0) {
+      sectores.push({ sector: 'PERSONAL', total: personal });
+    }
+    if (alimentacion > 0) {
+      sectores.push({ sector: 'ALIMENTACIÓN', total: alimentacion });
+    }
+    if (mantenimiento > 0) {
+      sectores.push({ sector: 'MANTENIMIENTO', total: mantenimiento });
+    }
+    if (inventario > 0) {
+      sectores.push({ sector: 'INVENTARIO', total: inventario });
+    }
+
+    return sectores;
+  }
+
+  // ============================================================
+  // DASHBOARD
+  // ============================================================
+  async obtenerDashboard(fechaInicio: Date, fechaFin: Date): Promise<any> {
+    const [financiero, criticos, personal, ventasPorBimestre, gastosPorSector] = await Promise.all([
       this.obtenerResumenFinanciero(fechaInicio, fechaFin),
       this.obtenerInventarioCritico(),
       this.prisma.trabajador.findMany({
         where: { estado: 'Activo' },
         take: 5
-      })
+      }),
+      this.obtenerVentasPorBimestre(fechaInicio, fechaFin),
+      this.obtenerGastosPorSector(fechaInicio, fechaFin),
     ]);
 
     return {
-      ganancias: { tipo1: 'GANANCIA NETA', cantidad1: financiero.balance },
-      inversion: { tipo1: 'INVERSIÓN TOTAL', cantidad1: financiero.egresos },
-      gastosPorSector: [
-        { name: 'PERSONAL', valor: financiero.egresos, color: '#8b5cf6', detalle: `Total: ${financiero.detalle.totalPagosEfectuados} pagos` },
-        { name: 'VENTAS', valor: financiero.ingresos, color: '#10b981', detalle: `Total: ${financiero.detalle.totalVentas} ventas` }
-      ],
-      insumosCriticos: {
-        dias: criticos.length,
-        titulo: 'Insumos Críticos',
-        lista: criticos.map(c => `${c.nombre}: ${c.stock}${c.unidad}`)
-      },
-      pagosTrabajadores: {
-        titulo: 'Últimos Pagos',
-        lista: [] // Podría agregarse detalle si se desea
-      },
-      trabajadoresActivos: {
-        titulo: 'PERSONAL ACTIVO',
-        lista: personal.map(t => t.nombre_completo)
+      ganancias: { tipo1: 'TOTAL VENTAS', cantidad1: financiero.ingresos },
+      inversion: { tipo1: 'TOTAL INVERSIÓN', cantidad1: financiero.egresos },
+      gastos_por_sector: gastosPorSector,
+      grafica_ganancias: ventasPorBimestre,
+      supervision: {
+        insumos_criticos: criticos.length,
+        pagos_trabajadores: {
+          total_pagado: financiero.egresos,
+          num_pagos: financiero.detalle.totalPagosEfectuados
+        },
+        trabajadores_activos: personal.length
       },
       filtrosDisponibles: ['ESTE MES', 'SEIS MESES', 'UN AÑO ATRÁS']
     };

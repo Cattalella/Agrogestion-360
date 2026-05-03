@@ -10,6 +10,7 @@ interface Hero3Props {
     onBorrarTodo?: () => void;
     onBorrarUnaFoto?: (id: number) => void;
     onConfirmarPago?: (idPago: number) => void;
+    onToggleLike?: (id: number) => void;
 }
 
 export const Hero3 = ({ 
@@ -20,7 +21,8 @@ export const Hero3 = ({
     onSubirClick, 
     onBorrarTodo, 
     onBorrarUnaFoto,
-    onConfirmarPago 
+    onConfirmarPago,
+    onToggleLike
 }: Hero3Props) => {
     return (
         <div className="flex mt-[5rem] w-full max-w-[80rem] mx-auto bg-white mb-20">
@@ -34,6 +36,7 @@ export const Hero3 = ({
                         onBorrarTodo={onBorrarTodo}
                         onBorrarUnaFoto={onBorrarUnaFoto}
                         onConfirmarPago={onConfirmarPago}
+                        onToggleLike={onToggleLike}
                     /> 
                 </div>
                 {rol === "boss" && (

@@ -3,6 +3,7 @@ import apiClient from '../api/apiClient';
 import { LogIn } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import vaca from '../assets/imgs/rvaca.jpg';
+import { Animacion } from './animations/Animacion';
 
 export const Login = () => {
     const navigate = useNavigate();
@@ -11,9 +12,39 @@ export const Login = () => {
     const [error, setError] = useState<string | null>(null);    
     const [cargando, setCargando] = useState(false);
 
+    // 🔧 Función para limpiar automáticamente si hay exceso
+    const limpiarStorageSiExcede = () => {
+        let tamaño = 0;
+        const itemsABorrar = ['foto_perfil', 'userAvatar', 'wallpaper_url'];
+        
+        // Calcular tamaño actual
+        for (let key in localStorage) {
+            if (localStorage.hasOwnProperty(key) && localStorage[key]) {
+                tamaño += localStorage[key].length || 0;
+            }
+        }
+        
+        console.log(`📦 Tamaño localStorage: ${(tamaño / 1024 / 1024).toFixed(2)} MB`);
+        
+        // Si excede 2MB, limpiar imágenes
+        if (tamaño > 2000000) {
+            console.log('⚠️ Exceso detectado, limpiando imágenes...');
+            itemsABorrar.forEach(item => {
+                if (localStorage.getItem(item)) {
+                    localStorage.removeItem(item);
+                    console.log(`🗑️ Eliminado: ${item}`);
+                }
+            });
+            console.log('✅ Storage limpiado automáticamente');
+        }
+    };
+
     const handleLogin = async () => {
         setCargando(true);
         setError(null);
+
+        // 🆕 Limpiar storage antes de guardar nuevos datos
+        limpiarStorageSiExcede();
 
         try {
             const respuesta = await apiClient.post('/autenticacion/iniciar-sesion', {
@@ -21,14 +52,17 @@ export const Login = () => {
                 contrasena: clave
             });
 
-            // ✅ Guardar token y datos
+            // Guardar solo lo esencial
             localStorage.setItem('token', respuesta.data.token);
-            localStorage.setItem('usuario', JSON.stringify(respuesta.data.usuario));
+            localStorage.setItem('usuario', JSON.stringify({
+                id: respuesta.data.usuario.id_persona,
+                nombre: respuesta.data.usuario.nombre,
+                rol: respuesta.data.usuario.rol
+            }));
             
             console.log("✅ Login exitoso:", respuesta.data.usuario.nombre);
             
-            // 🆕 ESPERAR un momento antes de redirigir
-            // Esto asegura que el token esté 100% disponible
+            // Redirigir según rol
             setTimeout(() => {
                 const rol = respuesta.data.usuario.rol;
                 if (rol === 'Dueño') {
@@ -38,7 +72,7 @@ export const Login = () => {
                 } else {
                     navigate('/boss', { replace: true });
                 }
-            }, 100); // 100ms de delay
+            }, 100);
 
         } catch (err: any) {
             console.error('❌ Error en login:', err);
@@ -58,11 +92,14 @@ export const Login = () => {
     return (
         <section className='flex flex-col bg-black border-4 border-white backdrop-blur-[2px] items-center h-[35rem] justify-center w-[22rem]'>
             
-            <img 
+            <Animacion>
+                <img 
                 src={vaca} 
                 alt="Logo" 
-                className='shadow-[0px_0px_150px_5px_rgba(255,255,255,0.5)] w-[7rem] h-[7rem] object-cover rounded-full mb-[4rem]' 
+                className='shadow-[0px_0px_150px_5px_rgba(255,255,255,0.5)] w-[7rem] h-[7rem] object-cover rounded-full mb-[1rem]' 
             />
+            </Animacion>
+            
 
             <form 
                 onSubmit={(e) => {
@@ -101,20 +138,20 @@ export const Login = () => {
                     <button 
                         type='submit' 
                         disabled={cargando} 
-                        className={`hover:bg-green-700 w-[12rem] !border-[var(--color-verdeBorde)] px-4 border-white border-1 flex items-center justify-center gap-2 cursor-pointer rounded-tl-[3rem] rounded-br-[3rem] transition-all
-                        ${cargando ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`}
+                        className={`w-[12rem] !border-[var(--color-amarilloBorde)] border-1 hover:!border-[var(--color-verdeBorde)] flex items-center justify-center gap-2 cursor-pointer rounded-tl-[3rem] rounded-br-[3rem] transition-all border-r-8 border-l-8
+                        ${cargando ? 'cursor-not-allowed' : 'hover:scale-105 transition-all'}`}
                     >
-                        <div className='text-white px-4 py-2 flex gap-4 text-[0.8rem] items-center'> 
+                        <div className='text-white flex gap-4 text-[0.8rem] items-center'> 
                             {cargando ? 'VALIDANDO...' : 'INGRESAR'} 
                             {!cargando && <LogIn className='text-white w-4' />} 
                         </div>
                     </button>
                 </div>
 
-                <div className="text-white">
+                <div className="text-white p-3 -mt-4 cursor-pointer hover:text-[var(--color-amarilloBorde)] tracking-[1px] transition-all">
                     <p 
                         onClick={() => navigate("/contrasena")}
-                        className="cursor-pointer hover:text-[var(--color-amarilloBorde)] text-[0.8rem] transition-colors duration-300"
+                        className="text-[0.8rem]"
                     >
                         ¿Olvidaste tu contraseña?
                     </p>

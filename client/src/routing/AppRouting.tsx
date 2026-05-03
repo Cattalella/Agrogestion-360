@@ -20,9 +20,10 @@ export const AppRouting = () => {
                 <Route path="/confirmar-reset" element={<ConfirmarReset />} />
             </Route>
 
+            <Route path="/info" element={<Informacion />} />
+
             {/* Rutas Protegidas (General para Admin y Dueño) */}
             <Route element={<ProtectedRoute allowedRoles={['Administrador', 'Dueño']} />}>
-                <Route path="/info" element={<Informacion />} />
                 <Route path="/admin" element={<Admin />} />
             </Route>
 

@@ -6,11 +6,11 @@ import apiClient from "../api/apiClient";
 // ============================================================
 export interface Pago {
     id_pago: number;
+    concepto: string;
     id_trabajador: number;
     id_trabajo?: number;
     fecha_pago: string;
     monto_total: number;
-    concepto: string;
     estado_pago: string;
     firma_url?: string;
     justificacion_anulacion?: string;
@@ -33,7 +33,7 @@ export interface TrabajoRealizado {
 
 export interface PagosStats {
     tipo1: string;
-    cantidad1: string | number;
+    cantidad1: number;
     tipo2: string;
     cantidad2: number;
 }
@@ -51,6 +51,14 @@ export const useRegistrarPagos = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [vista, setVista] = useState<Vista>('lista');
     const [pagoAEditar, setPagoAEditar] = useState<Pago | null>(null);
+    
+    // 🆕 STATE PARA STATS (para que React detecte cambios)
+    const [stats, setStats] = useState<PagosStats>({
+        tipo1: "TOTAL",
+        cantidad1: 0,
+        tipo2: "PENDIENTES",
+        cantidad2: 0
+    });
 
     // ============================================================
     // CARGAR PAGOS
@@ -69,12 +77,11 @@ export const useRegistrarPagos = () => {
     };
 
     // ============================================================
-    // CARGAR TRABAJADORES ACTIVOS (CORREGIDO: acepta 'activo' y 'Activo')
+    // CARGAR TRABAJADORES ACTIVOS
     // ============================================================
     const cargarTrabajadores = async () => {
         try {
             const response = await apiClient.get('/trabajadores');
-            // 🔥 CORREGIDO: usa toLowerCase() para aceptar ambos formatos
             const activos = response.data.filter((t: any) => t.estado?.toLowerCase() === 'activo');
             setTrabajadores(activos);
             console.log('✅ Trabajadores activos cargados:', activos.length);
@@ -84,7 +91,7 @@ export const useRegistrarPagos = () => {
     };
 
     // ============================================================
-    // 🆕 CARGAR TRABAJOS REALIZADOS
+    // CARGAR TRABAJOS REALIZADOS
     // ============================================================
     const cargarTrabajosRealizados = async () => {
         try {
@@ -96,12 +103,14 @@ export const useRegistrarPagos = () => {
         }
     };
 
+    // Cargar datos iniciales
     useEffect(() => {
         cargarPagos();
         cargarTrabajadores();
         cargarTrabajosRealizados();
     }, []);
 
+    // Recargar cuando se abre el modal
     useEffect(() => {
         if (isModalOpen) {
             cargarPagos();
@@ -110,34 +119,37 @@ export const useRegistrarPagos = () => {
         }
     }, [isModalOpen]);
 
-    // ============================================================
-    // STATS PARA LA CARD
-    // ============================================================
-    const calcularStats = (): PagosStats => {
+    // 🆕 Escuchar evento de recarga desde el carrusel (cuando el boss da like)
+    useEffect(() => {
+        const handleRecargar = () => {
+            console.log('🔄 [useRegistrarPagos] Evento recargar-pagos recibido');
+            cargarPagos();
+        };
+        window.addEventListener('recargar-pagos', handleRecargar);
+        return () => window.removeEventListener('recargar-pagos', handleRecargar);
+    }, []);
+
+    // 🆕 RECALCULAR STATS CADA VEZ QUE CAMBIAN LOS PAGOS
+    useEffect(() => {
         const pagosValidos = pagos.filter(p =>
             p.estado_pago !== 'Anulado' && !p.justificacion_anulacion
         );
 
-        const totalNomina = pagosValidos.reduce((sum, p) => sum + (p.monto_total || 0), 0);
-
-        const totalFormateado = new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0
-        }).format(totalNomina);
+        const totalNomina = pagosValidos.reduce((sum, p) => sum + (Number(p.monto_total) || 0), 0);
 
         const pendientes = pagos.filter(p =>
             p.estado_pago === 'No pagado' || p.estado_pago === 'Pendiente de firma'
         ).length;
 
-        return {
-            tipo1: "NÓMINA TOTAL",
-            cantidad1: totalFormateado,
-            tipo2: "PENDIENTES",
+        setStats({
+            tipo1: "TOTAL",
+            cantidad1: totalNomina,
+            tipo2: pendientes === 1 ? "PENDIENTE" : "PENDIENTES",
             cantidad2: pendientes
-        };
-    };
+        });
+        
+        console.log('📊 [useRegistrarPagos] Stats actualizados:', { totalNomina, pendientes });
+    }, [pagos]);
 
     // ============================================================
     // ABRIR / CERRAR MODAL
@@ -170,7 +182,15 @@ export const useRegistrarPagos = () => {
     const guardarPago = async (datos: any, cerrar: boolean = true) => {
         setCargando(true);
         try {
-            // Caso anulación
+            if (datos.accion === 'actualizar' && datos.id_pago) {
+                await apiClient.put(`/trabajadores/pagos/${datos.id_pago}`, {
+                    estado_pago: datos.estado_pago
+                });
+                await cargarPagos();
+                if (cerrar) cerrarModal();
+                return true;
+            }
+
             if (datos.accion === 'anular' && datos.id_pago) {
                 await apiClient.patch(`/trabajadores/pagos/${datos.id_pago}/anular`, {
                     justificacion: datos.justificacion_anulacion
@@ -180,7 +200,6 @@ export const useRegistrarPagos = () => {
                 return true;
             }
 
-            // Caso edición
             if (pagoAEditar) {
                 const datosActualizar = {
                     fecha_pago: datos.fecha_pago,
@@ -189,8 +208,8 @@ export const useRegistrarPagos = () => {
                     estado_pago: datos.estado_pago,
                 };
                 await apiClient.put(`/trabajadores/pagos/${pagoAEditar.id_pago}`, datosActualizar);
-            } else {
-                // Caso creación
+            } 
+            else {
                 const datosParaBackend = {
                     id_trabajador: datos.id_trabajador,
                     id_trabajo: datos.id_trabajo || null,
@@ -203,7 +222,6 @@ export const useRegistrarPagos = () => {
             }
 
             await cargarPagos();
-
             if (cerrar) {
                 cerrarModal();
             } else {
@@ -244,7 +262,7 @@ export const useRegistrarPagos = () => {
         listaPagos: pagos,
         pagos,
         trabajadores,
-        trabajosRealizados,  // 🆕 AGREGADO
+        trabajosRealizados,
         cargando,
         loading: cargando,
         isModalOpen,
@@ -253,7 +271,7 @@ export const useRegistrarPagos = () => {
         setPagoAEditar,
         setVista,
         cambiarVista,
-        stats: calcularStats(),
+        stats,  // ✅ AHORA ES UN ESTADO QUE REACT DETECTA
         abrirModal,
         cerrarModal,
         abrirEdicion,

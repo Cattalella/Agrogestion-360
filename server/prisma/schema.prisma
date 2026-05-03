@@ -6,7 +6,6 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
 }
 
 model Rol {
@@ -54,6 +53,7 @@ model Persona {
   vacunacionesAdmin RegVacuna[]         @relation("AdminVacunas")
   solicitudes     Solicitud[]         @relation("solicitante")
   aprobaciones    Solicitud[]         @relation("aprobador")
+  evidencias      Evidencia[]         // 👈 RELACIÓN CON EVIDENCIAS
   
   @@unique([id_tipo_doc, num_documento])
 }
@@ -197,7 +197,7 @@ model Recordatorio {
   cumplido       Boolean   @default(false)
   fecha_cumplida DateTime?
   createdAt      DateTime  @default(now())
-  updatedAt      DateTime @updatedAt
+  updatedAt      DateTime  @updatedAt
   persona        Persona   @relation(fields: [id_persona], references: [id_persona])
 }
 
@@ -278,6 +278,25 @@ model Venta {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   Animal        Animal   @relation(fields: [id_animal], references: [id_animal])
+}
+
+model Evidencia {
+  id            Int      @id @default(autoincrement())
+  url           String   @db.Text
+  fecha         DateTime @default(now())
+  like          Boolean  @default(false)
+  origen        String   @db.VarChar(20)
+  id_referencia Int?
+  id_admin      Int
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+  
+  admin Persona @relation(fields: [id_admin], references: [id_persona], onDelete: Cascade)
+  
+  @@index([origen])
+  @@index([id_referencia])
+  @@index([id_admin])
+  @@map("evidencias")
 }
 
 model Auditoria {

@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 // Utilidades
-import { useFotosStorage } from "../utils/useFotosStorage";
+import { useEvidencias } from "../hooks/useEvidencias";
 
 // Hooks pecuarios
 import { useGanado } from "../hooks/useGanado";
@@ -26,7 +26,6 @@ import { useInventario } from "../hooks/useInventario";
 // Componentes de layout
 import { Encabezado } from "../components/Encabezado";
 import { Modal } from "../components/Modal";
-import { type FotoEvidencia } from "../components/Carrusel";
 
 // Heroes
 import { Hero, Hero2, Hero3 } from "../components/Heroes";
@@ -55,7 +54,7 @@ export const Admin = () => {
     const trabajadores = useNuevoTrabajador() as any;
     const compras = useRegistrarCompra() as any;
     const generarPDF = useGenerarPagoPDF() as any;
-    
+
     // ============================================================
     // HOOKS DE INVENTARIO
     // ============================================================
@@ -64,18 +63,20 @@ export const Admin = () => {
     const inventario = useInventario() as any;
 
     // ============================================================
-    // HOOK DE FOTOS
+    // HOOK DE EVIDENCIAS
     // ============================================================
-    const { 
-        fotos: todasLasFotos, 
-        agregarFoto, 
-        eliminarFoto, 
-        eliminarTodasFotos, 
-        toggleLike 
-    } = useFotosStorage();
+    const {
+        listasFotos: todasLasFotos,
+        manejarSubida,
+        abrirModalBorrarUna,
+        abrirModalBorrarTodo,
+        modalConfig,
+        cerrarModal,
+        toggleLike,
+        recargar: recargarFotos
+    } = useEvidencias();
 
-    // Filtrar solo fotos de trabajo realizado
-    const fotosTrabajo = todasLasFotos.filter(f => f.origen === 'trabajo');
+    const fotosVisibles = todasLasFotos;
 
     // ============================================================
     // ESTADO PARA MODAL DE INVENTARIO
@@ -90,57 +91,25 @@ export const Admin = () => {
         setIsInventarioOpen(true);
     };
 
-    // 🆕 Función para confirmar pago con firma (cuando se sube la foto)
+    // 🔧 CORREGIDO: Cuando el admin sube la foto y la asocia a un pago,
+    // el estado pasa a "Pendiente de firma" — NO a "Pagado con firma".
+    // "Pagado con firma" SOLO ocurre cuando el boss da like en el carrusel.
     const handleConfirmarPagoConFirma = async (idPago: number) => {
         try {
-            // Buscar el pago en la lista
             const pago = pagos.listaPagos?.find((p: any) => p.id_pago === idPago);
             if (pago && pago.estado_pago !== 'Pagado con firma') {
-                // Actualizar el estado del pago
                 await pagos.guardarPago({
-                    ...pago,
-                    estado_pago: 'Pagado con firma',
+                    id_pago: idPago,
+                    estado_pago: 'Pendiente de firma', // ← antes decía 'Pagado con firma'
                     accion: 'actualizar'
-                }, true);
-                console.log(`✅ Pago ${idPago} marcado como Pagado con firma`);
-                // Recargar la lista de pagos
+                }, false); // ← false para no cerrar el modal
+                console.log(`⏳ Pago ${idPago} → "Pendiente de firma" (esperando aprobación del boss)`);
                 await pagos.recargarLista();
             }
         } catch (error) {
-            console.error("Error al confirmar pago:", error);
+            console.error("Error al actualizar estado del pago:", error);
+            alert("Error al actualizar el estado del pago");
         }
-    };
-
-    // ============================================================
-    // MODAL DE CONFIRMACIÓN (BORRAR FOTOS)
-    // ============================================================
-    const [modalConfig, setModalConfig] = useState({ abierto: false, mensaje: "", accion: () => {} });
-
-    const manejarSubida = (nuevaFoto: FotoEvidencia) => {
-        console.log("📸 Nueva foto subida:", nuevaFoto);
-        agregarFoto(nuevaFoto);
-    };
-
-    const abrirModalBorrarTodo = () => {
-        setModalConfig({
-            abierto: true,
-            mensaje: "Vas a eliminar todas las fotos de evidencia. Esta acción no se puede deshacer.",
-            accion: () => {
-                eliminarTodasFotos();
-                setModalConfig(prev => ({ ...prev, abierto: false }));
-            }
-        });
-    };
-
-    const abrirModalBorrarUna = (id: number) => {
-        setModalConfig({   
-            abierto: true,
-            mensaje: "Vas a eliminar esta foto de evidencia permanentemente.",
-            accion: () => {
-                eliminarFoto(id);
-                setModalConfig(prev => ({ ...prev, abierto: false }));
-            }
-        });
     };
 
     return (
@@ -167,13 +136,13 @@ export const Admin = () => {
             />
 
             {/* ============================================================ */}
-            {/* MODAL DE CONFIRMACIÓN (BORRAR FOTOS) */}
+            {/* MODAL DE CONFIRMACIÓN */}
             {/* ============================================================ */}
             <Modal
                 abierto={modalConfig.abierto}
                 mensaje={modalConfig.mensaje}
                 onConfirmar={modalConfig.accion}
-                onCancelar={() => setModalConfig(prev => ({ ...prev, abierto: false }))}
+                onCancelar={cerrarModal}
             />
 
             {/* ============================================================ */}
@@ -219,13 +188,14 @@ export const Admin = () => {
             {/* HERO 3 — EVIDENCIAS */}
             {/* ============================================================ */}
             <Hero3
-                fotos={fotosTrabajo}
+                fotos={fotosVisibles}
                 rol="admin"
                 pagosPendientes={pagos.listaPagos || []}
                 onSubirClick={manejarSubida}
                 onBorrarTodo={abrirModalBorrarTodo}
                 onBorrarUnaFoto={abrirModalBorrarUna}
                 onConfirmarPago={handleConfirmarPagoConFirma}
+                onToggleLike={toggleLike}
             />
 
         </div>

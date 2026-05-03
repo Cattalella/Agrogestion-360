@@ -6,8 +6,18 @@ export class AnaliticasController {
   constructor(private readonly analiticasService: AnaliticasService) {}
 
   @Get('dashboard')
-  getDashboard(@Query('filtro') filtro: FiltroFecha = FiltroFecha.ESTE_MES) {
-    // GET /analiticas/dashboard?filtro=este_mes
-    return this.analiticasService.getDashboard(filtro);
+  getDashboard(
+    @Query('filtro') filtro?: FiltroFecha,
+    @Query('fecha_inicio') fechaInicio?: string,
+    @Query('fecha_fin') fechaFin?: string,
+    @Query('es_rango') esRango?: string
+  ) {
+    // Si es rango personalizado
+    if (esRango === 'true' && fechaInicio && fechaFin) {
+      return this.analiticasService.getDashboard(undefined, fechaInicio, fechaFin);
+    }
+    
+    // Filtro normal
+    return this.analiticasService.getDashboard(filtro || FiltroFecha.ESTE_MES);
   }
 }

@@ -143,7 +143,7 @@ export const Hero2 = ({
                 <div className="flex gap-5 w-full max-w-[30rem]">
                     <div
                         onClick={() => setVerModalRevocados(true)}
-                        className="flex flex-col rounded-[2rem] shadow-[0_3px_15px_rgba(0,0,0,0.5)] gap-8 p-5 items-center py-15 w-full cursor-pointer hover:bg-gray-50 transition-colors"
+                        className="flex flex-col rounded-[2rem] bg-[#ffffff] shadow-[0_3px_15px_rgba(0,0,0,0.5)] gap-8 p-5 items-center py-15 w-full cursor-pointer hover:bg-gray-50 transition-colors"
                     >
                         <Animacion><img className="w-14" src={administrador} alt="revocar" /></Animacion>
                         <p className="text-center font-bold"> ADMINISTRADORES <br /> REVOCADOS </p>
@@ -152,7 +152,7 @@ export const Hero2 = ({
 
                     <div
                         onClick={() => setVerModalAdmin(true)}
-                        className="flex flex-col rounded-[2rem] shadow-[0_3px_15px_rgba(0,0,0,0.5)] gap-8 p-5 items-center py-15 w-full cursor-pointer hover:bg-gray-50 transition-colors"
+                        className="flex flex-col rounded-[2rem] bg-[#ffffff] shadow-[0_3px_15px_rgba(0,0,0,0.5)] gap-8 p-5 items-center py-15 w-full cursor-pointer hover:bg-gray-50 transition-colors"
                     >
                         <Animacion><img className="w-14" src={nuevoadmin} alt="nuevo" /></Animacion>
                         <p className="text-center font-bold"> REGISTRAR NUEVO <br /> ADMINISTRADOR </p>
@@ -164,8 +164,8 @@ export const Hero2 = ({
             {/* ============================================================ */}
             {/* SECCIÓN PRINCIPAL - SUPERVISIÓN */}
             {/* ============================================================ */}
-            <div className={`flex flex-col shadow-[0_3px_15px_rgba(0,0,0,0.5)] rounded-[2rem] overflow-hidden p-6 ${esVistaBoss ? 'w-full' : 'w-full'}`}>
-                <div className="mx-auto bg-white pb-6 text-center">
+            <div className={`flex flex-col shadow-[0_3px_15px_rgba(0,0,0,0.5)] rounded-[2rem] overflow-hidden bg-white p-6 ${esVistaBoss ? 'w-full' : 'w-full'}`}>
+                <div className="mx-auto pb-6 text-center">
                     <p className="tracking-[3px] font-semibold">-- SUPERVISIÓN DE ACTIVOS Y PERSONAL --</p>
                 </div>
 
@@ -175,9 +175,9 @@ export const Hero2 = ({
                     <div className="flex flex-col shadow-[0_2px_5px_rgba(0,0,0,0.5)] p-5 rounded-2xl flex-1 bg-white h-[18rem] min-w-[0]">
                         <div className="flex flex-col border-b-1 border-dashed pb-2 gap-2 shrink-0">
                             <p className={`tracking-[3px] font-black ${colorDias}`}>
-                                {mostrarInsumosCriticos} INSUMOS CRÍTICOS
+                                {mostrarInsumosCriticos} / DIAS
                             </p>
-                            <p className="text-red-800 text-[0.8rem] font-bold uppercase">INSUMOS CRÍTICOS</p>
+                            <p className="text-red-800 text-[0.8rem] font-bold uppercase"> vencen: </p>
                         </div>
                         <ListaInsumos items={mostrarListaInsumosCriticos} />
                     </div>
@@ -189,18 +189,21 @@ export const Hero2 = ({
                     >
                         <div className="flex flex-col border-b-1 border-dashed pb-2 shrink-0">
                             <p className="tracking-[2px] font-black text-green-600 uppercase text-[0.7rem]">PAGOS A TRABAJADORES</p>
-                            <p className="text-gray-800 text-[0.8rem] font-bold uppercase">
+                            {/* <p className="text-gray-800 text-[0.8rem] font-bold uppercase">
                                 ${typeof mostrarTotalPagado === 'number' ? mostrarTotalPagado.toLocaleString('es-CO') : mostrarTotalPagado}
-                            </p>
+                            </p> */}
                         </div>
                         <ListaInsumos items={[]} />
+
+                        <div className="mt-2">
                         <Grafica3
                             pagosRealizados={totalPagos}
                             totalTrabajadores={mostrarTotalTrabajadores}
                         />
+                        </div>
                     </div>
 
-                    {/* TARJETA 3 — TRABAJADORES ACTIVOS */}
+                    {/* TARJETA 3 — TRABAJADORES ACTIVOS (MODIFICADA PARA MOSTRAR NOMBRES) */}
                     <div
                         onClick={!esVistaBoss ? onRegTrabajadoresClick : undefined}
                         className={`flex flex-col shadow-[0_2px_5px_rgba(0,0,0,0.5)] p-5 rounded-2xl flex-1 bg-white h-[18rem] min-w-[0] ${!esVistaBoss ? 'cursor-pointer hover:shadow-[0_0_15px_rgba(16,185,129,0.3)] transition-all group' : ''}`}
@@ -208,9 +211,29 @@ export const Hero2 = ({
                         <div className="flex flex-col border-b-1 border-dashed pb-2 gap-2 shrink-0">
                             <p className="tracking-[2px] font-black text-green-600 uppercase text-[0.7rem]">TRABAJADORES ACTIVOS</p>
                         </div>
-                        <div className="mx-auto my-auto transition-transform group-hover:scale-110">
-                            <img className="w-15" src={work} alt="Trabajador" />
+                        
+                        {/* 👇 SECCIÓN MODIFICADA: Muestra los nombres de los trabajadores */}
+                        <div className="flex-1 overflow-y-auto my-2 min-h-[80px]">
+                            {esVistaBoss && trabajadoresActivosBoss?.lista && trabajadoresActivosBoss.lista.length > 0 ? (
+                                <div className="space-y-1">
+                                    {trabajadoresActivosBoss.lista.slice(0, 4).map((trab: any, idx: number) => (
+                                        <p key={idx} className="text-[0.6rem] font-bold text-gray-600 truncate">
+                                            {typeof trab === 'string' ? trab : trab.nombre_completo || trab.nombre}
+                                        </p>
+                                    ))}
+                                    {trabajadoresActivosBoss.lista.length > 4 && (
+                                        <p className="text-[0.5rem] text-gray-400 font-bold">
+                                            +{trabajadoresActivosBoss.lista.length - 4} más
+                                        </p>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="mx-auto my-auto transition-transform group-hover:scale-110 flex items-center justify-center h-full">
+                                    <img className="w-15" src={work} alt="Trabajador" />
+                                </div>
+                            )}
                         </div>
+                        
                         <p className="mt-auto text-[0.8rem] font-bold">
                             TOTAL: <span className="text-green-700">
                                 {mostrarTotalTrabajadores}

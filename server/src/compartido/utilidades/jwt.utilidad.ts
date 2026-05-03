@@ -2,7 +2,7 @@
 
 export interface DatosToken {
   id_persona: number;
-  email: string;
+  email: string
   nombre_usuario: string;
   nombre_completo: string;
   id_rol: number;

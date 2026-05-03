@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { APP_FILTER, APP_PIPE } from '@nestjs/core';
+import { EvidenciasModule } from './modulos/evidencias/evidencias.module';
 
 import { PrismaModule } from './prisma/prisma.module';
 import { AutenticacionModule } from './modulos/autenticacion/autenticacion.module';
@@ -48,6 +49,7 @@ import { AppService } from './app.service';
     VacunacionModule,
     AnaliticasModule,
     AdministradoresModule,
+    EvidenciasModule,
   ],
   controllers: [AppController],
   providers: [

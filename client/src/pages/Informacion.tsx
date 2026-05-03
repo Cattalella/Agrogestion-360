@@ -306,6 +306,3 @@ export const Informacion = () => { /*  */
         </div>
     );
 };
-
-
-
