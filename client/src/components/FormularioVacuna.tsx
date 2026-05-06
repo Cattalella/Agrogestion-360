@@ -54,43 +54,78 @@ export const FormularioVacuna = ({
         }
     }, [vacunaAEditar]);
 
-    // Función para determinar si un animal es GANADO por su código local
     const esGanadoPorCodigo = (codigoLocal: string) => {
-        return codigoLocal?.startsWith('VA') || 
-               codigoLocal?.startsWith('TO') || 
-               codigoLocal?.startsWith('NO') || 
-               codigoLocal?.startsWith('TE');
+        if (!codigoLocal) return false;
+        const upperCode = codigoLocal.toUpperCase();
+        return upperCode.startsWith('VA') || 
+               upperCode.startsWith('TO') || 
+               upperCode.startsWith('NO') || 
+               upperCode.startsWith('TE');
     };
 
-    // Función para determinar si un animal es CERDO por su código local
     const esCerdoPorCodigo = (codigoLocal: string) => {
-        return codigoLocal?.startsWith('C') || 
-               codigoLocal?.startsWith('V') || 
-               codigoLocal?.startsWith('L') || 
-               codigoLocal?.startsWith('E');
+        if (!codigoLocal) return false;
+        const upperCode = codigoLocal.toUpperCase();
+        if (esGanadoPorCodigo(codigoLocal)) return false;
+        return upperCode.startsWith('C-') || 
+               upperCode.startsWith('C') ||
+               upperCode.startsWith('V-') ||
+               upperCode.startsWith('V') ||
+               upperCode.startsWith('L-') ||
+               upperCode.startsWith('L') ||
+               upperCode.startsWith('E-') ||
+               upperCode.startsWith('E');
     };
 
-    // Filtrar animales por tipo seleccionado usando el código local
+    // 🔧 CORREGIDO: Función para verificar si el animal está activo
+    // Ahora acepta cualquier valor y solo excluye estados negativos
+    const estaActivo = (animal: any): boolean => {
+        const estado = animal.estado || animal.estado?.nombre || '';
+        console.log(`🔍 Estado raw del animal: "${estado}"`);
+        
+        // Si no hay estado, considerarlo activo
+        if (!estado) return true;
+        
+        const estadoLower = String(estado).toLowerCase();
+        
+        // Solo excluir estados negativos
+        const esInactivo = estadoLower === 'inactivo' || 
+                           estadoLower === 'vendido' || 
+                           estadoLower === 'muerto' || 
+                           estadoLower === 'anulado';
+        
+        return !esInactivo;
+    };
+
     useEffect(() => {
+        console.log('🔍 Tipo animal seleccionado:', formData.tipo_animal);
+        console.log('📋 Lista completa de animales recibida:', listaAnimales.map(a => ({ 
+            id: a.id_animal || a.id, 
+            local: a.codigo_local || a.local, 
+            tipo: a.tipo,
+            estado: a.estado,
+            estadoRaw: a.estado?.nombre || a.estado
+        })));
+        
         if (formData.tipo_animal === "GANADO") {
             const ganado = listaAnimales.filter(a => {
                 const codigoLocal = a.codigo_local || a.local || '';
                 const esGanado = esGanadoPorCodigo(codigoLocal);
-                const estaActivo = a.estado === 'Activo' || 
-                                  a.estado?.nombre === 'Activo' || 
-                                  a.EstadoAni?.nombre === 'Activo';
-                return esGanado && estaActivo;
+                const activo = estaActivo(a);
+                console.log(`Animal ${codigoLocal}: esGanado=${esGanado}, activo=${activo}, estado="${a.estado}"`);
+                return esGanado && activo;
             });
+            console.log('🐄 Ganado filtrado:', ganado.length, ganado.map(g => g.codigo_local || g.local));
             setAnimalesFiltrados(ganado);
         } else if (formData.tipo_animal === "CERDO") {
             const cerdos = listaAnimales.filter(a => {
                 const codigoLocal = a.codigo_local || a.local || '';
                 const esCerdo = esCerdoPorCodigo(codigoLocal);
-                const estaActivo = a.estado === 'Activo' || 
-                                  a.estado?.nombre === 'Activo' || 
-                                  a.EstadoAni?.nombre === 'Activo';
-                return esCerdo && estaActivo;
+                const activo = estaActivo(a);
+                console.log(`Animal ${codigoLocal}: esCerdo=${esCerdo}, activo=${activo}, estado="${a.estado}"`);
+                return esCerdo && activo;
             });
+            console.log('🐖 Cerdos filtrados:', cerdos.length, cerdos.map(c => c.codigo_local || c.local));
             setAnimalesFiltrados(cerdos);
         } else {
             setAnimalesFiltrados([]);
@@ -194,7 +229,7 @@ export const FormularioVacuna = ({
                         }`}
                     />
                     {errores.tipo_vacuna && (
-                        <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.tipo_vacuna}</p>
+                        <p className="text-[10px] text-red-500 ml-4 mt-0.5">{errores.tipo_vacuna}</p>
                     )}
                 </div>
 
@@ -208,9 +243,9 @@ export const FormularioVacuna = ({
                         placeholder="DOSIS APLICADA (opcional)"
                         className="w-full border-1 border-cyan-200 rounded-full pl-4 pr-14 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-cyan-300 text-right font-bold"
                     />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-bold text-cyan-400">ml</span>
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-bold text-cyan-800">ml</span>
                     {errores.dosis && (
-                        <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.dosis}</p>
+                        <p className="text-[10px] text-red-500 ml-4 mt-0.5">{errores.dosis}</p>
                     )}
                 </div>
 
@@ -228,7 +263,7 @@ export const FormularioVacuna = ({
                         <option value="CERDO">🐖 CERDOS</option>
                     </select>
                     {errores.tipo_animal && (
-                        <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.tipo_animal}</p>
+                        <p className="text-[10px] text-red-500 ml-4 mt-0.5">{errores.tipo_animal}</p>
                     )}
                 </div>
 
@@ -248,7 +283,6 @@ export const FormularioVacuna = ({
                             const raza = animal.raza || 'Sin raza';
                             const sexo = animal.sexo === 'F' ? 'HEMBRA' : animal.sexo === 'M' ? 'MACHO' : animal.sexo || '—';
                             const peso = animal.peso_actual ? `${animal.peso_actual}kg` : '—';
-                            // Clave única combinando id y código local para evitar duplicados
                             const uniqueKey = `${animal.id_animal || animal.id}-${animal.codigo_local || animal.local || animal.id}`;
                             
                             return (
@@ -259,10 +293,10 @@ export const FormularioVacuna = ({
                         })}
                     </select>
                     {errores.id_animal && (
-                        <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.id_animal}</p>
+                        <p className="text-[10px] text-red-500 ml-4 mt-0.5">{errores.id_animal}</p>
                     )}
                     {formData.tipo_animal && animalesFiltrados.length === 0 && !esEdicion && (
-                        <p className="text-[9px] text-amber-500 ml-4 mt-0.5">
+                        <p className="text-[10px] text-amber-500 ml-4 mt-0.5">
                             ⚠️ No hay animales {formData.tipo_animal === 'GANADO' ? 'GANADO' : 'CERDOS'} activos disponibles
                         </p>
                     )}
@@ -272,7 +306,7 @@ export const FormularioVacuna = ({
             {/* COLUMNA DERECHA */}
             <div className="flex flex-col gap-3">
                 <div className="flex flex-col gap-1">
-                    <label className="text-[9px] uppercase ml-4 text-cyan-400 font-black tracking-tighter">
+                    <label className="text-[10px] uppercase ml-4 text-cyan-800 font-black tracking-[1px]">
                         Fecha Aplicación <span className="text-red-400">*</span>
                     </label>
                     <input
@@ -285,7 +319,7 @@ export const FormularioVacuna = ({
                         }`}
                     />
                     {errores.fecha_aplicacion && (
-                        <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.fecha_aplicacion}</p>
+                        <p className="text-[10px] text-red-500 ml-4 mt-0.5">{errores.fecha_aplicacion}</p>
                     )}
                 </div>
 
@@ -301,7 +335,7 @@ export const FormularioVacuna = ({
                 </select>
 
                 <div className="flex flex-col gap-1">
-                    <label className="text-[9px] uppercase ml-4 text-cyan-400 font-black tracking-tighter">
+                    <label className="text-[10px] uppercase ml-4 text-cyan-800 font-black tracking-[1px]">
                         Próximo Refuerzo
                     </label>
                     <input
@@ -314,7 +348,7 @@ export const FormularioVacuna = ({
                         }`}
                     />
                     {errores.proximo_refuerzo && (
-                        <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.proximo_refuerzo}</p>
+                        <p className="text-[10px] text-red-500 ml-4 mt-0.5">{errores.proximo_refuerzo}</p>
                     )}
                 </div>
 

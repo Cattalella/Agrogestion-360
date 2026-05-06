@@ -51,8 +51,7 @@ export const useRegistrarPagos = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [vista, setVista] = useState<Vista>('lista');
     const [pagoAEditar, setPagoAEditar] = useState<Pago | null>(null);
-    
-    // 🆕 STATE PARA STATS (para que React detecte cambios)
+
     const [stats, setStats] = useState<PagosStats>({
         tipo1: "TOTAL",
         cantidad1: 0,
@@ -119,7 +118,7 @@ export const useRegistrarPagos = () => {
         }
     }, [isModalOpen]);
 
-    // 🆕 Escuchar evento de recarga desde el carrusel (cuando el boss da like)
+    // Escuchar evento de recarga desde el carrusel (cuando el boss da like)
     useEffect(() => {
         const handleRecargar = () => {
             console.log('🔄 [useRegistrarPagos] Evento recargar-pagos recibido');
@@ -129,26 +128,30 @@ export const useRegistrarPagos = () => {
         return () => window.removeEventListener('recargar-pagos', handleRecargar);
     }, []);
 
-    // 🆕 RECALCULAR STATS CADA VEZ QUE CAMBIAN LOS PAGOS
+    // ============================================================
+    // RECALCULAR STATS CADA VEZ QUE CAMBIAN LOS PAGOS
+    // 🔧 CORREGIDO: totalNomina solo suma pagos 'Pagado con firma'
+    //    El monto NO se cuenta si el boss no ha aprobado con like
+    // ============================================================
     useEffect(() => {
-        const pagosValidos = pagos.filter(p =>
-            p.estado_pago !== 'Anulado' && !p.justificacion_anulacion
-        );
+        // Solo suma los que el boss aprobó con like (Pagado con firma)
+        const totalNomina = pagos
+            .filter(p => p.estado_pago === 'Pagado con firma')
+            .reduce((sum, p) => sum + (Number(p.monto_total) || 0), 0);
 
-        const totalNomina = pagosValidos.reduce((sum, p) => sum + (Number(p.monto_total) || 0), 0);
-
+        // Pendientes = los que aún no tienen aprobación del boss
         const pendientes = pagos.filter(p =>
             p.estado_pago === 'No pagado' || p.estado_pago === 'Pendiente de firma'
         ).length;
 
         setStats({
-            tipo1: "TOTAL",
+            tipo1: "PAGADO",
             cantidad1: totalNomina,
             tipo2: pendientes === 1 ? "PENDIENTE" : "PENDIENTES",
             cantidad2: pendientes
         });
-        
-        console.log('📊 [useRegistrarPagos] Stats actualizados:', { totalNomina, pendientes });
+
+        console.log('📊 [useRegistrarPagos] Stats:', { totalNomina, pendientes });
     }, [pagos]);
 
     // ============================================================
@@ -208,8 +211,7 @@ export const useRegistrarPagos = () => {
                     estado_pago: datos.estado_pago,
                 };
                 await apiClient.put(`/trabajadores/pagos/${pagoAEditar.id_pago}`, datosActualizar);
-            } 
-            else {
+            } else {
                 const datosParaBackend = {
                     id_trabajador: datos.id_trabajador,
                     id_trabajo: datos.id_trabajo || null,
@@ -271,7 +273,7 @@ export const useRegistrarPagos = () => {
         setPagoAEditar,
         setVista,
         cambiarVista,
-        stats,  // ✅ AHORA ES UN ESTADO QUE REACT DETECTA
+        stats,
         abrirModal,
         cerrarModal,
         abrirEdicion,

@@ -8,7 +8,6 @@ import { sincronizarFotosDesdeBackend } from "../utils/useFotosStorage";
 // ============================================================
 const supabaseUrl = "https://xqxbqmalxinmqyjmrvmk.supabase.co";
 const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhxeGJxbWFseGlubXF5am1ydm1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MjcyODEsImV4cCI6MjA5MTQwMzI4MX0.up2DjRg-wqDd9E5UWW-VBVIkheyHHUwLT0mXEpHlvac";
-
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // ============================================================
@@ -25,10 +24,10 @@ export interface TrabajoRealizado {
     evidencia_url: string;
     observaciones?: string;
     Trabajador?: { nombre_completo: string };
-    Pago?: {
+    PagoTrabajador?: Array<{
         id_pago: number;
         estado_pago: string;
-    };
+    }>;
 }
 
 export interface TrabajoStats {
@@ -67,7 +66,6 @@ const subirFotoEvidencia = async (fileSource: string) => {
     }
 };
 
-// Guardar también en la tabla evidencias del backend
 const guardarEnEvidencias = async (url: string, idReferencia: number) => {
     try {
         await apiClient.post('/evidencias', {
@@ -92,16 +90,22 @@ export const useTrabajoRealizado = () => {
     const [trabajoAEditar, setTrabajoAEditar] = useState<TrabajoRealizado | null>(null);
     const [trabajadores, setTrabajadores] = useState<any[]>([]);
 
+    // 🆕 STATE PARA STATS (para que React detecte cambios)
+    const [stats, setStats] = useState<TrabajoStats>({
+        tipo1: "HORAS TOTALES",
+        cantidad1: 0,
+        tipo2: "REALIZADOS",
+        cantidad2: 0,
+        pendientesFirma: 0
+    });
+
     const cargarTrabajos = useCallback(async () => {
         setCargando(true);
         try {
             const response = await apiClient.get('/trabajadores/trabajos');
             const data = response.data;
             setTrabajos(data);
-            
-            // Sincronizamos las fotos del backend con el carrusel global (useFotosStorage)
             sincronizarFotosDesdeBackend(data);
-            
         } catch (error) {
             console.error("❌ Error al cargar trabajos:", error);
         } finally {
@@ -124,7 +128,7 @@ export const useTrabajoRealizado = () => {
         cargarTrabajadores();
     }, [cargarTrabajos]);
 
-    // 🆕 Escuchar evento de recarga desde el carrusel (cuando el boss da like)
+    // Escuchar evento de recarga desde el carrusel (cuando el boss da like)
     useEffect(() => {
         const handleRecargar = () => {
             console.log('🔄 [useTrabajoRealizado] Evento recargar-trabajos recibido');
@@ -132,20 +136,32 @@ export const useTrabajoRealizado = () => {
         };
         window.addEventListener('recargar-trabajos', handleRecargar);
         return () => window.removeEventListener('recargar-trabajos', handleRecargar);
-    }, []);
+    }, [cargarTrabajos]);
 
-    const calcularStats = (): TrabajoStats => {
+    // 🆕 RECALCULAR STATS CADA VEZ QUE CAMBIAN LOS TRABAJOS
+    // Un trabajo está "pagado con firma" si tiene al menos un pago
+    // con estado_pago === 'Pagado con firma'
+    useEffect(() => {
         const horasTotales = trabajos.reduce((total, t) => total + (Number(t.duracion_horas) || 0), 0);
-        const pendientesFirma = trabajos.filter(t => t.Pago?.estado_pago !== 'Pagado con firma').length;
 
-        return {
+        const pagadosConFirma = trabajos.filter(t =>
+            t.PagoTrabajador?.some(p => p.estado_pago === 'Pagado con firma')
+        ).length;
+
+        const pendientesFirma = trabajos.filter(t =>
+            !t.PagoTrabajador?.some(p => p.estado_pago === 'Pagado con firma')
+        ).length;
+
+        setStats({
             tipo1: "HORAS TOTALES",
             cantidad1: Math.round(horasTotales),
-            tipo2: "TRABAJOS REGISTRADOS",
+            tipo2: "REALIZADOS",
             cantidad2: trabajos.length,
             pendientesFirma
-        };
-    };
+        });
+
+        console.log('📊 [useTrabajoRealizado] Stats actualizados:', { pagadosConFirma, pendientesFirma });
+    }, [trabajos]);
 
     const abrirModal = () => {
         setVista('lista');
@@ -174,16 +190,13 @@ export const useTrabajoRealizado = () => {
         try {
             let urlFinal = datos.evidencia_url;
 
-            // 1. Subida a Supabase Storage
             if (datos.evidencia_url?.startsWith('data:image') || datos.evidencia_url?.startsWith('blob:')) {
                 const urlSubida = await subirFotoEvidencia(datos.evidencia_url);
                 if (urlSubida) {
                     urlFinal = urlSubida;
-                    
-                    // Sincronizar con carrusel global (useFotosStorage)
-                    sincronizarFotosDesdeBackend([{ 
-                        evidencia_url: urlFinal, 
-                        fecha_inicio: datos.fecha_inicio 
+                    sincronizarFotosDesdeBackend([{
+                        evidencia_url: urlFinal,
+                        fecha_inicio: datos.fecha_inicio
                     }]);
                 }
             }
@@ -195,13 +208,12 @@ export const useTrabajoRealizado = () => {
                 fecha_inicio: datos.fecha_inicio,
                 fecha_fin: datos.fecha_fin,
                 duracion_horas: datos.duracion_horas,
-                evidencia_url: urlFinal, 
+                evidencia_url: urlFinal,
                 observaciones: datos.observaciones || null,
             };
 
             let nuevoId: number | null = null;
 
-            // 2. Guardar en Base de Datos (tabla trabajos)
             if (trabajoAEditar) {
                 await apiClient.put(`/trabajadores/trabajos/${trabajoAEditar.id_trabajo}`, datosParaBackend);
                 nuevoId = trabajoAEditar.id_trabajo;
@@ -210,14 +222,12 @@ export const useTrabajoRealizado = () => {
                 nuevoId = response.data?.id_trabajo;
             }
 
-            // 3. Guardar también en tabla evidencias para que aparezca en el carrusel
             if (urlFinal && urlFinal.startsWith('http')) {
                 await guardarEnEvidencias(urlFinal, nuevoId || 0);
             }
 
-            // 4. Recargar listas
             await cargarTrabajos();
-            
+
             if (cerrar) {
                 cerrarModal();
             } else {
@@ -263,7 +273,7 @@ export const useTrabajoRealizado = () => {
         setTrabajoAEditar,
         setVista,
         cambiarVista,
-        stats: calcularStats(),
+        stats,  // ✅ AHORA ES UN ESTADO QUE REACT DETECTA
         abrirModal,
         cerrarModal,
         abrirEdicion,

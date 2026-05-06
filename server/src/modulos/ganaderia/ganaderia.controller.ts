@@ -14,7 +14,6 @@ import {
 } from '@nestjs/common';
 import { GanaderiaService } from './ganaderia.service';
 import { CrearAnimalDto } from './dto/crear-animal.dto';
-import { ActualizarAnimalDto } from './dto/actualizar-animal.dto';
 import { AutenticacionGuardia } from '../../compartido/guardias/autenticacion.guardia';
 import { Roles } from '../../compartido/decoradores/roles.decorador';
 import { RolesGuardia } from '../../compartido/guardias/roles.guardia';
@@ -58,13 +57,13 @@ export class GanaderiaController {
     }
 
     // ============================================================
-    // PUT /api/ganaderia/:id
+    // PUT /api/ganaderia/:id (CORREGIDO - usa any para recibir salud)
     // ============================================================
     @Put(':id')
     @Roles('Administrador', 'Dueño')
     async actualizar(
         @Param('id', ParseIntPipe) id: number,
-        @Body() actualizarDto: ActualizarAnimalDto,
+        @Body() actualizarDto: any,  // ✅ Cambiado de ActualizarAnimalDto a any
     ) {
         return this.ganaderiaService.actualizar(id, actualizarDto);
     }

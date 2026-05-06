@@ -103,7 +103,7 @@ export const Admin = () => {
                     estado_pago: 'Pendiente de firma', // ← antes decía 'Pagado con firma'
                     accion: 'actualizar'
                 }, false); // ← false para no cerrar el modal
-                console.log(`⏳ Pago ${idPago} → "Pendiente de firma" (esperando aprobación del boss)`);
+                console.log(`⏳ Pago ${idPago} → "Pendiente de firma" (esperando aprobación del Dueño)`);
                 await pagos.recargarLista();
             }
         } catch (error) {

@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Camera, Package, Calendar, User, FileText } from "lucide-react";
+import { Camera, Package, Calendar, User, FileText, DollarSign } from "lucide-react";
 
 interface InsumoInventario {
     id: string;
@@ -41,6 +41,7 @@ export const FormularioConsumoInsumos = ({
         fechaPropuesta: new Date().toISOString().split('T')[0],
         tipoInsumoId: "",
         cantidadSolicitada: "",
+        precio_unitario: "",  // ✅ AGREGAR
         responsable: "",
         motivo: "",
         evidencia_fotografica: ""
@@ -50,6 +51,21 @@ export const FormularioConsumoInsumos = ({
     const [errorStock, setErrorStock] = useState("");
 
     const insumoSeleccionado = inventario.find(i => i.id === formData.tipoInsumoId);
+
+    // ✅ Formatear precio unitario
+    const formatearPrecio = (valor: string): string => {
+        const numeros = valor.replace(/\D/g, '');
+        if (!numeros) return '';
+        return new Intl.NumberFormat('es-CO').format(parseInt(numeros));
+    };
+
+    const limpiarFormateo = (valor: string): number => {
+        return parseInt(valor.replace(/\D/g, '')) || 0;
+    };
+
+    const precioUnitarioFormateado = formData.precio_unitario 
+        ? formatearPrecio(formData.precio_unitario.toString()) 
+        : '';
 
     // ============================================================
     // MANEJADORES
@@ -67,6 +83,12 @@ export const FormularioConsumoInsumos = ({
                 name === 'cantidadSolicitada' ? parseFloat(value) || 0 : parseFloat(formData.cantidadSolicitada) || 0
             );
         }
+    };
+
+    const manejarCambioPrecio = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        const valorLimpio = limpiarFormateo(value);
+        setFormData(prev => ({ ...prev, [name]: valorLimpio.toString() }));
     };
 
     const validarStock = (insumoId: string, cantidad: number) => {
@@ -103,6 +125,9 @@ export const FormularioConsumoInsumos = ({
         if (!formData.cantidadSolicitada || parseFloat(formData.cantidadSolicitada) <= 0) {
             nuevosErrores.cantidad = 'La cantidad debe ser mayor a 0';
         }
+        if (!formData.precio_unitario || limpiarFormateo(formData.precio_unitario) <= 0) {
+            nuevosErrores.precio_unitario = 'El precio unitario es obligatorio';
+        }
         if (!formData.responsable) nuevosErrores.responsable = 'Selecciona un responsable';
         if (!formData.motivo.trim()) nuevosErrores.motivo = 'El motivo es obligatorio';
         if (errorStock) nuevosErrores.stock = errorStock;
@@ -124,6 +149,7 @@ export const FormularioConsumoInsumos = ({
             fecha_consumo: formData.fechaPropuesta,
             id_responsable: parseInt(formData.responsable),
             observaciones: formData.motivo,
+            precio_unitario: limpiarFormateo(formData.precio_unitario),  // ✅ AGREGAR
             evidencia_fotografica: formData.evidencia_fotografica || null
         };
 
@@ -243,6 +269,31 @@ export const FormularioConsumoInsumos = ({
                     )}
                 </div>
 
+                {/* Precio Unitario */}
+                <div>
+                    <label className="text-[9px] uppercase ml-4 text-emerald-500 font-black tracking-tighter">
+                        <DollarSign size={10} className="inline mr-1" />
+                        Precio Unitario <span className="text-red-400">*</span>
+                    </label>
+                    <div className="relative">
+                        <input
+                            name="precio_unitario"
+                            value={precioUnitarioFormateado}
+                            onChange={manejarCambioPrecio}
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="$0"
+                            className={`w-full border-1 rounded-full pl-4 pr-12 py-2 text-[12px] focus:outline-none focus:ring-2 text-right font-bold transition-all ${
+                                errores.precio_unitario ? 'border-red-400 focus:ring-red-300' : 'border-emerald-200 focus:ring-emerald-300'
+                            }`}
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-bold text-emerald-500">$</span>
+                    </div>
+                    {errores.precio_unitario && (
+                        <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.precio_unitario}</p>
+                    )}
+                </div>
+
                 {/* Responsable */}
                 <div>
                     <label className="text-[9px] uppercase ml-4 text-emerald-500 font-black tracking-tighter">
@@ -292,7 +343,7 @@ export const FormularioConsumoInsumos = ({
             </div>
 
             {/* ============================================================ */}
-            {/* EVIDENCIA FOTOGRÁFICA (solo preview local, no se guarda en Carrusel) */}
+            {/* EVIDENCIA FOTOGRÁFICA */}
             {/* ============================================================ */}
             <div className="col-span-2">
                 <input

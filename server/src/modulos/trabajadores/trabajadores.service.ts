@@ -110,6 +110,9 @@ export class TrabajadoresService {
       include: {
         Trabajador: {
           select: { nombre_completo: true, id_trabajador: true }
+        },
+        PagoTrabajador: {
+          select: { id_pago: true, estado_pago: true }
         }
       },
       orderBy: { fecha_inicio: 'desc' }
@@ -391,7 +394,7 @@ export class TrabajadoresService {
   }
 
   // ============================================================
-  // 📌 SINCRONIZACIÓN FIRMA DESDE CARRUSEL (AÑADIDO)
+  // 📌 SINCRONIZACIÓN FIRMA DESDE CARRUSEL
   // ============================================================
 
   async sincronizarFirmaDesdeFoto(idTrabajo: number, estadoPago: string) {
@@ -406,7 +409,7 @@ export class TrabajadoresService {
 
       const pagoActualizado = await tx.pagoTrabajador.update({
         where: { id_pago: pagoAsociado.id_pago },
-        data: { 
+        data: {
           estado_pago: estadoPago,
           updatedAt: new Date()
         }
@@ -443,15 +446,27 @@ export class TrabajadoresService {
     });
   }
 
+  // 🔧 CORREGIDO: totalPagos = solo pagos aprobados por el boss (Pagado con firma)
+  // Esto hace que la barra PAGOS en Grafica3 solo suba cuando el boss da like
   async resumenPagos() {
-    const pagos = await this.prisma.pagoTrabajador.findMany({
+    // totalPagado = suma de montos de pagos aprobados
+    const pagosAprobados = await this.prisma.pagoTrabajador.findMany({
+      where: { estado_pago: 'Pagado con firma' },
       select: { monto_total: true }
     });
+    const totalPagado = pagosAprobados.reduce((sum, p) => sum + Number(p.monto_total), 0);
 
-    const totalPagado = pagos.reduce((sum, p) => sum + Number(p.monto_total), 0);
-    const totalPagos = pagos.length;
+    // totalPagos = número de pagos aprobados (para la barra PAGOS de Grafica3)
+    const totalPagosAprobados = await this.prisma.pagoTrabajador.count({
+      where: { estado_pago: 'Pagado con firma' }
+    });
 
-    return { totalPagado, totalPagos };
+    console.log('📊 resumenPagos:', { totalPagado, totalPagosAprobados });
+
+    return { 
+      totalPagado, 
+      totalPagos: totalPagosAprobados 
+    };
   }
 
   async contarInsumosCriticos(): Promise<number> {

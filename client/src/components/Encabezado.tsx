@@ -68,10 +68,10 @@ const TooltipRecordatorio = ({
     return (
         <div 
             ref={tooltipRef}
-            className="absolute top-full right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 z-[200] overflow-hidden"
+            className="absolute top-full -right-23 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 z-[200] overflow-hidden"
         >
-            <div className="bg-green-700 p-3 text-white">
-                <h3 className="text-sm font-bold text-center">📅 NUEVO RECORDATORIO</h3>
+            <div className="bg-green-900 p-3 text-white">
+                <h3 className="text-sm font-bold text-center"> -- NUEVO RECORDATORIO --</h3>
             </div>
             
             <div className="p-4 space-y-3">
@@ -80,10 +80,10 @@ const TooltipRecordatorio = ({
                         FECHA DEL RECORDATORIO
                     </label>
                     <input
-                        type="date"
+                        type="datetime-local"
                         value={fecha}
                         onChange={(e) => setFecha(e.target.value)}
-                        className="w-full border-2 border-gray-200 rounded-lg p-2 text-sm focus:border-green-500 outline-none"
+                        className="w-full uppercase border-2 border-gray-200 rounded-lg p-2 text-sm focus:border-green-500 outline-none"
                     />
                 </div>
 
@@ -411,7 +411,11 @@ const ModalPerfil = ({ onClose }: { onClose: () => void }) => {
 };
 
 // ============================================================
-// 📌 NAV2 CON SISTEMA DE RECORDATORIOS (BACKEND)
+// 📌 NAV2 CON SISTEMA DE 
+// 
+
+
+S (BACKEND)
 // ============================================================
 export const Nav2 = () => {
     const navigate = useNavigate();
@@ -487,7 +491,7 @@ export const Nav2 = () => {
         setRecordatoriosActivos(prev => prev.filter(r => r.id !== id));
     };
 
-    const estiloBoton = "backdrop-blur-md bg-white/60 px-4 py-2 rounded-full hover:bg-white transition-all cursor-pointer font-bold text-xs shadow-sm border border-white/80";
+    const estiloBoton = "backdrop-blur-md bg-white/80 hover:scale-105 px-4 py-2 rounded-full hover:bg-white transition-all cursor-pointer font-bold text-xs shadow-sm border border-white";
 
     const handleCerrarSesion = () => {
         localStorage.removeItem('token');
@@ -509,7 +513,7 @@ export const Nav2 = () => {
 
                 <div className="relative">
                     <p className={estiloBoton} onClick={() => setMostrarTooltipRecordatorio(!mostrarTooltipRecordatorio)}> 
-                        📅 RECORDATORIO 
+                        RECORDATORIO 
                     </p>
                     <TooltipRecordatorio 
                         isOpen={mostrarTooltipRecordatorio}
@@ -648,7 +652,7 @@ export const Encabezado = ({ children, estilos, titulo, id, titulos, subtitulo }
                 </button>
             )}
 
-            <div className="flex items-center absolute w-fit h-fit gap-100 left-10 top-10 z-30 pointer-events-auto">
+            <div className="flex items-center absolute w-fit h-fit gap-165 left-10 top-10 z-30 pointer-events-auto">
                 <Navegar />
                 <Nav2 />
             </div>

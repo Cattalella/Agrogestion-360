@@ -1,4 +1,3 @@
-// src/modulos/ganaderia/ganaderia.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CrearAnimalDto } from './dto/crear-animal.dto';
@@ -9,10 +8,31 @@ export class GanaderiaService {
     constructor(private prisma: PrismaService) {}
 
     // ============================================================
-    // OBTENER TODOS LOS ANIMALES
+    // OBTENER ID DE ESPECIE BOVINA
+    // ============================================================
+    private async obtenerIdEspecieBovina() {
+        let especie = await this.prisma.especie.findFirst({
+            where: { nombre: { contains: 'Bovino', mode: 'insensitive' } }
+        });
+
+        if (!especie) {
+            especie = await this.prisma.especie.create({
+                data: { nombre: 'Bovino' }
+            });
+            console.log('✅ Especie Bovino creada automáticamente');
+        }
+
+        return especie.id_especie;
+    }
+
+    // ============================================================
+    // OBTENER TODOS LOS ANIMALES (SOLO BOVINOS)
     // ============================================================
     async obtenerTodos() {
+        const idBovino = await this.obtenerIdEspecieBovina();
+        
         const animales = await this.prisma.animal.findMany({
+            where: { id_especie: idBovino },
             include: {
                 especie: true,
                 estado: true,
@@ -30,7 +50,7 @@ export class GanaderiaService {
             fecha_nacimiento: a.fecha_nacimiento,
             peso_actual: a.peso_actual,
             origen: a.origen,
-            estado: a.estado?.nombre || 'Activo',
+            estado: a.estado?.nombre === 'Activo' ? 'Sano' : (a.estado?.nombre || 'Sano'),
             ubicacion: a.ubicacion?.nombre_ubi || 'Sin ubicación',
             foto_url: a.foto_url,
         }));
@@ -69,7 +89,7 @@ export class GanaderiaService {
             fecha_nacimiento: animal.fecha_nacimiento,
             peso_actual: animal.peso_actual,
             origen: animal.origen,
-            estado: animal.estado?.nombre || 'Activo',
+            estado: animal.estado?.nombre === 'Activo' ? 'Sano' : (animal.estado?.nombre || 'Sano'),
             ubicacion: animal.ubicacion?.nombre_ubi || 'Sin ubicación',
             foto_url: animal.foto_url,
             pesajes: animal.pesajes,
@@ -83,7 +103,7 @@ export class GanaderiaService {
     }
 
     // ============================================================
-    // MÉTODO AUXILIAR: OBTENER O CREAR ESPECIE
+    // MÉTODOS AUXILIARES
     // ============================================================
     private async obtenerOCrearEspecie(nombreEspecie: string = 'Bovino') {
         let especie = await this.prisma.especie.findFirst({
@@ -100,10 +120,7 @@ export class GanaderiaService {
         return especie;
     }
 
-    // ============================================================
-    // MÉTODO AUXILIAR: OBTENER O CREAR ESTADO
-    // ============================================================
-    private async obtenerOCrearEstado(nombreEstado: string = 'Activo') {
+    private async obtenerOCrearEstado(nombreEstado: string = 'Sano') {
         let estado = await this.prisma.estadoAni.findFirst({
             where: { nombre: nombreEstado }
         });
@@ -118,9 +135,6 @@ export class GanaderiaService {
         return estado;
     }
 
-    // ============================================================
-    // MÉTODO AUXILIAR: OBTENER O CREAR UBICACIÓN
-    // ============================================================
     private async obtenerOCrearUbicacion(nombreUbicacion: string = 'Potrero 1') {
         let ubicacion = await this.prisma.ubicacion.findFirst({
             where: { nombre_ubi: nombreUbicacion }
@@ -141,7 +155,7 @@ export class GanaderiaService {
     // ============================================================
     async crear(datos: CrearAnimalDto) {
         const especie = await this.obtenerOCrearEspecie('Bovino');
-        const estado = await this.obtenerOCrearEstado('Activo');
+        let estado = await this.obtenerOCrearEstado('Sano');
         const ubicacion = await this.obtenerOCrearUbicacion('Potrero 1');
 
         const animal = await this.prisma.animal.create({
@@ -176,7 +190,7 @@ export class GanaderiaService {
             });
         }
 
-        console.log(`✅ Animal registrado: ${animal.codigo_local}`);
+        console.log(`✅ Animal registrado: ${animal.codigo_local} con estado Sano`);
 
         return {
             id: animal.id_animal,
@@ -184,17 +198,19 @@ export class GanaderiaService {
             local: animal.codigo_local,
             sexo: animal.sexo === 'F' ? 'HEMBRA' : 'MACHO',
             raza: animal.raza,
-            estado: animal.estado?.nombre || 'Activo',
+            estado: 'Sano',
             ubicacion: animal.ubicacion?.nombre_ubi || 'Potrero 1',
             mensaje: 'Animal registrado correctamente'
         };
     }
 
     // ============================================================
-    // ACTUALIZAR ANIMAL
+    // ACTUALIZAR ANIMAL (CORREGIDO)
     // ============================================================
     async actualizar(id: number, datos: ActualizarAnimalDto) {
-        const dataActualizar: any = {};
+        const dataActualizar: any = {
+            updatedAt: new Date()
+        };
         
         if (datos.num_ica_chapeta !== undefined) dataActualizar.num_ica_chapeta = datos.num_ica_chapeta;
         if (datos.codigo_local !== undefined) dataActualizar.codigo_local = datos.codigo_local;
@@ -204,30 +220,39 @@ export class GanaderiaService {
         if (datos.peso_actual !== undefined) dataActualizar.peso_actual = datos.peso_actual;
         if (datos.origen !== undefined) dataActualizar.origen = datos.origen;
         if (datos.id_ubicacion !== undefined) dataActualizar.id_ubicacion = datos.id_ubicacion;
-        if (datos.id_estado_ani !== undefined) dataActualizar.id_estado_ani = datos.id_estado_ani;
         if (datos.foto_url !== undefined) dataActualizar.foto_url = datos.foto_url;
         
-        dataActualizar.updatedAt = new Date();
+        // ✅ CORREGIDO: Manejar actualización de estado por nombre (salud)
+        if (datos.salud !== undefined && datos.salud !== null) {
+            const estadoObj = await this.obtenerOCrearEstado(datos.salud);
+            dataActualizar.id_estado_ani = estadoObj.id_estado_ani;
+            console.log(`📝 Actualizando estado a: ${datos.salud} (ID: ${estadoObj.id_estado_ani})`);
+        }
+
+        console.log('📝 Datos a actualizar:', dataActualizar);
 
         const animal = await this.prisma.animal.update({
             where: { id_animal: id },
             data: dataActualizar,
+            include: { estado: true }
         });
+
+        console.log(`✅ Animal actualizado: ${animal.codigo_local} - Nuevo estado: ${animal.estado?.nombre}`);
 
         return {
             mensaje: 'Animal actualizado correctamente',
             animal: {
                 id: animal.id_animal,
                 local: animal.codigo_local,
+                estado: animal.estado?.nombre
             }
         };
     }
 
     // ============================================================
-    // ELIMINAR ANIMAL (CON NOMBRES CORRECTOS DEL SCHEMA)
+    // ELIMINAR ANIMAL
     // ============================================================
     async eliminar(id: number) {
-        // Verificar si el animal existe
         const animal = await this.prisma.animal.findUnique({
             where: { id_animal: id }
         });
@@ -238,25 +263,18 @@ export class GanaderiaService {
 
         console.log(`🗑️ Eliminando animal: ${animal.codigo_local} (ID: ${id})`);
 
-        // 1. Eliminar registros de HISTORIAL DE PESO (historialPeso)
-        const pesosEliminados = await this.prisma.historialPeso.deleteMany({
+        await this.prisma.historialPeso.deleteMany({
             where: { id_animal: id }
         });
-        console.log(`   - Eliminados ${pesosEliminados.count} registros de peso`);
 
-        // 2. Eliminar registros de VACUNAS (RegVacuna - con R mayúscula)
-        const vacunasEliminadas = await this.prisma.regVacuna.deleteMany({
+        await this.prisma.regVacuna.deleteMany({
             where: { id_animal: id }
         });
-        console.log(`   - Eliminados ${vacunasEliminadas.count} registros de vacunas`);
 
-        // 3. Eliminar registros de VENTAS (Venta - con V mayúscula)
-        const ventasEliminadas = await this.prisma.venta.deleteMany({
+        await this.prisma.venta.deleteMany({
             where: { id_animal: id }
         });
-        console.log(`   - Eliminadas ${ventasEliminadas.count} ventas`);
 
-        // 4. Finalmente eliminar el ANIMAL
         await this.prisma.animal.delete({
             where: { id_animal: id }
         });
@@ -267,9 +285,6 @@ export class GanaderiaService {
             mensaje: 'Animal eliminado correctamente junto con todos sus registros asociados',
             detalles: {
                 animal: animal.codigo_local,
-                pesos_eliminados: pesosEliminados.count,
-                vacunas_eliminadas: vacunasEliminadas.count,
-                ventas_eliminadas: ventasEliminadas.count,
             }
         };
     }

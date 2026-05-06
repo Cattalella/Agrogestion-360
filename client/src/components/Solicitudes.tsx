@@ -22,6 +22,7 @@ interface Solicitud {
     cantidad?: number;
     unidadMedida?: string;
     motivo?: string;
+    precio_total?: number;  // ✅ AGREGADO
 }
 
 export const Solicitudes = () => {
@@ -164,7 +165,7 @@ export const Solicitudes = () => {
                         </p>
                     ) : (
                         <div
-                            className={`flex gap-4 ${conAnimacion ? "transition-transform duration-500 ease-in-out" : ""}`}
+                            className={`flex gap-4 ${conAnimacion ? "transition-transform duration-1000 ease-in-out" : ""}`}
                             style={{ transform: `translateX(-${indice * itemWidth}px)` }}
                         >
                             {listaPendientes.map((item: Solicitud) => (
@@ -179,8 +180,8 @@ export const Solicitudes = () => {
                                             className="w-full h-full object-cover opacity-80"
                                             alt="usuario"
                                         />
-                                        <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 flex flex-col justify-end p-2 transition-all">
-                                            <p className="text-[8px] font-bold text-white uppercase text-center leading-tight truncate">
+                                        <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 flex flex-col justify-end p-1 transition-all">
+                                            <p className="text-[10px] font-bold bg-black/60 rounded-full backdrop-blur-[5px] text-white uppercase tracking-[1px] text-center leading-tight truncate">
                                                 {item.usuario || 'ADMIN'}
                                             </p>
                                         </div>
@@ -215,7 +216,7 @@ export const Solicitudes = () => {
             </p>
 
             {/* ============================================================ */}
-            {/* MODAL CORREGIDO - AHORA MUESTRA EL NOMBRE DEL PRODUCTO */}
+            {/* MODAL CORREGIDO - AHORA MUESTRA EL PRECIO TOTAL */}
             {/* ============================================================ */}
             {modalAbierto && seleccionado && createPortal(
                 <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
@@ -241,7 +242,6 @@ export const Solicitudes = () => {
                             ID: #{seleccionado.id}
                         </p>
                         
-                        {/* ✅ CORREGIDO: Muestra el nombre del producto, no solo "insumo" */}
                         <p className="text-emerald-700 font-black text-xs uppercase mb-1">
                             PRODUCTO: {getNombreProducto(seleccionado)}
                         </p>
@@ -249,6 +249,13 @@ export const Solicitudes = () => {
                         <p className="text-gray-500 text-xs mb-3">
                             CANTIDAD: {seleccionado.cantidad} {seleccionado.unidadMedida || 'unidades'}
                         </p>
+                        
+                        {/* 🆕 MOSTRAR PRECIO TOTAL */}
+                        {seleccionado.precio_total !== undefined && seleccionado.precio_total > 0 && (
+                            <p className="text-emerald-600 font-black text-sm uppercase mb-3">
+                                TOTAL: ${seleccionado.precio_total.toLocaleString('es-CO')}
+                            </p>
+                        )}
                         
                         {seleccionado.motivo && (
                             <p className="text-gray-400 text-[10px] italic mb-3">

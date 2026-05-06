@@ -26,6 +26,8 @@ export interface RegistroConsumo {
     id_insumo: number;
     nombreInsumo: string;
     cantidad: number;
+    valor_total: number;  // ✅ AGREGAR
+    precio_unitario: number;  // ✅ AGREGAR
     unidadMedida: string;
     responsable: string;
     observaciones: string;
@@ -63,12 +65,11 @@ export const useConsumoInsumos = () => {
     };
 
     // ============================================================
-    // 🆕 CARGAR INVENTARIO DISPONIBLE
+    // CARGAR INVENTARIO DISPONIBLE
     // ============================================================
     const cargarInventario = async () => {
         try {
             const response = await apiClient.get('/inventario');
-            // Transformar datos para que coincidan con el formulario
             const inventarioTransformado = response.data.map((item: any) => ({
                 id: item.id_insumo.toString(),
                 id_insumo: item.id_insumo,
@@ -89,7 +90,7 @@ export const useConsumoInsumos = () => {
     };
 
     // ============================================================
-    // 🆕 CARGAR INSUMOS CRÍTICOS (para Hero2)
+    // CARGAR INSUMOS CRÍTICOS (para Hero2)
     // ============================================================
     const cargarInsumosCriticos = async () => {
         try {
@@ -116,28 +117,25 @@ export const useConsumoInsumos = () => {
     }, [isModalOpen]);
 
     // ============================================================
-    // 🆕 CALCULAR STATS PARA LA CARD
+    // ✅ CALCULAR STATS PARA LA CARD (SUMA VALORES MONETARIOS)
     // ============================================================
     const calcularStats = (): ConsumoStats => {
-        // Total de consumos este mes
         const hoy = new Date();
         const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
         
-        const consumosMes = consumos.filter(c => {
-            const fecha = new Date(c.fecha_consumo);
-            return fecha >= inicioMes;
-        }).length;
+        // ✅ Sumar valor_total (dinero gastado), no cantidad
+        const totalGastadoMes = consumos
+            .filter(c => new Date(c.fecha_consumo) >= inicioMes)
+            .reduce((sum, c) => sum + (c.valor_total || 0), 0);
 
-        // Insumos bajo stock mínimo
-        const bajoStock = inventario.filter(i => 
-            i.stock_minimo && i.stock <= i.stock_minimo
-        ).length;
+        const totalGastadoGeneral = consumos
+            .reduce((sum, c) => sum + (c.valor_total || 0), 0);
 
         return {
-            tipo1: "CONSUMOS ESTE MES",
-            cantidad1: consumosMes,
-            tipo2: "BAJO STOCK MÍNIMO",
-            cantidad2: bajoStock
+            tipo1: "GASTADO MES",
+            cantidad1: totalGastadoMes,
+            tipo2: "GASTADO TOTAL",
+            cantidad2: totalGastadoGeneral
         };
     };
 
@@ -157,12 +155,11 @@ export const useConsumoInsumos = () => {
     const cambiarVista = (v: 'lista' | 'formulario') => setVista(v);
 
     // ============================================================
-    // REGISTRAR CONSUMO (CORREGIDO)
+    // REGISTRAR CONSUMO (con precio_unitario)
     // ============================================================
     const registrarConsumo = async (datos: any, cerrar: boolean = true) => {
         setCargando(true);
         try {
-            // Validar que id_insumo no sea null
             if (!datos.id_insumo) {
                 throw new Error("Debes seleccionar un insumo");
             }
@@ -174,6 +171,7 @@ export const useConsumoInsumos = () => {
                 fecha_consumo: datos.fecha_consumo || new Date().toISOString().split('T')[0],
                 id_responsable: datos.id_responsable,
                 observaciones: datos.observaciones || datos.motivo || "",
+                precio_unitario: datos.precio_unitario || 0,  // ✅ AGREGAR
                 evidencia_fotografica: datos.evidencia_fotografica || null
             };
 
@@ -202,7 +200,7 @@ export const useConsumoInsumos = () => {
     };
 
     // ============================================================
-    // 🆕 ACTUALIZAR CONSUMO
+    // ACTUALIZAR CONSUMO
     // ============================================================
     const actualizarConsumo = async (id: number, datos: Partial<RegistroConsumo>) => {
         try {
@@ -217,7 +215,7 @@ export const useConsumoInsumos = () => {
     };
 
     // ============================================================
-    // 🆕 ELIMINAR CONSUMO
+    // ELIMINAR CONSUMO
     // ============================================================
     const eliminarConsumo = async (id: number) => {
         try {

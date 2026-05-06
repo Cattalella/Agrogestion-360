@@ -9,6 +9,7 @@ export type EstadoSolicitud = 'Pendiente' | 'Aprobada' | 'Rechazada';
 
 export interface SolicitudCompra {
     id: number;
+    id_solicitud: number;
     categoria_general: CategoriaGeneral;
     fecha_propuesta: string;
     cantidad: number;
@@ -17,6 +18,7 @@ export interface SolicitudCompra {
     estado_sol: EstadoSolicitud;
     ejecutada: boolean;
     fecha_creacion: string;
+    fecha_compra?: string;
     hora_creacion: string;
     usuario: string;
     tipo_insumo?: string;
@@ -28,6 +30,8 @@ export interface SolicitudCompra {
     categoria_alimento?: string;
     eliminada: boolean;
     motivo_eliminacion?: string;
+    precio_total?: number;
+    precio_unitario?: number;   // ✅ AGREGADO
 }
 
 export interface ComprasStats {
@@ -39,9 +43,6 @@ export interface ComprasStats {
 
 type Vista = 'lista' | 'formulario';
 
-// ============================================================
-// 📌 UTILIDADES
-// ============================================================
 const diasParaVencer = (fechaVencimiento: string): number => {
     const hoy = new Date();
     const vence = new Date(fechaVencimiento);
@@ -57,9 +58,6 @@ export const verificarAlertas = (solicitudes: SolicitudCompra[]): SolicitudCompr
     });
 };
 
-// ============================================================
-// 📌 HOOK PRINCIPAL
-// ============================================================
 export const useRegistrarCompra = () => {
 
     const [listaSolicitudes, setListaSolicitudes] = useState<SolicitudCompra[]>([]);
@@ -70,15 +68,12 @@ export const useRegistrarCompra = () => {
     const [solicitudAEditar, setSolicitudAEditar] = useState<SolicitudCompra | null>(null);
     const [alertasVencimiento, setAlertasVencimiento] = useState<SolicitudCompra[]>([]);
 
-    // ============================================================
-    // CARGAR SOLICITUDES DEL BACKEND
-    // ============================================================
     const cargarSolicitudes = async () => {
         setCargando(true);
         try {
             const respuesta = await apiClient.get('/inventario/solicitudes');
+            console.log('📋 Solicitudes cargadas:', respuesta.data);
             setListaSolicitudes(respuesta.data);
-            console.log('✅ Solicitudes cargadas:', respuesta.data.length);
         } catch (error) {
             console.error("❌ Error al cargar solicitudes:", error);
         } finally {
@@ -86,45 +81,40 @@ export const useRegistrarCompra = () => {
         }
     };
 
-    // Cargar al iniciar
     useEffect(() => {
         cargarSolicitudes();
     }, []);
 
-    // Actualizar alertas cuando cambia la lista
     useEffect(() => {
         setAlertasVencimiento(verificarAlertas(listaSolicitudes));
     }, [listaSolicitudes]);
 
-    // ============================================================
-    // 🆕 CALCULAR STATS PARA LA CARD (CORREGIDO)
-    // ============================================================
     const calcularStats = (): ComprasStats => {
         const solicitudesVisibles = listaSolicitudes.filter(s => !s.eliminada);
         
         const hoy = new Date();
         const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
         
-        const comprasMes = solicitudesVisibles.filter(s => {
-            const fecha = new Date(s.fecha_creacion);
-            return fecha >= inicioMes && s.estado_sol === 'Aprobada';
-        }).length;
+        const totalGastadoMes = solicitudesVisibles
+            .filter(s => {
+                const fecha = new Date(s.fecha_creacion);
+                const esAprobada = s.estado_sol === 'Aprobada';
+                return fecha >= inicioMes && esAprobada;
+            })
+            .reduce((sum, s) => sum + (Number(s.precio_total) || 0), 0);
 
         const pendientes = solicitudesVisibles.filter(s => 
             s.estado_sol === 'Pendiente'
         ).length;
 
         return {
-            tipo1: "INSUMOS MES",
-            cantidad1: comprasMes,
+            tipo1: "TOTAL",
+            cantidad1: totalGastadoMes,
             tipo2: "PENDIENTES",
             cantidad2: pendientes
         };
     };
 
-    // ============================================================
-    // ABRIR / CERRAR MODAL
-    // ============================================================
     const abrirModal = () => {
         setVista('lista');
         setSolicitudAEditar(null);
@@ -141,31 +131,27 @@ export const useRegistrarCompra = () => {
         setVista(nuevaVista);
     };
 
-    // ============================================================
-    // CREAR SOLICITUD (BACKEND) - SOLO PARA PEDIR
-    // ============================================================
-    const crearSolicitud = async (
-        datos: any,
-        cerrar: boolean = true
-    ) => {
+    const crearSolicitud = async (datos: any, cerrar: boolean = true) => {
         setCargando(true);
         try {
             const datosParaBackend = {
-                categoria_general: datos.categoria_general,
-                fecha_compra: datos.fechaPropuesta || datos.fecha_propuesta,
+                categoria_general: datos.tipo || datos.categoria_general,
+                fecha_compra_propuesta: datos.fechaPropuesta,
                 cantidad: datos.cantidad,
                 motivo: datos.motivo,
-                fecha_vencimiento: datos.fechaVencimiento || datos.fecha_vencimiento || null,
+                fecha_vencimiento: datos.fechaVencimiento || null,
                 proveedor: datos.proveedor || null,
-                tipo_insumo: datos.tipoInsumo || datos.tipo_insumo || null,
-                categoria_insumo: datos.categoriaInsumo || datos.categoria_insumo || null,
-                tipo_alimento: datos.tipoAlimento || datos.tipo_alimento || null,
-                especie_destino: datos.especieDestino || datos.especie_destino || null,
-                unidad_medida: datos.unidadMedida || datos.unidad_medida || null,
+                tipo_insumo: datos.tipoInsumo || null,
+                categoria_insumo: datos.categoriaInsumo || null,
+                tipo_alimento: datos.tipoAlimento || null,
+                especie_destino: datos.especieDestino || null,
+                unidad_medida: datos.unidadMedida || 'kg',
                 usuario: datos.usuario || "Admin",
+                precio_total: datos.precio_total || 0,
+                precio_unitario: datos.precio_unitario || 0,
             };
 
-            console.log('📤 Enviando a backend (Solicitud Compra):', datosParaBackend);
+            console.log('📤 Enviando a backend:', datosParaBackend);
             
             await apiClient.post('/inventario/solicitudes', datosParaBackend);
             
@@ -186,9 +172,6 @@ export const useRegistrarCompra = () => {
         }
     };
 
-    // ============================================================
-    // 🆕 EJECUTAR COMPRA REAL (con todos los datos del formulario)
-    // ============================================================
     const ejecutarCompraReal = async (datosCompra: any) => {
         setCargando(true);
         try {
@@ -224,15 +207,17 @@ export const useRegistrarCompra = () => {
         }
     };
 
-    // ============================================================
-    // EJECUTAR COMPRA (SOLO ID - versión simple)
-    // ============================================================
     const ejecutarCompra = async (id: number) => {
         const solicitud = listaSolicitudes.find(s => s.id === id);
         if (!solicitud) return false;
         
         if (solicitud.estado_sol !== 'Aprobada') {
             alert("Solo puedes ejecutar una compra si la solicitud fue aprobada por el dueño.");
+            return false;
+        }
+        
+        if (solicitud.ejecutada) {
+            alert("Esta compra ya fue registrada. No se puede duplicar.");
             return false;
         }
         
@@ -246,9 +231,6 @@ export const useRegistrarCompra = () => {
         }
     };
 
-    // ============================================================
-    // ELIMINAR SOLICITUD
-    // ============================================================
     const eliminarSolicitud = async (id: number, motivo: string) => {
         if (!motivo.trim()) {
             alert("Debes ingresar un motivo para eliminar la solicitud.");
@@ -267,9 +249,6 @@ export const useRegistrarCompra = () => {
         }
     };
 
-    // ============================================================
-    // CAMBIAR ESTADO (APROBAR/RECHAZAR) - SOLO DUEÑO
-    // ============================================================
     const cambiarEstado = async (id: number, nuevoEstado: EstadoSolicitud) => {
         try {
             await apiClient.patch(`/inventario/solicitudes/${id}/estado`, {
@@ -286,16 +265,10 @@ export const useRegistrarCompra = () => {
         }
     };
 
-    // ============================================================
-    // FILTROS
-    // ============================================================
     const solicitudesVisibles = listaSolicitudes.filter(s => !s.eliminada);
     const solicitudesPendientes = solicitudesVisibles.filter(s => s.estado_sol === 'Pendiente');
-    const solicitudesAprobadas = solicitudesVisibles.filter(s => s.estado_sol === 'Aprobada');
+    const solicitudesAprobadas = solicitudesVisibles.filter(s => s.estado_sol === 'Aprobada' && !s.ejecutada);
 
-    // ============================================================
-    // RETORNAR
-    // ============================================================
     return {
         listaSolicitudes,
         solicitudesVisibles,

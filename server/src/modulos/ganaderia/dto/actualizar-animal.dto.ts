@@ -1,5 +1,5 @@
 // src/modulos/ganaderia/dto/actualizar-animal.dto.ts
-import { IsString, IsOptional, IsNumber, IsDateString, Min, Max } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsDateString, Min } from 'class-validator';
 
 export class ActualizarAnimalDto {
     @IsString({ message: 'El número ICA/Chapeta debe ser texto' })
@@ -37,9 +37,14 @@ export class ActualizarAnimalDto {
 
     @IsNumber({}, { message: 'El ID de estado debe ser un número' })
     @IsOptional()
-    id_estado_ani?: number;  // 1 = Activo, 2 = Vendido, 3 = Muerto
+    id_estado_ani?: number;
 
     @IsString({ message: 'La URL de la foto debe ser texto' })
     @IsOptional()
     foto_url?: string;
+
+    // ✅ AGREGAR: Estado de salud (Sano, Enfermo, En cuidado)
+    @IsString({ message: 'El estado de salud debe ser texto' })
+    @IsOptional()
+    salud?: string;
 }

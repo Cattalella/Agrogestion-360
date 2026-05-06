@@ -6,6 +6,7 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
 }
 
 model Rol {
@@ -169,7 +170,8 @@ model Solicitud {
   motivo              String?
   observaciones_aprob String?
   proveedor           String?    @db.VarChar(100)
-  updatedAt           DateTime
+  updatedAt           DateTime   @updatedAt
+  precio_total        Decimal?   @db.Decimal(12, 2)
   solicitante         Persona    @relation("solicitante", fields: [id_admin], references: [id_persona])
   aprobador           Persona    @relation("aprobador", fields: [id_dueno], references: [id_persona])
   insumo              CatInsumos @relation(fields: [id_insumo], references: [id_insumo])
@@ -178,9 +180,11 @@ model Solicitud {
 model LoteInv {
   id_lote      Int        @id @default(autoincrement())
   id_insumo    Int
+  id_solicitud  Int?
   cant_actual  Decimal    @db.Decimal(10, 2)
   fecha_venc   DateTime?
   cant_inicial Decimal    @db.Decimal(10, 2)
+  precio_total   Decimal?    @db.Decimal(12, 2)
   createdAt    DateTime   @default(now())
   fecha_compra DateTime   @default(now())
   numero_lote  String?    @db.VarChar(50)
@@ -207,6 +211,8 @@ model ConsumoInsumo {
   id_trabajador  Int
   actividad      String     @db.VarChar(50)
   cantidad       Decimal    @db.Decimal(10, 2)
+  valor_total    Decimal?    @db.Decimal(12, 2)
+  precio_unitario Decimal?    @db.Decimal(10, 2)
   fecha_consumo  DateTime   @default(now())
   observaciones  String?
   createdAt      DateTime   @default(now())

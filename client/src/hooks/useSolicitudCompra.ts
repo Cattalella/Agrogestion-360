@@ -20,6 +20,8 @@ export interface SolicitudCompra {
     estado_sol: EstadoSolicitud;
     createdAt: string;
     usuario?: string;
+    fotoUsuario?: string;          // ✅ AGREGADO
+    precio_total?: number;         // ✅ AGREGADO
     tipoInsumo?: string;
     categoriaInsumo?: CategoriaInsumo;
     fechaVencimiento?: string;
@@ -50,7 +52,6 @@ export const useSolicitudCompra = () => {
     const [bannerVisible, setBannerVisible] = useState(true);
     const [error, setError] = useState<string | null>(null);
     
-    // 🆕 Estado para modal de confirmación
     const [modalConfirmacion, setModalConfirmacion] = useState<ModalConfirmacionState>({
         isOpen: false,
         id: null,
@@ -104,7 +105,6 @@ export const useSolicitudCompra = () => {
     const cambiarVista = (nuevaVista: Vista) => setVista(nuevaVista);
     const cerrarBanner = () => setBannerVisible(false);
 
-    // 🆕 Abrir modal de confirmación para eliminar
     const abrirModalEliminar = (id: number, nombre: string) => {
         setModalConfirmacion({
             isOpen: true,
@@ -144,13 +144,12 @@ export const useSolicitudCompra = () => {
     };
 
     // ============================================================
-    // 📝 CREAR SOLICITUD (CORREGIDO)
+    // 📝 CREAR SOLICITUD
     // ============================================================
     const crearSolicitud = async (datos: any, cerrar: boolean = true) => {
         setCargando(true);
         setError(null);
         try {
-            // Determinar el tipo desde los datos
             const tipo = datos.tipo || datos.categoria_general || tipoSeleccionado;
             
             const payload = {
@@ -164,7 +163,8 @@ export const useSolicitudCompra = () => {
                 fecha_vencimiento: datos.fechaVencimiento || null,
                 motivo: datos.motivo,
                 proveedor: datos.proveedor || null,
-                usuario: datos.usuario || 'Admin'
+                usuario: datos.usuario || 'Admin',
+                precio_total: datos.precio_total || 0
             };
 
             console.log('📤 Creando nueva solicitud:', payload);
@@ -235,7 +235,7 @@ export const useSolicitudCompra = () => {
     };
 
     // ============================================================
-    // 🎯 GUARDAR (CREAR O ACTUALIZAR SEGÚN CORRESPONDA)
+    // 🎯 GUARDAR (CREAR O ACTUALIZAR)
     // ============================================================
     const guardarSolicitud = async (datos: any, cerrar: boolean = true) => {
         if (solicitudAEditar) {
@@ -248,19 +248,18 @@ export const useSolicitudCompra = () => {
     // ============================================================
     // FILTROS
     // ============================================================
-    // 🆕 Función para cambiar estado de solicitud
-const cambiarEstadoSolicitud = async (id: number, estado: 'Aprobada' | 'Rechazada') => {
-    try {
-        await apiClient.patch(`/inventario/solicitudes/${id}/procesar`, { 
-            estado: estado  // ✅ 'estado' no 'estado_sol'
-        });
-        await cargarSolicitudes();
-        console.log(`✅ Solicitud ${id} marcada como ${estado}`);
-    } catch (error: any) {
-        console.error('❌ Error al cambiar estado:', error);
-        alert(error.response?.data?.mensaje || 'Error al procesar la solicitud');
-    }
-};
+    const cambiarEstadoSolicitud = async (id: number, estado: 'Aprobada' | 'Rechazada') => {
+        try {
+            await apiClient.patch(`/inventario/solicitudes/${id}/procesar`, { 
+                estado: estado
+            });
+            await cargarSolicitudes();
+            console.log(`✅ Solicitud ${id} marcada como ${estado}`);
+        } catch (error: any) {
+            console.error('❌ Error al cambiar estado:', error);
+            alert(error.response?.data?.mensaje || 'Error al procesar la solicitud');
+        }
+    };
 
     const solicitudesPendientes = solicitudes.filter(s => s.estado_sol === 'Pendiente');
     const solicitudesAprobadas = solicitudes.filter(s => s.estado_sol === 'Aprobada');
@@ -281,14 +280,12 @@ const cambiarEstadoSolicitud = async (id: number, estado: 'Aprobada' | 'Rechazad
         bannerVisible,
         error,
         
-        // 🆕 Modal de confirmación
         modalConfirmacion,
         eliminando,
         abrirModalEliminar,
         cerrarModalConfirmacion,
         confirmarEliminar,
         
-        // 🆕 Cambiar estado de solicitud
         cambiarEstadoSolicitud,
         
         setVista,
@@ -302,7 +299,7 @@ const cambiarEstadoSolicitud = async (id: number, estado: 'Aprobada' | 'Rechazad
         
         crearSolicitud,
         actualizarSolicitud,
-        guardarSolicitud,  // 🆕 Función unificada
+        guardarSolicitud,
         recargarLista: cargarSolicitudes,
     };
 };

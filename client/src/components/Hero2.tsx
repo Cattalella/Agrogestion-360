@@ -143,7 +143,7 @@ export const Hero2 = ({
                 <div className="flex gap-5 w-full max-w-[30rem]">
                     <div
                         onClick={() => setVerModalRevocados(true)}
-                        className="flex flex-col rounded-[2rem] bg-[#ffffff] shadow-[0_3px_15px_rgba(0,0,0,0.5)] gap-8 p-5 items-center py-15 w-full cursor-pointer hover:bg-gray-50 transition-colors"
+                        className="flex flex-col rounded-[2rem] bg-[#ffffff] hover:-translate-y-1 hover:scale-101 shadow-[0_3px_15px_rgba(0,0,0,0.5)] gap-8 p-5 items-center py-15 w-full cursor-pointer hover:bg-gray-50 transition-all"
                     >
                         <Animacion><img className="w-14" src={administrador} alt="revocar" /></Animacion>
                         <p className="text-center font-bold"> ADMINISTRADORES <br /> REVOCADOS </p>
@@ -152,7 +152,7 @@ export const Hero2 = ({
 
                     <div
                         onClick={() => setVerModalAdmin(true)}
-                        className="flex flex-col rounded-[2rem] bg-[#ffffff] shadow-[0_3px_15px_rgba(0,0,0,0.5)] gap-8 p-5 items-center py-15 w-full cursor-pointer hover:bg-gray-50 transition-colors"
+                        className="flex flex-col rounded-[2rem] bg-[#ffffff] hover:-translate-y-1 hover:scale-101 shadow-[0_3px_15px_rgba(0,0,0,0.5)] gap-8 p-5 items-center py-15 w-full cursor-pointer hover:bg-gray-50 transition-all"
                     >
                         <Animacion><img className="w-14" src={nuevoadmin} alt="nuevo" /></Animacion>
                         <p className="text-center font-bold"> REGISTRAR NUEVO <br /> ADMINISTRADOR </p>
@@ -172,12 +172,12 @@ export const Hero2 = ({
                 <div className="flex justify-around items-center mx-auto my-auto w-full px-5 gap-6 max-w-[46rem]">
 
                     {/* TARJETA 1 — INSUMOS CRÍTICOS */}
-                    <div className="flex flex-col shadow-[0_2px_5px_rgba(0,0,0,0.5)] p-5 rounded-2xl flex-1 bg-white h-[18rem] min-w-[0]">
-                        <div className="flex flex-col border-b-1 border-dashed pb-2 gap-2 shrink-0">
-                            <p className={`tracking-[3px] font-black ${colorDias}`}>
+                    <div className="flex flex-col cursor-pointer hover:-translate-y-1 transition-all shadow-[0_2px_5px_rgba(0,0,0,0.5)] p-5 rounded-2xl flex-1 bg-white h-[18rem] min-w-[0]">
+                        <div className="flex mb-2 flex-col border-b-1 border-dashed pb-2 gap-2 shrink-0">
+                            <p className={`tracking-[1px] font-black ${colorDias}`}>
                                 {mostrarInsumosCriticos} / DIAS
                             </p>
-                            <p className="text-red-800 text-[0.8rem] font-bold uppercase"> vencen: </p>
+                            <p className="text-red-500 text-[0.8rem] font-bold uppercase"> vencen: </p>
                         </div>
                         <ListaInsumos items={mostrarListaInsumosCriticos} />
                     </div>
@@ -185,7 +185,7 @@ export const Hero2 = ({
                     {/* TARJETA 2 — PAGOS A TRABAJADORES */}
                     <div 
                         onClick={onRegFormatoPagoClick}
-                        className="flex flex-col shadow-[0_2px_5px_rgba(0,0,0,0.5)] p-5 rounded-2xl flex-1 bg-white h-[18rem] min-w-[0] cursor-pointer hover:shadow-[0_0_15px_rgba(16,185,129,0.3)] transition-all group"
+                        className="flex flex-col shadow-[0_2px_5px_rgba(0,0,0,0.5)] p-5 rounded-2xl flex-1 bg-white h-[18rem] min-w-[0] cursor-pointer hover:-translate-y-1 transition-all group"
                     >
                         <div className="flex flex-col border-b-1 border-dashed pb-2 shrink-0">
                             <p className="tracking-[2px] font-black text-green-600 uppercase text-[0.7rem]">PAGOS A TRABAJADORES</p>
@@ -206,19 +206,19 @@ export const Hero2 = ({
                     {/* TARJETA 3 — TRABAJADORES ACTIVOS (MODIFICADA PARA MOSTRAR NOMBRES) */}
                     <div
                         onClick={!esVistaBoss ? onRegTrabajadoresClick : undefined}
-                        className={`flex flex-col shadow-[0_2px_5px_rgba(0,0,0,0.5)] p-5 rounded-2xl flex-1 bg-white h-[18rem] min-w-[0] ${!esVistaBoss ? 'cursor-pointer hover:shadow-[0_0_15px_rgba(16,185,129,0.3)] transition-all group' : ''}`}
+                        className={`flex flex-col shadow-[0_2px_5px_rgba(0,0,0,0.5)] cursor-pointer hover:-translate-y-1 transition-all p-5 rounded-2xl flex-1 bg-white h-[18rem] min-w-[0] ${!esVistaBoss ? 'cursor-pointer hover:shadow-[0_0_15px_rgba(16,185,129,0.3)] transition-all group' : ''}`}
                     >
                         <div className="flex flex-col border-b-1 border-dashed pb-2 gap-2 shrink-0">
                             <p className="tracking-[2px] font-black text-green-600 uppercase text-[0.7rem]">TRABAJADORES ACTIVOS</p>
                         </div>
                         
                         {/* 👇 SECCIÓN MODIFICADA: Muestra los nombres de los trabajadores */}
-                        <div className="flex-1 overflow-y-auto my-2 min-h-[80px]">
+                        <div className="flex-1 overflow-y-auto my-2 uppercase min-h-[80px]">
                             {esVistaBoss && trabajadoresActivosBoss?.lista && trabajadoresActivosBoss.lista.length > 0 ? (
                                 <div className="space-y-1">
                                     {trabajadoresActivosBoss.lista.slice(0, 4).map((trab: any, idx: number) => (
-                                        <p key={idx} className="text-[0.6rem] font-bold text-gray-600 truncate">
-                                            {typeof trab === 'string' ? trab : trab.nombre_completo || trab.nombre}
+                                        <p key={idx} className="text-[0.6rem] tracking-[1px] font-bold text-gray-800 truncate">
+                                            - {typeof trab === 'string' ? trab : trab.nombre_completo || trab.nombre}
                                         </p>
                                     ))}
                                     {trabajadoresActivosBoss.lista.length > 4 && (

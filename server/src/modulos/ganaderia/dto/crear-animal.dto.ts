@@ -4,19 +4,19 @@ import { IsString, IsNotEmpty, IsOptional, IsNumber, IsDateString } from 'class-
 export class CrearAnimalDto {
     @IsString()
     @IsOptional()
-    num_ica_chapeta?: string;  // oficial
+    num_ica_chapeta?: string;
 
     @IsString()
     @IsNotEmpty({ message: 'El código local es requerido' })
-    codigo_local: string;       // local
+    codigo_local: string;
 
     @IsNumber()
     @IsOptional()
-    id_especie?: number;        // El servicio lo crea automáticamente si no viene
+    id_especie?: number;
 
     @IsString()
     @IsNotEmpty({ message: 'El sexo es requerido' })
-    sexo: string;               // MACHO, HEMBRA
+    sexo: string;
 
     @IsString()
     @IsOptional()
@@ -32,21 +32,22 @@ export class CrearAnimalDto {
 
     @IsString()
     @IsOptional()
-    origen?: string;            // Nacimiento, Compra, etc.
+    origen?: string;
 
     @IsNumber()
     @IsOptional()
-    id_ubicacion?: number;      // El servicio lo crea automáticamente si no viene
+    id_ubicacion?: number;
 
     @IsNumber()
     @IsOptional()
-    id_estado_ani?: number;     // Usado en actualizaciones
+    id_estado_ani?: number;
 
+    // ✅ CORREGIDO: estado_salud → salud
     @IsString()
     @IsOptional()
-    estado_salud?: string;      // Sano, Enfermo, etc.
+    salud?: string;
 
     @IsString()
     @IsOptional()
     foto_url?: string;
-}
+}

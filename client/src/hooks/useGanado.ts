@@ -249,7 +249,7 @@ export const useGanado = () => {
     };
 
     // ============================================================
-    // GUARDAR ANIMAL (CREAR O EDITAR)
+    // GUARDAR ANIMAL (CREAR O EDITAR) - CORREGIDO CON SALUD
     // ============================================================
     const guardarAnimal = async (nuevoAnimal: any, cerrar: boolean) => {
         setCargando(true);
@@ -262,7 +262,8 @@ export const useGanado = () => {
                 fecha_nacimiento: nuevoAnimal.nacimiento || null,
                 peso_actual: parseFloat(nuevoAnimal.peso) || 0,
                 origen: nuevoAnimal.origen || 'Registro inicial',
-                foto_url: null
+                foto_url: null,
+                salud: nuevoAnimal.salud || 'Sano'  // ✅ AGREGADO: estado de salud
             };
 
             if (animalAEditar) {

@@ -7,7 +7,7 @@ import type {
     UnidadMedida 
 } from "../hooks/useSolicitudCompra";
 import type { Trabajador } from "../hooks/useNuevoTrabajador";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, DollarSign } from "lucide-react";
 
 interface Props {
     solicitudAEditar: SolicitudCompra | null;
@@ -29,6 +29,19 @@ export const FormularioSolicitudCompra = ({
     usuarioActual
 }: Props) => {
 
+    // ============================================================
+    // FUNCIONES DE FORMATEO DE MONTOS
+    // ============================================================
+    const formatearMontoCOP = (valor: string): string => {
+        const numeros = valor.replace(/\D/g, '');
+        if (!numeros) return '';
+        return new Intl.NumberFormat('es-CO').format(parseInt(numeros));
+    };
+
+    const limpiarFormateoMonto = (valor: string): number => {
+        return parseInt(valor.replace(/\D/g, '')) || 0;
+    };
+
     const [form, setForm] = useState({
         tipo: tipoSeleccionado,
         fechaPropuesta: "",
@@ -43,10 +56,25 @@ export const FormularioSolicitudCompra = ({
         proveedor: "",
         categoriaAlimento: "",
         usuario: usuarioActual,
+        precio_unitario: "",      // 🆕 AGREGADO
+        precio_total: "",         // 🆕 AGREGADO
     });
 
     const [errores, setErrores] = useState<Record<string, string>>({});
     const [enviando, setEnviando] = useState(false);
+
+    // ============================================================
+    // RECALCULAR PRECIO TOTAL
+    // ============================================================
+    const recalcularTotal = (cantidad: string, precioUnitario: string) => {
+        const cant = parseFloat(cantidad) || 0;
+        const precio = limpiarFormateoMonto(precioUnitario);
+        const total = cant * precio;
+        setForm(prev => ({ 
+            ...prev, 
+            precio_total: total > 0 ? total.toFixed(2) : "" 
+        }));
+    };
 
     // ============================================================
     // 🔄 SINCRONIZAR form.tipo con tipoSeleccionado
@@ -74,6 +102,8 @@ export const FormularioSolicitudCompra = ({
                 proveedor: solicitudAEditar.proveedor || "",
                 categoriaAlimento: solicitudAEditar.categoriaAlimento || "",
                 usuario: usuarioActual,
+                precio_unitario: "",
+                precio_total: "",
             });
         }
     }, [solicitudAEditar, usuarioActual]);
@@ -97,6 +127,8 @@ export const FormularioSolicitudCompra = ({
                 proveedor: "",
                 categoriaAlimento: "",
                 usuario: usuarioActual,
+                precio_unitario: "",
+                precio_total: "",
             });
             setErrores({});
         }
@@ -108,7 +140,6 @@ export const FormularioSolicitudCompra = ({
     const validarFormulario = (): boolean => {
         const nuevosErrores: Record<string, string> = {};
         
-        // Fecha propuesta (debe ser hoy o futura)
         if (!form.fechaPropuesta) {
             nuevosErrores.fechaPropuesta = 'La fecha propuesta es obligatoria';
         } else {
@@ -142,6 +173,12 @@ export const FormularioSolicitudCompra = ({
             }
         }
         
+        // 🆕 Validar precio unitario
+        const precioUnitarioNum = limpiarFormateoMonto(form.precio_unitario);
+        if (!form.precio_unitario || precioUnitarioNum <= 0) {
+            nuevosErrores.precio_unitario = 'El precio unitario es obligatorio';
+        }
+        
         setErrores(nuevosErrores);
         return Object.keys(nuevosErrores).length === 0;
     };
@@ -160,6 +197,8 @@ export const FormularioSolicitudCompra = ({
             const datosEnvio = {
                 ...form,
                 cantidad: parseFloat(form.cantidad),
+                precio_unitario: limpiarFormateoMonto(form.precio_unitario),
+                precio_total: parseFloat(form.precio_total || '0'),
             };
             await onGuardar(datosEnvio, true);
         } catch (error) {
@@ -169,6 +208,32 @@ export const FormularioSolicitudCompra = ({
             setEnviando(false);
         }
     };
+
+    // ============================================================
+    // MANEJADOR DE CAMBIOS CON RECÁLCULO
+    // ============================================================
+    const manejarCambio = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+        const { name, value } = e.target;
+        
+        if (name === 'cantidad') {
+            setForm(prev => ({ ...prev, cantidad: value }));
+            recalcularTotal(value, form.precio_unitario);
+        } else if (name === 'precio_unitario') {
+            const valorLimpio = formatearMontoCOP(value);
+            setForm(prev => ({ ...prev, precio_unitario: valorLimpio }));
+            recalcularTotal(form.cantidad, valorLimpio);
+        } else {
+            setForm(prev => ({ ...prev, [name]: value }));
+        }
+        
+        if (value) {
+            setErrores(prev => ({ ...prev, [name]: '' }));
+        }
+    };
+
+    const precioUnitarioFormateado = form.precio_unitario 
+        ? formatearMontoCOP(form.precio_unitario.toString()) 
+        : '';
 
     const tipoActual = tipoSeleccionado;
 
@@ -252,10 +317,8 @@ export const FormularioSolicitudCompra = ({
                             errores.fechaPropuesta ? 'border-red-400 focus:ring-red-300' : 'border-gray-200'
                         }`}
                         value={form.fechaPropuesta} 
-                        onChange={(e) => {
-                            setForm({ ...form, fechaPropuesta: e.target.value });
-                            setErrores(prev => ({ ...prev, fechaPropuesta: '' }));
-                        }} 
+                        onChange={manejarCambio}
+                        name="fechaPropuesta"
                     />
                     {errores.fechaPropuesta && (
                         <p className="text-[9px] text-red-500 ml-4 mt-1">{errores.fechaPropuesta}</p>
@@ -275,10 +338,8 @@ export const FormularioSolicitudCompra = ({
                             errores.cantidad ? 'border-red-400 focus:ring-red-300' : 'border-gray-200'
                         }`}
                         value={form.cantidad}
-                        onChange={(e) => {
-                            setForm({ ...form, cantidad: e.target.value });
-                            setErrores(prev => ({ ...prev, cantidad: '' }));
-                        }} 
+                        onChange={manejarCambio}
+                        name="cantidad"
                         placeholder="0"
                     />
                     {errores.cantidad && (
@@ -294,7 +355,8 @@ export const FormularioSolicitudCompra = ({
                     <select 
                         className="border border-gray-200 rounded-full p-2 text-sm bg-white px-4 focus:outline-none focus:ring-2 focus:ring-emerald-300"
                         value={form.unidadMedida} 
-                        onChange={(e) => setForm({ ...form, unidadMedida: e.target.value as UnidadMedida })} 
+                        onChange={manejarCambio}
+                        name="unidadMedida"
                     >
                         <option value="kg">Kilogramos (kg)</option>
                         <option value="litros">Litros (L)</option>
@@ -302,6 +364,49 @@ export const FormularioSolicitudCompra = ({
                         <option value="unidades">Unidades</option>
                         <option value="toneladas">Toneladas</option>
                     </select>
+                </div>
+
+                {/* 🆕 Precio Unitario */}
+                <div className="flex flex-col gap-1">
+                    <label className="text-[9px] uppercase ml-4 text-emerald-600 font-black tracking-tighter">
+                        <DollarSign size={10} className="inline mr-1" />
+                        Precio Unitario *
+                    </label>
+                    <div className="relative">
+                        <input 
+                            type="text" 
+                            className={`border rounded-full p-2 text-sm px-4 pr-8 focus:outline-none focus:ring-2 focus:ring-emerald-300 text-right ${
+                                errores.precio_unitario ? 'border-red-400 focus:ring-red-300' : 'border-gray-200'
+                            }`}
+                            value={precioUnitarioFormateado}
+                            onChange={manejarCambio}
+                            name="precio_unitario"
+                            placeholder="$0"
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-bold text-emerald-500">$</span>
+                    </div>
+                    {errores.precio_unitario && (
+                        <p className="text-[9px] text-red-500 ml-4 mt-1">{errores.precio_unitario}</p>
+                    )}
+                </div>
+
+                {/* 🆕 Precio Total (automático) */}
+                <div className="flex flex-col gap-1">
+                    <label className="text-[9px] uppercase ml-4 text-emerald-600 font-black tracking-tighter">
+                        <DollarSign size={10} className="inline mr-1" />
+                        Precio Total
+                    </label>
+                    <div className="relative">
+                        <input 
+                            type="text" 
+                            className="border border-emerald-200 bg-emerald-50 rounded-full p-2 text-sm px-4 pr-8 text-right font-bold text-emerald-700"
+                            value={form.precio_total ? new Intl.NumberFormat('es-CO').format(parseFloat(form.precio_total)) : ''}
+                            readOnly
+                            placeholder="$0"
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-bold text-emerald-500">$</span>
+                    </div>
+                    <span className="text-[8px] text-gray-400 ml-4">Calculado automáticamente</span>
                 </div>
             </div>
 
@@ -321,10 +426,8 @@ export const FormularioSolicitudCompra = ({
                                     errores.tipoInsumo ? 'border-red-400 focus:ring-red-300' : 'border-gray-200'
                                 }`}
                                 value={form.tipoInsumo} 
-                                onChange={(e) => {
-                                    setForm({ ...form, tipoInsumo: e.target.value });
-                                    setErrores(prev => ({ ...prev, tipoInsumo: '' }));
-                                }} 
+                                onChange={manejarCambio}
+                                name="tipoInsumo"
                             />
                             {errores.tipoInsumo && (
                                 <p className="text-[9px] text-red-500 ml-4 mt-1">{errores.tipoInsumo}</p>
@@ -335,7 +438,8 @@ export const FormularioSolicitudCompra = ({
                             <select 
                                 className="border border-gray-200 rounded-full p-2 text-sm bg-white px-4 focus:outline-none focus:ring-2 focus:ring-emerald-300"
                                 value={form.categoriaInsumo} 
-                                onChange={(e) => setForm({ ...form, categoriaInsumo: e.target.value as CategoriaInsumo })}
+                                onChange={manejarCambio}
+                                name="categoriaInsumo"
                             >
                                 <option value="">Seleccionar categoría</option>
                                 <option value="fertilizante">🌱 Fertilizante</option>
@@ -350,7 +454,8 @@ export const FormularioSolicitudCompra = ({
                                 type="date" 
                                 className="border border-gray-200 bg-white rounded-full p-2 text-sm px-4 focus:outline-none focus:ring-2 focus:ring-emerald-300"
                                 value={form.fechaVencimiento} 
-                                onChange={(e) => setForm({ ...form, fechaVencimiento: e.target.value })} 
+                                onChange={manejarCambio}
+                                name="fechaVencimiento"
                             />
                             <span className="text-[8px] text-gray-400">¿Hasta cuándo es válido este insumo?</span>
                         </div>
@@ -374,10 +479,8 @@ export const FormularioSolicitudCompra = ({
                                     errores.tipoAlimento ? 'border-red-400 focus:ring-red-300' : 'border-gray-200'
                                 }`}
                                 value={form.tipoAlimento} 
-                                onChange={(e) => {
-                                    setForm({ ...form, tipoAlimento: e.target.value });
-                                    setErrores(prev => ({ ...prev, tipoAlimento: '' }));
-                                }} 
+                                onChange={manejarCambio}
+                                name="tipoAlimento"
                             />
                             {errores.tipoAlimento && (
                                 <p className="text-[9px] text-red-500 ml-4 mt-1">{errores.tipoAlimento}</p>
@@ -390,10 +493,8 @@ export const FormularioSolicitudCompra = ({
                                     errores.especieDestino ? 'border-red-400' : 'border-gray-200'
                                 }`}
                                 value={form.especieDestino} 
-                                onChange={(e) => {
-                                    setForm({ ...form, especieDestino: e.target.value as EspecieDestino });
-                                    setErrores(prev => ({ ...prev, especieDestino: '' }));
-                                }} 
+                                onChange={manejarCambio}
+                                name="especieDestino"
                             >
                                 <option value="">Seleccionar especie</option>
                                 <option value="cerdos">🐷 Cerdos</option>
@@ -410,7 +511,8 @@ export const FormularioSolicitudCompra = ({
                                 placeholder="Nombre de la empresa o proveedor" 
                                 className="border border-gray-200 bg-white rounded-full p-2 text-sm px-4 focus:outline-none focus:ring-2 focus:ring-blue-300"
                                 value={form.proveedor} 
-                                onChange={(e) => setForm({ ...form, proveedor: e.target.value })} 
+                                onChange={manejarCambio}
+                                name="proveedor"
                             />
                         </div>
                         <div className="flex flex-col gap-1">
@@ -420,7 +522,8 @@ export const FormularioSolicitudCompra = ({
                                 placeholder="Ej: Balanceado, Suplemento, Grano" 
                                 className="border border-gray-200 bg-white rounded-full p-2 text-sm px-4 focus:outline-none focus:ring-2 focus:ring-blue-300"
                                 value={form.categoriaAlimento} 
-                                onChange={(e) => setForm({ ...form, categoriaAlimento: e.target.value })} 
+                                onChange={manejarCambio}
+                                name="categoriaAlimento"
                             />
                         </div>
                         <div className="flex flex-col gap-1">
@@ -429,7 +532,8 @@ export const FormularioSolicitudCompra = ({
                                 type="date" 
                                 className="border border-gray-200 bg-white rounded-full p-2 text-sm px-4 focus:outline-none focus:ring-2 focus:ring-blue-300"
                                 value={form.fechaVencimiento} 
-                                onChange={(e) => setForm({ ...form, fechaVencimiento: e.target.value })} 
+                                onChange={manejarCambio}
+                                name="fechaVencimiento"
                             />
                             <span className="text-[8px] text-gray-400">¿Hasta cuándo es válido este alimento?</span>
                         </div>
@@ -451,10 +555,8 @@ export const FormularioSolicitudCompra = ({
                     rows={3} 
                     placeholder="Ej: Se requiere para alimentación de cerdos, stock bajo, reposición de inventario, etc." 
                     value={form.motivo} 
-                    onChange={(e) => {
-                        setForm({ ...form, motivo: e.target.value });
-                        setErrores(prev => ({ ...prev, motivo: '' }));
-                    }} 
+                    onChange={manejarCambio}
+                    name="motivo"
                 />
                 {errores.motivo && (
                     <p className="text-[9px] text-red-500 ml-4 mt-1">{errores.motivo}</p>

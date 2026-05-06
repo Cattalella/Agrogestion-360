@@ -36,7 +36,7 @@ export const useVacunas = () => {
     const [vista, setVista] = useState<'lista' | 'formulario'>('lista');
     const [cargando, setCargando] = useState(false);
     const [animalesDisponibles, setAnimalesDisponibles] = useState<any[]>([]);
-    
+
     const [vacunaAEditar, setVacunaAEditar] = useState<any | null>(null);
     const [modalConfirmacion, setModalConfirmacion] = useState<ModalConfirmacionState>({
         isOpen: false,
@@ -72,36 +72,86 @@ export const useVacunas = () => {
         }
     };
 
+    const esGanadoPorCodigo = (codigoLocal: string) => {
+        if (!codigoLocal) return false;
+        const upperCode = codigoLocal.toUpperCase();
+        return upperCode.startsWith('VA') ||
+            upperCode.startsWith('TO') ||
+            upperCode.startsWith('NO') ||
+            upperCode.startsWith('TE');
+    };
+
+    const esCerdoPorCodigo = (codigoLocal: string) => {
+        if (!codigoLocal) return false;
+        const upperCode = codigoLocal.toUpperCase();
+        if (esGanadoPorCodigo(codigoLocal)) return false;
+        return upperCode.startsWith('C-') ||
+            upperCode.startsWith('C') ||
+            upperCode.startsWith('V-') ||
+            upperCode.startsWith('V') ||
+            upperCode.startsWith('L-') ||
+            upperCode.startsWith('L') ||
+            upperCode.startsWith('E-') ||
+            upperCode.startsWith('E');
+    };
+
+    // 🔧 CORREGIDO: acepta 'Sano' (ganado) y 'Activo' (cerdos/legacy)
+    // Excluye solo estados negativos: vendido, muerto, inactivo
+    // RN.4.1.2: "solo animales activos pueden ser vacunados"
+    const estaActivo = (animal: any): boolean => {
+        const estado = String(
+            animal.estado?.nombre || animal.estado || ''
+        ).toLowerCase();
+
+        if (!estado) return true;
+
+        const estadosNegativos = ['vendido', 'muerto', 'inactivo', 'fallecido', 'anulado'];
+        return !estadosNegativos.includes(estado);
+    };
+
     const cargarAnimalesDisponibles = async () => {
         try {
             const ganado = await apiClient.get('/ganaderia');
             const cerdos = await apiClient.get('/porcicultura/cerdos');
-            
-            console.log('📊 GANADO del backend:', ganado.data);
-            console.log('📊 CERDOS del backend:', cerdos.data);
-            
+
+            console.log('📊 GANADO raw:', ganado.data.map((g: any) => ({
+                id: g.id_animal, local: g.codigo_local, estado: g.estado
+            })));
+            console.log('📊 CERDOS raw:', cerdos.data.map((c: any) => ({
+                id: c.id_animal, local: c.codigo_local, estado: c.estado
+            })));
+
             const todos = [
-                ...(ganado.data || []).map((a: any) => ({ 
-                    ...a, 
+                ...(ganado.data || []).map((a: any) => ({
+                    ...a,
                     tipo: 'GANADO',
-                    id: a.id_animal || a.id 
+                    id: a.id_animal || a.id,
+                    codigo_local: a.codigo_local || a.local,
+                    local: a.local || a.codigo_local,
+                    // Ganado devuelve estado como string directo ('Sano', 'Vendido', etc.)
+                    estado: a.estado || 'Sano'
                 })),
-                ...(cerdos.data || []).map((a: any) => ({ 
-                    ...a, 
+                ...(cerdos.data || []).map((a: any) => ({
+                    ...a,
                     tipo: 'CERDO',
-                    id: a.id_animal || a.id 
+                    id: a.id_animal || a.id,
+                    codigo_local: a.codigo_local || a.local,
+                    local: a.local || a.codigo_local,
+                    // Cerdos devuelve estado como string también
+                    estado: a.estado || 'Activo'
                 }))
             ];
-            
-            console.log('📊 TODOS los animales después de mapear:', todos.map(a => ({ 
-                id: a.id, 
-                local: a.codigo_local || a.local, 
-                tipo: a.tipo,
-                especie: a.especie
-            })));
-            
-            setAnimalesDisponibles(todos);
-            console.log('✅ Animales disponibles para vacunar:', todos.length);
+
+            // 🔧 CORREGIDO: filtrar con estaActivo que acepta 'Sano' y 'Activo'
+            const activos = todos.filter(a => estaActivo(a));
+
+            console.log('📊 Todos los animales:', todos.length);
+            console.log('✅ Animales activos para vacunar:', activos.length);
+            activos.forEach(a => {
+                console.log(`   - ${a.codigo_local} (${a.tipo}) estado: "${a.estado}"`);
+            });
+
+            setAnimalesDisponibles(activos);
         } catch (error) {
             console.error('❌ Error al cargar animales disponibles:', error);
         }
@@ -120,32 +170,17 @@ export const useVacunas = () => {
     }, [isModalOpen]);
 
     const stats = useMemo((): VacunasStats => {
-        // Contar vacunas por tipo de animal usando el código local
         const ganadosVacunados = listaVacunas.filter(v => {
             const animal = animalesDisponibles.find(a => a.id === v.id_animal);
             const codigoLocal = animal?.codigo_local || animal?.local || '';
-            
-            // GANADO: prefijos VA, TO, NO, TE
-            const esGanado = codigoLocal.startsWith('VA') || 
-                            codigoLocal.startsWith('TO') || 
-                            codigoLocal.startsWith('NO') || 
-                            codigoLocal.startsWith('TE');
-            return esGanado;
+            return esGanadoPorCodigo(codigoLocal);
         }).length;
-        
+
         const cerdosVacunados = listaVacunas.filter(v => {
             const animal = animalesDisponibles.find(a => a.id === v.id_animal);
             const codigoLocal = animal?.codigo_local || animal?.local || '';
-            
-            // CERDO: prefijos C, V, L, E
-            const esCerdo = codigoLocal.startsWith('C') || 
-                           codigoLocal.startsWith('V') || 
-                           codigoLocal.startsWith('L') || 
-                           codigoLocal.startsWith('E');
-            return esCerdo;
+            return esCerdoPorCodigo(codigoLocal);
         }).length;
-
-        console.log('📊 Stats calculados:', { ganadosVacunados, cerdosVacunados });
 
         return {
             tipo1: "GANADOS VACUNADOS",
@@ -160,7 +195,7 @@ export const useVacunas = () => {
         setVista('lista');
         setIsModalOpen(true);
     };
-    
+
     const cerrarModal = () => {
         setIsModalOpen(false);
         setVista('lista');
@@ -175,7 +210,6 @@ export const useVacunas = () => {
     };
 
     const abrirEdicion = (vacuna: any) => {
-        console.log('✏️ Abriendo edición para vacuna:', vacuna);
         setVacunaAEditar(vacuna);
         setVista('formulario');
     };
@@ -225,18 +259,16 @@ export const useVacunas = () => {
             };
 
             if (vacunaAEditar) {
-                console.log('✏️ Editando vacuna:', vacunaAEditar.id_reg_vac, datosParaBackend);
                 await apiClient.put(`/vacunacion/${vacunaAEditar.id_reg_vac}`, datosParaBackend);
                 console.log('✅ Vacuna actualizada');
             } else {
-                console.log('📤 Creando nueva vacuna:', datosParaBackend);
                 await apiClient.post('/vacunacion', datosParaBackend);
                 console.log('✅ Vacuna creada');
             }
-            
+
             await cargarVacunas();
             setVacunaAEditar(null);
-            
+
             if (cerrar) {
                 cerrarModal();
             } else {

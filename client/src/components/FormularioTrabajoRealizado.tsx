@@ -230,7 +230,7 @@ export const FormularioTrabajoRealizado = ({
                         type="datetime-local"
                         value={formData.fecha_inicio}
                         onChange={manejarCambio}
-                        className="border-1 border-amber-100 rounded-full px-6 py-2 text-[11px] outline-none focus:ring-2 focus:ring-amber-300"
+                        className="border-1 uppercase border-amber-100 rounded-full px-6 py-2 text-[11px] outline-none focus:ring-2 focus:ring-amber-300"
                     />
                 </div>
 
@@ -243,7 +243,7 @@ export const FormularioTrabajoRealizado = ({
                         type="datetime-local"
                         value={formData.fecha_fin}
                         onChange={manejarCambio}
-                        className="border-1 border-amber-100 rounded-full px-6 py-2 text-[11px] outline-none focus:ring-2 focus:ring-amber-300"
+                        className="border-1 uppercase border-amber-100 rounded-full px-6 py-2 text-[11px] outline-none focus:ring-2 focus:ring-amber-300"
                     />
                 </div>
 
@@ -275,14 +275,14 @@ export const FormularioTrabajoRealizado = ({
             {/* BOTONES */}
             <div className="col-span-2 flex flex-col gap-2 mt-4">
                 <div className="flex gap-2">
-                    <button type="button" onClick={() => ejecutarEnvio(false)} className="flex-1 border-1 border-amber-400 text-amber-500 py-3 rounded-l-full font-black text-[11px] uppercase italic">
+                    <button type="button" onClick={() => ejecutarEnvio(false)} className="flex-1 cursor-pointer hover:translate-x-[-4px] transition-all border-1 border-amber-400 text-amber-500 py-3 rounded-l-full font-black text-[11px] uppercase italic">
                         Guardar y Continuar
                     </button>
-                    <button type="button" onClick={() => ejecutarEnvio(true)} className="flex-1 bg-amber-600 text-white py-3 rounded-r-full font-black text-[11px] uppercase">
+                    <button type="button" onClick={() => ejecutarEnvio(true)} className="flex-1 cursor-pointer hover:-translate-x-[-4px] transition-all bg-amber-600 text-white py-3 rounded-r-full font-black text-[11px] uppercase">
                         {trabajoAEditar ? 'Actualizar' : 'Finalizar Registro'}
                     </button>
                 </div>
-                <button type="button" onClick={onCancelar} className="text-[10px] text-gray-400 font-bold uppercase hover:text-gray-600">
+                <button type="button" onClick={onCancelar} className="text-[10px] bg-gray-200 py-3 w-50 mt-3 mx-auto rounded-full cursor-pointer hover:scale-105 transition-all text-gray-500 font-bold uppercase hover:text-gray-800 hover:bg-gray-300">
                     Cancelar
                 </button>
             </div>

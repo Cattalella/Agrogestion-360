@@ -140,6 +140,7 @@ interface TrabajadoresHook {
     cerrarModal: () => void;
     cambiarVista: (vista: 'lista' | 'formulario') => void;
     guardarTrabajador: (datos: any, cerrar: boolean) => void;
+    editarTrabajador: (trabajador: any) => void;
 }
 
 interface ComprasHook {
@@ -372,8 +373,11 @@ export const AdminModales = ({
                                                     <td className="p-3">{cerdo.oficial || '—'}</td>
                                                     <td className="p-3">{cerdo.sexo || '—'}</td>
                                                     <td className="p-3">
-                                                        <span className="bg-emerald-100 text-emerald-600 px-2 py-1 rounded-full text-[9px]">
+                                                        <span className="bg-gray-100 border-[1px] font-black tracking-[1px] border-gray-200 text-gray-900 px-2 py-1 rounded-full text-[9px]">
                                                             {cerdo.estado || 'Activo'}
+                                                            <span> {cerdo.estado === 'SANO' && '🟢'} </span>
+                                                            <span> {cerdo.estado === 'ENFERMO' && '🔴'} </span>
+                                                            <span> {cerdo.estado === 'EN CUIDADO' && '🟡'} </span>
                                                         </span>
                                                     </td>
                                                     <td className="p-3">
@@ -742,12 +746,16 @@ export const AdminModales = ({
                                             <td className="p-3">{t.tipo_actividad || t.descripcion || '—'}</td>
                                             <td className="p-3">{t.fecha_inicio?.split('T')[0] || '—'}</td>
                                             <td className="p-3">
-                                                <span className={`px-2 py-1 rounded-full text-[9px] ${
-                                                    t.estado_trabajo === 'Completado' ? 'bg-green-100 text-green-600' : 
-                                                    'bg-yellow-100 text-yellow-600'
-                                                }`}>
-                                                    {t.estado_trabajo || 'Pendiente'}
-                                                </span>
+                                                {(() => {
+                                                    const tienePagoAprobado = t.PagoTrabajador?.some((p: any) => p.estado_pago === 'Pagado con firma');
+                                                    return (
+                                                        <span className={`px-2 py-1 rounded-full text-[9px] ${
+                                                            tienePagoAprobado ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'
+                                                        }`}>
+                                                            {tienePagoAprobado ? 'PAGADO CON FIRMA' : 'PENDIENTE DE FIRMA'}
+                                                        </span>
+                                                    );
+                                                })()}
                                             </td>
                                         </tr>
                                     )) : (
@@ -797,26 +805,42 @@ export const AdminModales = ({
                                         <th className="p-3">CARGO</th>
                                         <th className="p-3">TELÉFONO</th>
                                         <th className="p-3">ESTADO</th>
+                                        <th className="p-3 text-center">ACCIONES</th>
                                     </tr>
                                 </thead>
+                                {/* En AdminModales, dentro del modal NUEVO TRABAJADOR, vista 'lista' */}
+                                {/* Reemplaza el <tbody> actual de trabajadores con este: */}
                                 <tbody>
                                     {trabajadores?.trabajadores?.length > 0 ? trabajadores.trabajadores.map((t: any) => (
-                                        <tr key={t.id_trabajador || t.id} className="border-t border-indigo-50">
+                                        <tr key={t.id_trabajador || t.id} className="border-t border-indigo-50 group">
                                             <td className="p-3 font-bold">{t.id_trabajador || '—'}</td>
                                             <td className="p-3">{t.nombre_completo || '—'}</td>
                                             <td className="p-3">{t.tipo_trabajo || '—'}</td>
                                             <td className="p-3">{t.telefono || '—'}</td>
                                             <td className="p-3">
                                                 <span className={`px-2 py-1 rounded-full text-[9px] ${
-                                                    t.estado === 'Activo' || t.estado === 'activo' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
+                                                    t.estado === 'activo' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
                                                 }`}>
                                                     {t.estado?.toUpperCase() || 'ACTIVO'}
                                                 </span>
                                             </td>
+                                            {/* 🔧 NUEVO: botón editar */}
+                                            <td className="p-3">
+                                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity justify-center">
+                                                    <button
+                                                        onClick={() => {
+                                                            trabajadores?.editarTrabajador?.(t);
+                                                        }}
+                                                        className="text-blue-500 hover:text-blue-700 text-[10px] font-bold px-2 py-1 rounded-full hover:bg-blue-50 transition-all"
+                                                    >
+                                                        ✏️ Editar
+                                                    </button>
+                                                </div>
+                                            </td>
                                         </tr>
                                     )) : (
                                         <tr>
-                                            <td colSpan={5} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">
+                                            <td colSpan={6} className="p-6 text-center text-gray-300 text-[11px] uppercase font-bold italic">
                                                 — Sin trabajadores registrados —
                                             </td>
                                         </tr>
@@ -867,6 +891,7 @@ export const AdminModales = ({
                                         <th className="p-3">CANTIDAD</th>
                                         <th className="p-3">FECHA</th>
                                         <th className="p-3">ESTADO</th>
+                                        <th className="p-3">ACCIONES</th>
                                     </tr>
                                 </thead>
                                 <tbody>

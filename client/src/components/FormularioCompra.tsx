@@ -11,6 +11,8 @@ interface SolicitudAprobada {
     unidad_medida: string;
     proveedor_sugerido?: string;
     motivo: string;
+    precio_unitario?: number;   // ✅ AGREGADO
+    precio_total?: number;      // ✅ AGREGADO
 }
 
 interface Props {
@@ -33,10 +35,8 @@ export const FormularioCompra = ({
     // FUNCIONES DE FORMATEO DE MONTOS (COP - Puntos para miles)
     // ============================================================
     const formatearMontoCOP = (valor: string): string => {
-        // Limpiar todo lo que no sea número
         const numeros = valor.replace(/\D/g, '');
         if (!numeros) return '';
-        // Convertir a número y formatear con puntos
         return new Intl.NumberFormat('es-CO').format(parseInt(numeros));
     };
 
@@ -87,12 +87,10 @@ export const FormularioCompra = ({
     const manejarCambioNumerico = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
         if (name === 'precio_unitario') {
-            // Para el precio unitario, usamos el formateo automático
             const valorLimpio = limpiarFormateoMonto(value);
             setFormData(prev => ({ ...prev, precio_unitario: valorLimpio.toString() }));
             if (valorLimpio > 0) setErrores(prev => ({ ...prev, precio_unitario: '' }));
             
-            // Recalcular precio total
             const cantidad = parseFloat(formData.cantidad_real);
             if (!isNaN(cantidad) && cantidad > 0 && valorLimpio > 0) {
                 const total = cantidad * valorLimpio;
@@ -103,7 +101,6 @@ export const FormularioCompra = ({
                 setFormData(prev => ({ ...prev, [name]: value }));
                 if (value && parseFloat(value) > 0) setErrores(prev => ({ ...prev, [name]: '' }));
                 
-                // Recalcular precio total
                 const precioUnit = limpiarFormateoMonto(formData.precio_unitario);
                 const cantidad = parseFloat(value);
                 if (!isNaN(cantidad) && cantidad > 0 && precioUnit > 0) {
@@ -132,6 +129,8 @@ export const FormularioCompra = ({
                 unidad_medida: solicitud.unidad_medida,
                 cantidad_real: solicitud.cantidad.toString(),
                 proveedor_real: solicitud.proveedor_sugerido || "",
+                precio_unitario: solicitud.precio_unitario?.toString() || "",  // ✅ AGREGADO
+                precio_total: solicitud.precio_total?.toString() || "",        // ✅ AGREGADO
             }));
         }
     };
@@ -190,16 +189,13 @@ export const FormularioCompra = ({
         }
     };
 
-    // Obtener el precio unitario formateado para mostrar
     const precioUnitarioFormateado = formData.precio_unitario 
         ? formatearMontoCOP(formData.precio_unitario.toString()) 
         : '';
 
     return (
         <form className="flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-500 p-2">
-            {/* ============================================================ */}
-            {/* SELECTOR DE TIPO (INSUMO / ALIMENTO) */}
-            {/* ============================================================ */}
+            {/* SELECTOR DE TIPO */}
             <div className="flex justify-center gap-6 p-3 bg-orange-50 rounded-full border border-orange-200">
                 <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -231,9 +227,7 @@ export const FormularioCompra = ({
                 </label>
             </div>
 
-            {/* ============================================================ */}
             {/* SELECCIONAR SOLICITUD APROBADA */}
-            {/* ============================================================ */}
             <div className="bg-orange-50/50 p-4 rounded-2xl border border-orange-200">
                 <p className="text-[10px] uppercase font-black text-orange-600 tracking-wider mb-3 flex items-center gap-2">
                     <CheckCircle size={12} />
@@ -266,9 +260,7 @@ export const FormularioCompra = ({
                 )}
             </div>
 
-            {/* ============================================================ */}
             {/* DATOS REALES DE COMPRA */}
-            {/* ============================================================ */}
             <div className="bg-orange-50/30 p-4 rounded-2xl border border-orange-100">
                 <p className="text-[10px] uppercase font-black text-orange-600 tracking-wider mb-3 flex items-center gap-2">
                     <Truck size={12} />
@@ -342,7 +334,7 @@ export const FormularioCompra = ({
                         )}
                     </div>
 
-                    {/* Precio Unitario (con formateo de miles) */}
+                    {/* Precio Unitario */}
                     <div className="flex flex-col gap-1">
                         <label className="text-[9px] uppercase ml-4 text-orange-500 font-black tracking-tighter">
                             <DollarSign size={10} className="inline mr-1" />
@@ -367,7 +359,7 @@ export const FormularioCompra = ({
                         )}
                     </div>
 
-                    {/* Precio Total (automático - con formateo de miles) */}
+                    {/* Precio Total (automático) */}
                     <div className="flex flex-col gap-1">
                         <label className="text-[9px] uppercase ml-4 text-orange-500 font-black tracking-tighter">
                             <DollarSign size={10} className="inline mr-1" />
@@ -404,9 +396,7 @@ export const FormularioCompra = ({
                 </div>
             </div>
 
-            {/* ============================================================ */}
             {/* FECHA VENCIMIENTO Y PROVEEDOR */}
-            {/* ============================================================ */}
             <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1">
                     <label className="text-[9px] uppercase ml-4 text-orange-500 font-black tracking-tighter">
@@ -460,9 +450,7 @@ export const FormularioCompra = ({
                 />
             </div>
 
-            {/* ============================================================ */}
             {/* BOTONES */}
-            {/* ============================================================ */}
             <div className="flex justify-between gap-4 mt-4">
                 <button
                     type="button"

@@ -388,7 +388,7 @@ export const FormularioGenerarPagoPDF = ({
                     type="button"
                     onClick={onCancelar}
                     disabled={generando || generandoPDF}
-                    className="flex-1 border border-emerald-400 text-emerald-800 px-6 py-3 font-black text-[11px] uppercase italic 
+                    className="flex-1 border border-emerald-400 cursor-pointer hover:translate-x-[-4px] transition-all text-emerald-800 px-6 py-3 font-black text-[11px] uppercase italic 
                     shadow-sm active:scale-95 hover:bg-emerald-50 transition-all disabled:opacity-50 rounded-full"
                 >
                     Cancelar
@@ -398,7 +398,7 @@ export const FormularioGenerarPagoPDF = ({
                         type="button"
                         onClick={handlePrevisualizar}
                         disabled={generando || generandoPDF || !trabajador || trabajosDelPago.length === 0}
-                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 font-black text-[11px] uppercase shadow-md 
+                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 cursor-pointer hover:-translate-x-[-4px] transition-all text-white px-6 py-3 font-black text-[11px] uppercase shadow-md 
                         disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 rounded-full"
                     >
                         <Eye size={14} />
@@ -408,7 +408,7 @@ export const FormularioGenerarPagoPDF = ({
                 <button
                     type="submit"
                     disabled={generando || generandoPDF || !trabajador || trabajosDelPago.length === 0}
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 font-black text-[11px] uppercase shadow-md 
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 cursor-pointer hover:-translate-x-[-4px] transition-all text-white px-6 py-3 font-black text-[11px] uppercase shadow-md 
                     disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 rounded-full"
                 >
                     <Download size={14} />

@@ -497,14 +497,14 @@ export const FormularioPagos = ({
                     <button
                         type="button"
                         onClick={() => ejecutarEnvio(false)}
-                        className="flex-1 bg-white border-1 border-purple-400 text-purple-500 px-6 py-3 rounded-l-full rounded-r-lg font-black text-[11px] uppercase italic shadow-sm active:scale-95 hover:bg-purple-50 transition-all"
+                        className="flex-1 bg-white cursor-pointer hover:translate-x-[-4px] transition-all border-1 border-purple-400 text-purple-500 px-6 py-3 rounded-l-full rounded-r-lg font-black text-[11px] uppercase italic shadow-sm active:scale-95 hover:bg-purple-200 transition-all"
                     >
                         Guardar y Seguir
                     </button>
                     <button
                         type="button"
                         onClick={() => ejecutarEnvio(true)}
-                        className="flex-1 bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-r-full rounded-l-lg font-black text-[11px] uppercase shadow-md active:scale-95 transition-all"
+                        className="flex-1 bg-purple-600 cursor-pointer hover:-translate-x-[-4px] transition-all hover:bg-purple-700 text-white px-6 py-3 rounded-r-full rounded-l-lg font-black text-[11px] uppercase shadow-md active:scale-95 transition-all"
                     >
                         {pagoAEditar ? 'Actualizar Pago' : 'Guardar y Salir'}
                     </button>

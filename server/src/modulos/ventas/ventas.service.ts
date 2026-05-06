@@ -1,64 +1,33 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CrearVentaDto } from './dto/crear-venta.dto';
-import { ActualizarVentaDto } from './dto/actualizar-venta.dto';
 import { Decimal } from '@prisma/client/runtime/library';
 
 @Injectable()
 export class VentasService {
     constructor(private prisma: PrismaService) {}
 
-    // ============================================================
-    // LISTAR VENTAS
-    // ============================================================
     async listarVentas() {
-        const ventas = await this.prisma.venta.findMany({
+        return this.prisma.venta.findMany({
             include: {
                 Animal: {
-                    select: {
-                        id_animal: true,
-                        codigo_local: true,
-                        num_ica_chapeta: true,
-                        especie: {
-                            select: { nombre: true }
-                        },
-                        estado: {
-                            select: { nombre: true }
-                        }
+                    include: {
+                        especie: true,
+                        estado: true
                     }
                 }
             },
             orderBy: { fecha_venta: 'desc' }
         });
-
-        return ventas.map(v => ({
-            id_venta: v.id_venta,
-            id_animal: v.id_animal,
-            fecha_venta: v.fecha_venta,
-            peso_venta: v.peso_venta,
-            precio_total: v.precio_total,
-            comprador: v.comprador,
-            num_factura: v.num_factura,
-            metodo_pago: v.metodo_pago,
-            observaciones: v.observaciones,
-            createdAt: v.createdAt,
-            updatedAt: v.updatedAt,
-            Animal: v.Animal
-        }));
     }
 
-    // ============================================================
-    // OBTENER VENTA POR ID
-    // ============================================================
     async obtenerVenta(id: number) {
         const venta = await this.prisma.venta.findUnique({
             where: { id_venta: id },
             include: {
                 Animal: {
-                    select: {
-                        codigo_local: true,
-                        especie: { select: { nombre: true } },
-                        estado: { select: { nombre: true } }
+                    include: {
+                        especie: true,
+                        estado: true
                     }
                 }
             }
@@ -71,25 +40,21 @@ export class VentasService {
         return venta;
     }
 
-    // ============================================================
-    // CREAR VENTA
-    // ============================================================
-    async crearVenta(datos: CrearVentaDto, idAdmin: number) {
-        // Verificar que el animal existe y está activo
+    async crearVenta(datos: any) {
         const animal = await this.prisma.animal.findUnique({
             where: { id_animal: datos.id_animal },
             include: { estado: true }
         });
 
         if (!animal) {
-            throw new BadRequestException('Animal no encontrado');
+            throw new NotFoundException('Animal no encontrado');
         }
 
-        if (animal.estado?.nombre !== 'Activo') {
-            throw new BadRequestException('Solo se pueden vender animales activos');
+        // Solo animales SANOS pueden ser vendidos (RF.4.1.3 / RF.6.1.3)
+        if (animal.estado?.nombre?.toLowerCase() !== 'sano') {
+            throw new BadRequestException('Solo se pueden vender animales sanos');
         }
 
-        // Crear la venta
         const venta = await this.prisma.venta.create({
             data: {
                 id_animal: datos.id_animal,
@@ -97,79 +62,32 @@ export class VentasService {
                 peso_venta: new Decimal(datos.peso_venta),
                 precio_total: new Decimal(datos.precio_total),
                 comprador: datos.comprador,
-                num_factura: datos.num_factura || null,
-                metodo_pago: datos.metodo_pago || 'Efectivo',
-                observaciones: datos.observaciones || null,
-                updatedAt: new Date()
-            },
-            include: {
-                Animal: {
-                    select: {
-                        codigo_local: true
-                    }
-                }
+                num_factura: datos.num_factura,
+                metodo_pago: datos.metodo_pago,
+                observaciones: datos.observaciones
             }
         });
 
-        // Actualizar estado del animal a "Vendido"
-        await this.cambiarEstadoAnimal(datos.id_animal, 'Vendido');
+        // Actualizar estado del animal a "Vendido" automáticamente (RN.4.1.3)
+        let estadoVendido = await this.prisma.estadoAni.findFirst({
+            where: { nombre: 'Vendido' }
+        });
+
+        if (!estadoVendido) {
+            estadoVendido = await this.prisma.estadoAni.create({
+                data: { nombre: 'Vendido' }
+            });
+        }
+
+        await this.prisma.animal.update({
+            where: { id_animal: datos.id_animal },
+            data: { id_estado_ani: estadoVendido.id_estado_ani }
+        });
 
         return venta;
     }
 
-    // ============================================================
-    // ACTUALIZAR VENTA
-    // ============================================================
-    async actualizarVenta(id: number, datos: ActualizarVentaDto) {
-        const ventaExistente = await this.prisma.venta.findUnique({
-            where: { id_venta: id },
-            include: { Animal: true }
-        });
-
-        if (!ventaExistente) {
-            throw new NotFoundException('Venta no encontrada');
-        }
-
-        const dataActualizar: any = {
-            updatedAt: new Date()
-        };
-
-        if (datos.fecha_venta !== undefined) dataActualizar.fecha_venta = new Date(datos.fecha_venta);
-        if (datos.peso_venta !== undefined) dataActualizar.peso_venta = new Decimal(datos.peso_venta);
-        if (datos.precio_total !== undefined) dataActualizar.precio_total = new Decimal(datos.precio_total);
-        if (datos.comprador !== undefined) dataActualizar.comprador = datos.comprador;
-        if (datos.num_factura !== undefined) dataActualizar.num_factura = datos.num_factura;
-        if (datos.metodo_pago !== undefined) dataActualizar.metodo_pago = datos.metodo_pago;
-        if (datos.observaciones !== undefined) dataActualizar.observaciones = datos.observaciones;
-
-        // Si cambia el animal, actualizar estados de ambos
-        if (datos.id_animal !== undefined && datos.id_animal !== ventaExistente.id_animal) {
-            // Revertir estado del animal anterior a "Activo"
-            await this.cambiarEstadoAnimal(ventaExistente.id_animal, 'Activo');
-            // Cambiar estado del nuevo animal a "Vendido"
-            await this.cambiarEstadoAnimal(datos.id_animal, 'Vendido');
-            dataActualizar.id_animal = datos.id_animal;
-        }
-
-        const ventaActualizada = await this.prisma.venta.update({
-            where: { id_venta: id },
-            data: dataActualizar,
-            include: {
-                Animal: {
-                    select: {
-                        codigo_local: true
-                    }
-                }
-            }
-        });
-
-        return ventaActualizada;
-    }
-
-    // ============================================================
-    // ELIMINAR VENTA (Y REVERTIR ESTADO DEL ANIMAL)
-    // ============================================================
-    async eliminarVenta(id: number) {
+    async actualizarVenta(id: number, datos: any) {
         const venta = await this.prisma.venta.findUnique({
             where: { id_venta: id }
         });
@@ -178,41 +96,49 @@ export class VentasService {
             throw new NotFoundException('Venta no encontrada');
         }
 
-        // Eliminar la venta
-        await this.prisma.venta.delete({
-            where: { id_venta: id }
+        return this.prisma.venta.update({
+            where: { id_venta: id },
+            data: {
+                fecha_venta: datos.fecha_venta ? new Date(datos.fecha_venta) : undefined,
+                peso_venta: datos.peso_venta ? new Decimal(datos.peso_venta) : undefined,
+                precio_total: datos.precio_total ? new Decimal(datos.precio_total) : undefined,
+                comprador: datos.comprador,
+                num_factura: datos.num_factura,
+                metodo_pago: datos.metodo_pago,
+                observaciones: datos.observaciones
+            }
         });
-
-        // Revertir estado del animal a "Activo"
-        await this.cambiarEstadoAnimal(venta.id_animal, 'Activo');
-
-        return {
-            mensaje: 'Venta eliminada correctamente y animal revertido a estado Activo'
-        };
     }
 
-    // ============================================================
-    // MÉTODO AUXILIAR: CAMBIAR ESTADO DE UN ANIMAL
-    // ============================================================
-    private async cambiarEstadoAnimal(idAnimal: number, nombreEstado: string) {
-        const estado = await this.prisma.estadoAni.findFirst({
-            where: { nombre: nombreEstado }
+    async eliminarVenta(id: number) {
+        const venta = await this.prisma.venta.findUnique({
+            where: { id_venta: id },
+            include: { Animal: true }
         });
 
-        if (!estado) {
-            // Crear el estado si no existe
-            const nuevoEstado = await this.prisma.estadoAni.create({
-                data: { nombre: nombreEstado }
-            });
-            await this.prisma.animal.update({
-                where: { id_animal: idAnimal },
-                data: { id_estado_ani: nuevoEstado.id_estado_ani }
-            });
-        } else {
-            await this.prisma.animal.update({
-                where: { id_animal: idAnimal },
-                data: { id_estado_ani: estado.id_estado_ani }
+        if (!venta) {
+            throw new NotFoundException('Venta no encontrada');
+        }
+
+        // 🔧 CORREGIDO: devolver al estado 'Sano' (no 'Activo')
+        // Ganado usa 'Sano' como estado base, no 'Activo'
+        let estadoSano = await this.prisma.estadoAni.findFirst({
+            where: { nombre: 'Sano' }
+        });
+
+        if (!estadoSano) {
+            estadoSano = await this.prisma.estadoAni.create({
+                data: { nombre: 'Sano' }
             });
         }
+
+        await this.prisma.animal.update({
+            where: { id_animal: venta.id_animal },
+            data: { id_estado_ani: estadoSano.id_estado_ani }
+        });
+
+        return this.prisma.venta.delete({
+            where: { id_venta: id }
+        });
     }
 }

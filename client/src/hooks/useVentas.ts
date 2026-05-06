@@ -1,10 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import apiClient from '../api/apiClient';
 
-// ============================================================
-// 📌 INTERFACES
-// ============================================================
-export interface Venta {
+interface Venta {
     id_venta: number;
     id_animal: number;
     fecha_venta: string;
@@ -15,8 +12,11 @@ export interface Venta {
     metodo_pago: string;
     observaciones?: string;
     animal?: {
+        id_animal: number;
         codigo_local: string;
-        especie?: { nombre: string };
+        raza: string;
+        peso_actual: number;
+        estado?: string;
     };
 }
 
@@ -33,9 +33,6 @@ interface ModalConfirmacionState {
     nombre: string;
 }
 
-// ============================================================
-// 📌 HOOK PRINCIPAL
-// ============================================================
 export const useVentas = () => {
     const [listaVentas, setListaVentas] = useState<Venta[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -43,10 +40,7 @@ export const useVentas = () => {
     const [cargando, setCargando] = useState(false);
     const [animalesDisponibles, setAnimalesDisponibles] = useState<any[]>([]);
     
-    // Estado para edición
     const [ventaAEditar, setVentaAEditar] = useState<any | null>(null);
-    
-    // Estado para modal de confirmación
     const [modalConfirmacion, setModalConfirmacion] = useState<ModalConfirmacionState>({
         isOpen: false,
         id: null,
@@ -54,28 +48,16 @@ export const useVentas = () => {
     });
     const [eliminando, setEliminando] = useState(false);
 
-    // ============================================================
-    // CARGAR VENTAS
-    // ============================================================
     const cargarVentas = async () => {
         setCargando(true);
         try {
             const respuesta = await apiClient.get('/ventas');
-            // Transformar datos para tener un formato consistente
-            const ventasTransformadas = respuesta.data.map((v: any) => ({
-                id_venta: v.id_venta,
-                id_animal: v.id_animal,
-                fecha_venta: v.fecha_venta,
-                peso_venta: v.peso_venta,
-                precio_total: v.precio_total,
-                comprador: v.comprador,
-                num_factura: v.num_factura,
-                metodo_pago: v.metodo_pago,
-                observaciones: v.observaciones,
-                animal: v.Animal || v.animal,
+            const ventasConAnimal = respuesta.data.map((v: any) => ({
+                ...v,
+                animal: v.Animal || v.animal
             }));
-            setListaVentas(ventasTransformadas);
-            console.log('✅ Ventas cargadas:', ventasTransformadas.length);
+            setListaVentas(ventasConAnimal);
+            console.log('✅ Ventas cargadas:', ventasConAnimal.length);
         } catch (error) {
             console.error('❌ Error al cargar ventas:', error);
         } finally {
@@ -83,41 +65,85 @@ export const useVentas = () => {
         }
     };
 
-    // ============================================================
-    // CARGAR ANIMALES DISPONIBLES PARA VENDER (SOLO ACTIVOS)
-    // ============================================================
+    // ✅ Solo animales SANOS pueden ser vendidos
     const cargarAnimalesDisponibles = async () => {
         try {
             const ganado = await apiClient.get('/ganaderia');
             const cerdos = await apiClient.get('/porcicultura/cerdos');
             
-            // Filtrar solo animales ACTIVOS
-            const ganadoActivo = (ganado.data || []).filter((a: any) => 
-                a.estado === 'Activo' || a.estado?.nombre === 'Activo' || a.EstadoAni?.nombre === 'Activo'
-            );
-            const cerdosActivos = (cerdos.data || []).filter((a: any) => 
-                a.estado === 'Activo' || a.estado?.nombre === 'Activo' || a.EstadoAni?.nombre === 'Activo'
-            );
+            console.log('🐄 Ganado recibido:', ganado.data.length);
+            console.log('🐖 Cerdos recibidos:', cerdos.data.length);
             
-            const todos = [
-                ...ganadoActivo.map((a: any) => ({ 
-                    ...a, 
-                    tipo: 'GANADO',
-                    id: a.id_animal || a.id 
-                })),
-                ...cerdosActivos.map((a: any) => ({ 
-                    ...a, 
-                    tipo: 'CERDO',
-                    id: a.id_animal || a.id 
-                }))
+            const todosAnimales = [
+                ...(ganado.data || []).map((a: any) => ({ ...a, tipo: 'GANADO' })),
+                ...(cerdos.data || []).map((a: any) => ({ ...a, tipo: 'CERDO' }))
             ];
             
-            setAnimalesDisponibles(todos);
-            console.log('✅ Animales disponibles para vender:', todos.length);
+            // ✅ Solo animales SANOS pueden ser vendidos
+            const disponibles = todosAnimales.filter((a: any) => {
+                const estado = a.estado?.toLowerCase() || '';
+                const esSano = estado === 'sano';
+                const noVendido = estado !== 'vendido' && estado !== 'muerto';
+                const tienePeso = (a.peso_actual || 0) > 0;
+                return esSano && noVendido && tienePeso;
+            });
+            
+            console.log('✅ Animales disponibles para vender (sanos):', disponibles.length);
+            disponibles.forEach(a => {
+                console.log(`   - ${a.codigo_local} (${a.tipo}) - estado: ${a.estado}`);
+            });
+            setAnimalesDisponibles(disponibles);
         } catch (error) {
             console.error('❌ Error al cargar animales disponibles:', error);
         }
     };
+
+    const esGanadoPorCodigo = (codigoLocal: string): boolean => {
+        if (!codigoLocal) return false;
+        const upperCode = codigoLocal.toUpperCase();
+        return upperCode.startsWith('VA') || 
+               upperCode.startsWith('TO') || 
+               upperCode.startsWith('NO') || 
+               upperCode.startsWith('TE');
+    };
+
+    const esCerdoPorCodigo = (codigoLocal: string): boolean => {
+        if (!codigoLocal) return false;
+        const upperCode = codigoLocal.toUpperCase();
+        if (esGanadoPorCodigo(codigoLocal)) return false;
+        return upperCode.startsWith('C-') || 
+               upperCode.startsWith('C') ||
+               upperCode.startsWith('V-') ||
+               upperCode.startsWith('V') ||
+               upperCode.startsWith('L-') ||
+               upperCode.startsWith('L') ||
+               upperCode.startsWith('E-') ||
+               upperCode.startsWith('E');
+    };
+
+    const stats = useMemo((): VentasStats => {
+        let ganadosVendidos = 0;
+        let cerdosVendidos = 0;
+
+        listaVentas.forEach(venta => {
+            const codigoLocal = venta.animal?.codigo_local || '';
+            
+            if (esGanadoPorCodigo(codigoLocal)) {
+                ganadosVendidos++;
+            } else if (esCerdoPorCodigo(codigoLocal)) {
+                cerdosVendidos++;
+            }
+        });
+
+        console.log('📊 Ventas stats:', { ganadosVendidos, cerdosVendidos, totalVentas: listaVentas.length });
+
+        return {
+            tipo1: "GANADOS VENDIDOS",
+            cantidad1: ganadosVendidos,
+            tipo2: "CERDOS VENDIDOS",
+            cantidad2: cerdosVendidos
+        };
+    }, [listaVentas]);
 
     useEffect(() => {
         cargarVentas();
@@ -131,40 +157,6 @@ export const useVentas = () => {
         }
     }, [isModalOpen]);
 
-    // ============================================================
-    // CALCULAR STATS PARA LA CARD
-    // ============================================================
-    const stats = useMemo((): VentasStats => {
-        // Contar ventas por tipo de animal usando el código local
-        const ganadosVendidos = listaVentas.filter(v => {
-            const codigoLocal = v.animal?.codigo_local || '';
-            return codigoLocal.startsWith('VA') || 
-                   codigoLocal.startsWith('TO') || 
-                   codigoLocal.startsWith('NO') || 
-                   codigoLocal.startsWith('TE');
-        }).length;
-        
-        const cerdosVendidos = listaVentas.filter(v => {
-            const codigoLocal = v.animal?.codigo_local || '';
-            return codigoLocal.startsWith('C') || 
-                   codigoLocal.startsWith('V') || 
-                   codigoLocal.startsWith('L') || 
-                   codigoLocal.startsWith('E');
-        }).length;
-
-        console.log('📊 Stats ventas:', { ganadosVendidos, cerdosVendidos });
-
-        return {
-            tipo1: "GANADOS VENDIDOS",
-            cantidad1: ganadosVendidos,
-            tipo2: "CERDOS VENDIDOS",
-            cantidad2: cerdosVendidos
-        };
-    }, [listaVentas]);
-
-    // ============================================================
-    // ABRIR / CERRAR MODAL
-    // ============================================================
     const abrirModal = () => {
         setVentaAEditar(null);
         setVista('lista');
@@ -184,21 +176,9 @@ export const useVentas = () => {
         }
     };
 
-    // ============================================================
-    // EDICIÓN
-    // ============================================================
     const abrirEdicion = (venta: any) => {
         console.log('✏️ Abriendo edición para venta:', venta);
-        // Determinar el tipo de animal por el código local
-        const codigoLocal = venta.animal?.codigo_local || '';
-        const tipoAnimal = codigoLocal.startsWith('C') || codigoLocal.startsWith('V') || codigoLocal.startsWith('L') || codigoLocal.startsWith('E') 
-            ? 'CERDO' 
-            : 'GANADO';
-        
-        setVentaAEditar({
-            ...venta,
-            tipo_animal: tipoAnimal
-        });
+        setVentaAEditar(venta);
         setVista('formulario');
     };
 
@@ -207,9 +187,6 @@ export const useVentas = () => {
         setVista('lista');
     };
 
-    // ============================================================
-    // MODAL DE CONFIRMACIÓN PARA ELIMINAR
-    // ============================================================
     const abrirModalEliminar = (id: number, nombre: string) => {
         setModalConfirmacion({ isOpen: true, id, nombre });
     };
@@ -227,40 +204,32 @@ export const useVentas = () => {
             await cargarVentas();
             await cargarAnimalesDisponibles();
             cerrarModalConfirmacion();
-            console.log('✅ Venta eliminada');
         } catch (error) {
-            console.error('❌ Error al eliminar venta:', error);
+            console.error('❌ Error al eliminar:', error);
             alert('Error al eliminar la venta');
         } finally {
             setEliminando(false);
         }
     };
 
-    // ============================================================
-    // GUARDAR VENTA (CREAR O EDITAR)
-    // ============================================================
     const guardarVenta = async (datos: any, cerrar: boolean = true) => {
         setCargando(true);
         try {
             const datosParaBackend = {
                 id_animal: datos.id_animal,
                 fecha_venta: datos.fecha_venta,
-                peso_venta: parseFloat(datos.peso_venta),
-                precio_total: parseFloat(datos.precio_total),
+                peso_venta: datos.peso_venta,
+                precio_total: datos.precio_total,
                 comprador: datos.comprador,
                 num_factura: datos.num_factura || null,
                 metodo_pago: datos.metodo_pago,
                 observaciones: datos.observaciones || null
             };
 
-            console.log('📤 Datos a enviar (Venta):', datosParaBackend);
-
             if (ventaAEditar) {
-                console.log('✏️ Editando venta:', ventaAEditar.id_venta, datosParaBackend);
                 await apiClient.put(`/ventas/${ventaAEditar.id_venta}`, datosParaBackend);
                 console.log('✅ Venta actualizada');
             } else {
-                console.log('📤 Creando nueva venta:', datosParaBackend);
                 await apiClient.post('/ventas', datosParaBackend);
                 console.log('✅ Venta creada');
             }
@@ -284,22 +253,6 @@ export const useVentas = () => {
         }
     };
 
-    // ============================================================
-    // ACTUALIZAR VENTA (COMPATIBILIDAD)
-    // ============================================================
-    const actualizarVenta = async (id: number, datos: Partial<Venta>) => {
-        try {
-            const respuesta = await apiClient.put(`/ventas/${id}`, datos);
-            await cargarVentas();
-            return respuesta.data;
-        } catch (error) {
-            console.error('❌ Error al actualizar:', error);
-        }
-    };
-
-    // ============================================================
-    // RETORNAR
-    // ============================================================
     return {
         listaVentas,
         animalesDisponibles,
@@ -311,7 +264,6 @@ export const useVentas = () => {
         cerrarModal,
         cambiarVista,
         guardarVenta,
-        actualizarVenta,
         recargarLista: cargarVentas,
         ventaAEditar,
         abrirEdicion,

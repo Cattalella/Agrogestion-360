@@ -122,7 +122,7 @@ export const Grafica2 = ({ titulo, datos, soloDona = false }: Props) => {
                                 cx="50%" cy="50%" 
                                 innerRadius={soloDona ? 45 : 30} 
                                 outerRadius={soloDona ? 70 : 45} 
-                                paddingAngle={8}
+                                paddingAngle={5}
                                 dataKey="valor" 
                                 stroke="none" 
                             > 

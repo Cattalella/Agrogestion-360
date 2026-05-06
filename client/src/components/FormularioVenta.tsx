@@ -35,7 +35,6 @@ export const FormularioVenta = ({
     const [animalesFiltrados, setAnimalesFiltrados] = useState<any[]>([]);
     const [animalSeleccionado, setAnimalSeleccionado] = useState<any>(null);
 
-    // Cargar datos cuando se está editando
     useEffect(() => {
         if (ventaAEditar) {
             console.log('✏️ Cargando venta para edición:', ventaAEditar);
@@ -58,50 +57,69 @@ export const FormularioVenta = ({
         }
     }, [ventaAEditar]);
 
-    // Función para determinar si un animal es GANADO por su código local
     const esGanadoPorCodigo = (codigoLocal: string) => {
-        return codigoLocal?.startsWith('VA') || 
-               codigoLocal?.startsWith('TO') || 
-               codigoLocal?.startsWith('NO') || 
-               codigoLocal?.startsWith('TE');
+        if (!codigoLocal) return false;
+        const upperCode = codigoLocal.toUpperCase();
+        return upperCode.startsWith('VA') || 
+               upperCode.startsWith('TO') || 
+               upperCode.startsWith('NO') || 
+               upperCode.startsWith('TE');
     };
 
-    // Función para determinar si un animal es CERDO por su código local
     const esCerdoPorCodigo = (codigoLocal: string) => {
-        return codigoLocal?.startsWith('C') || 
-               codigoLocal?.startsWith('V') || 
-               codigoLocal?.startsWith('L') || 
-               codigoLocal?.startsWith('E');
+        if (!codigoLocal) return false;
+        const upperCode = codigoLocal.toUpperCase();
+        if (esGanadoPorCodigo(codigoLocal)) return false;
+        return upperCode.startsWith('C-') || 
+               upperCode.startsWith('C') ||
+               upperCode.startsWith('V-') ||
+               upperCode.startsWith('V') ||
+               upperCode.startsWith('L-') ||
+               upperCode.startsWith('L') ||
+               upperCode.startsWith('E-') ||
+               upperCode.startsWith('E');
     };
 
-    // Filtrar animales por tipo seleccionado usando el código local (solo ACTIVOS)
+    // ✅ Filtrar solo animales SANOS
     useEffect(() => {
+        console.log('🔍 Tipo animal seleccionado:', formData.tipo_animal);
+        
         if (formData.tipo_animal === "GANADO") {
             const ganado = listaAnimales.filter(a => {
                 const codigoLocal = a.codigo_local || a.local || '';
                 const esGanado = esGanadoPorCodigo(codigoLocal);
-                const estaActivo = a.estado === 'Activo' || 
-                                  a.estado?.nombre === 'Activo' || 
-                                  a.EstadoAni?.nombre === 'Activo';
-                return esGanado && estaActivo;
+                const esSano = a.estado?.toLowerCase() === 'sano';
+                console.log(`Animal ${codigoLocal}: esGanado=${esGanado}, sano=${esSano}, estado="${a.estado}"`);
+                return esGanado && esSano;
             });
+            console.log('🐄 Ganado vendible (sano):', ganado.length);
             setAnimalesFiltrados(ganado);
         } else if (formData.tipo_animal === "CERDO") {
             const cerdos = listaAnimales.filter(a => {
                 const codigoLocal = a.codigo_local || a.local || '';
                 const esCerdo = esCerdoPorCodigo(codigoLocal);
-                const estaActivo = a.estado === 'Activo' || 
-                                  a.estado?.nombre === 'Activo' || 
-                                  a.EstadoAni?.nombre === 'Activo';
-                return esCerdo && estaActivo;
+                const esSano = a.estado?.toLowerCase() === 'sano';
+                console.log(`Animal ${codigoLocal}: esCerdo=${esCerdo}, sano=${esSano}, estado="${a.estado}"`);
+                return esCerdo && esSano;
             });
+            console.log('🐖 Cerdos vendible (sano):', cerdos.length);
             setAnimalesFiltrados(cerdos);
         } else {
             setAnimalesFiltrados([]);
         }
     }, [formData.tipo_animal, listaAnimales]);
 
-    // Auto-completar peso al seleccionar animal
+    useEffect(() => {
+        if (esEdicion && ventaAEditar?.id_animal && listaAnimales.length > 0) {
+            const animalVendido = listaAnimales.find(a => 
+                (a.id_animal || a.id) === ventaAEditar.id_animal
+            );
+            if (animalVendido) {
+                setAnimalSeleccionado(animalVendido);
+            }
+        }
+    }, [esEdicion, ventaAEditar, listaAnimales]);
+
     useEffect(() => {
         if (formData.id_animal) {
             const animal = animalesFiltrados.find(a => 
@@ -116,7 +134,6 @@ export const FormularioVenta = ({
         }
     }, [formData.id_animal, animalesFiltrados, esEdicion]);
 
-    // Calcular precio total automáticamente
     useEffect(() => {
         const peso = parseFloat(formData.peso_venta) || 0;
         const precioKilo = parseFloat(formData.precio_kilo) || 0;
@@ -149,8 +166,11 @@ export const FormularioVenta = ({
     const validarFormulario = (): boolean => {
         const nuevosErrores: Record<string, string> = {};
         
-        if (!formData.tipo_animal) nuevosErrores.tipo_animal = 'Selecciona el tipo de animal';
-        if (!formData.id_animal) nuevosErrores.id_animal = 'Selecciona un animal';
+        if (!esEdicion) {
+            if (!formData.tipo_animal) nuevosErrores.tipo_animal = 'Selecciona el tipo de animal';
+            if (!formData.id_animal) nuevosErrores.id_animal = 'Selecciona un animal';
+        }
+        
         if (!formData.peso_venta || parseFloat(formData.peso_venta) <= 0) nuevosErrores.peso_venta = 'El peso debe ser mayor a 0';
         if (!formData.precio_kilo || parseFloat(formData.precio_kilo) <= 0) nuevosErrores.precio_kilo = 'El precio por kilo debe ser mayor a 0';
         if (!formData.comprador) nuevosErrores.comprador = 'El comprador es obligatorio';
@@ -188,82 +208,67 @@ export const FormularioVenta = ({
         if (onCancelarEdicion) onCancelarEdicion();
     };
 
-    // Formatear precio para mostrar
-    const formatearPrecio = (precio: string) => {
-        if (!precio) return '';
-        const num = parseFloat(precio);
-        if (isNaN(num)) return '';
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0
-        }).format(num);
-    };
-
     return (
         <form className="grid grid-cols-2 gap-4 animate-in fade-in zoom-in-95 duration-500 p-2">
-            {/* COLUMNA IZQUIERDA */}
             <div className="flex flex-col gap-3">
-                {/* Tipo de Animal - GANADO / CERDOS */}
-                <div>
+                {esEdicion ? (
+                    <div className="w-full border-1 rounded-full px-6 py-2 text-[12px] bg-gray-100 text-gray-600">
+                        {formData.tipo_animal === 'GANADO' ? '🐄 GANADO' : '🐖 CERDOS'}
+                    </div>
+                ) : (
                     <select
                         name="tipo_animal"
                         value={formData.tipo_animal}
                         onChange={manejarCambio}
-                        disabled={esEdicion}
                         className={`w-full border-1 rounded-full px-6 py-2 text-[12px] bg-white focus:outline-none focus:ring-2 cursor-pointer transition-all ${
                             errores.tipo_animal ? 'border-red-400 focus:ring-red-300 text-red-500' : 'border-orange-200 focus:ring-orange-300 text-gray-600'
-                        } ${esEdicion ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        }`}
                     >
                         <option value="">TIPO DE ANIMAL *</option>
                         <option value="GANADO">🐄 GANADO</option>
                         <option value="CERDO">🐖 CERDOS</option>
                     </select>
-                    {errores.tipo_animal && (
-                        <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.tipo_animal}</p>
-                    )}
-                    {esEdicion && (
-                        <p className="text-[8px] text-gray-400 ml-4 mt-1">⚠️ Tipo de animal bloqueado en edición</p>
-                    )}
-                </div>
+                )}
+                {errores.tipo_animal && !esEdicion && (
+                    <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.tipo_animal}</p>
+                )}
 
-                {/* ID del Animal */}
-                <div>
+                {esEdicion ? (
+                    <div className="w-full border-1 rounded-full px-6 py-2 text-[12px] bg-gray-100 text-gray-600 font-bold">
+                        {animalSeleccionado?.codigo_local || animalSeleccionado?.local || ventaAEditar?.animal?.codigo_local || 'Animal vendido'} - {animalSeleccionado?.peso_actual || ventaAEditar?.peso_venta || 0} kg
+                    </div>
+                ) : (
                     <select
                         name="id_animal"
                         value={formData.id_animal}
                         onChange={manejarCambio}
-                        disabled={!formData.tipo_animal || animalesFiltrados.length === 0 || esEdicion}
+                        disabled={!formData.tipo_animal || animalesFiltrados.length === 0}
                         className={`w-full border-1 rounded-full px-6 py-2 text-[12px] bg-white focus:outline-none focus:ring-2 cursor-pointer transition-all ${
                             errores.id_animal ? 'border-red-400 focus:ring-red-300' : 'border-orange-200 focus:ring-orange-300 text-orange-700 font-bold'
-                        } ${(!formData.tipo_animal || esEdicion) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        } ${!formData.tipo_animal ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                         <option value="">SELECCIONAR ANIMAL *</option>
                         {animalesFiltrados.map(animal => {
                             const animalId = animal.id_animal || animal.id;
                             const animalLocal = animal.local || animal.codigo_local || '—';
                             const animalPeso = animal.peso_actual ? `${animal.peso_actual} kg` : '—';
-                            const uniqueKey = `${animalId}-${animalLocal}`;
-                            
                             return (
-                                <option key={uniqueKey} value={animalId}>
+                                <option key={animalId} value={animalId}>
                                     {animalLocal} - {animalPeso}
                                 </option>
                             );
                         })}
                     </select>
-                    {errores.id_animal && (
-                        <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.id_animal}</p>
-                    )}
-                    {formData.tipo_animal && animalesFiltrados.length === 0 && !esEdicion && (
-                        <p className="text-[9px] text-amber-500 ml-4 mt-0.5">
-                            ⚠️ No hay animales {formData.tipo_animal === 'GANADO' ? 'GANADO' : 'CERDOS'} activos disponibles
-                        </p>
-                    )}
-                </div>
+                )}
+                {errores.id_animal && !esEdicion && (
+                    <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.id_animal}</p>
+                )}
+                {!esEdicion && formData.tipo_animal && animalesFiltrados.length === 0 && (
+                    <p className="text-[9px] text-amber-500 ml-4 mt-0.5">
+                        ⚠️ No hay animales {formData.tipo_animal === 'GANADO' ? 'GANADO' : 'CERDOS'} sanos disponibles
+                    </p>
+                )}
 
-                {/* Peso del Animal con "kg" pegado */}
                 <div className="relative">
                     <input
                         name="peso_venta"
@@ -277,15 +282,12 @@ export const FormularioVenta = ({
                         } ${animalSeleccionado && !esEdicion ? 'bg-orange-50' : ''}`}
                         readOnly={!!animalSeleccionado && !esEdicion}
                     />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-bold text-orange-400">
-                        kg
-                    </span>
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-bold text-orange-400">kg</span>
                     {errores.peso_venta && (
                         <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.peso_venta}</p>
                     )}
                 </div>
 
-                {/* Precio por Kilo con "$/kg" pegado */}
                 <div className="relative">
                     <input
                         name="precio_kilo"
@@ -298,18 +300,14 @@ export const FormularioVenta = ({
                             errores.precio_kilo ? 'border-red-400 focus:ring-red-300' : 'border-orange-200 focus:ring-orange-300'
                         }`}
                     />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-bold text-emerald-600">
-                        $/kg
-                    </span>
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-bold text-emerald-600">$/kg</span>
                     {errores.precio_kilo && (
                         <p className="text-[9px] text-red-500 ml-4 mt-0.5">{errores.precio_kilo}</p>
                     )}
                 </div>
             </div>
 
-            {/* COLUMNA DERECHA */}
             <div className="flex flex-col gap-3">
-                {/* Comprador */}
                 <div>
                     <input
                         name="comprador"
@@ -326,7 +324,6 @@ export const FormularioVenta = ({
                     )}
                 </div>
 
-                {/* Número de Factura */}
                 <input
                     name="num_factura"
                     value={formData.num_factura}
@@ -336,7 +333,6 @@ export const FormularioVenta = ({
                     className="border-1 border-orange-200 rounded-full px-6 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-orange-300"
                 />
 
-                {/* Fecha de Venta */}
                 <div className="flex flex-col gap-1">
                     <label className="text-[9px] uppercase ml-4 text-orange-400 font-black tracking-tighter">
                         Fecha de Venta <span className="text-red-400">*</span>
@@ -350,7 +346,6 @@ export const FormularioVenta = ({
                     />
                 </div>
 
-                {/* Método de Pago */}
                 <select
                     name="metodo_pago"
                     value={formData.metodo_pago}
@@ -363,7 +358,6 @@ export const FormularioVenta = ({
                     <option value="Mixto">🔄 MIXTO</option>
                 </select>
 
-                {/* Precio Total (calculado automáticamente) */}
                 <div className="relative">
                     <input
                         name="precio_total"
@@ -373,19 +367,15 @@ export const FormularioVenta = ({
                         className="w-full border-1 border-emerald-200 bg-emerald-50 rounded-full pl-4 pr-12 py-3 text-[14px] focus:outline-none focus:ring-2 focus:ring-emerald-300 text-right font-bold text-emerald-700"
                         readOnly
                     />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[14px] font-bold text-emerald-600">
-                        $
-                    </span>
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[14px] font-bold text-emerald-600">$</span>
                 </div>
 
-                {/* Icono indicador */}
                 <div className="flex items-center justify-end gap-1 text-[9px] text-orange-400 uppercase font-bold">
                     <TrendingUp size={12} />
                     <span>Total calculado automáticamente</span>
                 </div>
             </div>
 
-            {/* BOTONES */}
             <div className="col-span-2 flex justify-between mt-6 gap-4">
                 {esEdicion ? (
                     <>

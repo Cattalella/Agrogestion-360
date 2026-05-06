@@ -10,10 +10,6 @@ export class InventarioService {
     private auditoria: AuditoriaService
   ) {}
 
-  // ============================================================
-  // 📌 GESTIÓN DE CATÁLOGO DE INSUMOS
-  // ============================================================
-  
   async obtenerInventarioActual() {
     const insumos = await this.prisma.catInsumos.findMany({
       include: {
@@ -30,7 +26,7 @@ export class InventarioService {
         ...insumo,
         stockTotal: stock,
         alertas: {
-          bajoStock: stock <= Number(insumo.stock_minimo),
+          bajoStock: stock <= 20,
           vencimientoProximo: insumo.lotes.some(lote => {
             if (!lote.fecha_venc) return false;
             const diasParaVencer = Math.ceil((new Date(lote.fecha_venc).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
@@ -46,7 +42,10 @@ export class InventarioService {
       include: {
         insumo: true,
         solicitante: {
-          select: { nombre_completo: true }
+          select: { 
+            nombre_completo: true,
+            foto_perfil: true
+          }
         },
         aprobador: {
           select: { nombre_completo: true }
@@ -55,30 +54,52 @@ export class InventarioService {
       orderBy: { createdAt: 'desc' }
     });
 
-    return solicitudes.map(s => ({
-      id_solicitud: s.id_solicitud,
-      tipo: s.insumo?.categoria === 'alimento' ? 'alimento' : 'insumo',
-      fecha_compra: s.fecha_compra,
-      cantidad: s.cantidad,
-      unidad_medida: s.insumo?.unidad_medida || 'kg',
-      motivo: s.motivo,
-      estado_sol: s.estado_sol,
-      createdAt: s.createdAt,
-      usuario: s.solicitante?.nombre_completo,
-      tipoInsumo: s.insumo?.categoria !== 'alimento' ? s.insumo?.nombre_insumo : null,
-      categoriaInsumo: s.insumo?.categoria !== 'alimento' ? s.insumo?.categoria : null,
-      fechaVencimiento: null,
-      tipoAlimento: s.insumo?.categoria === 'alimento' ? s.insumo?.nombre_insumo : null,
-      especieDestino: s.insumo?.especie_destino,
-      proveedor: s.proveedor,
-      categoriaAlimento: s.insumo?.categoria === 'alimento' ? s.insumo?.categoria : null
-    }));
+    const comprasReales = await this.prisma.loteInv.findMany({
+      where: { id_solicitud: { not: null } },
+      select: { id_solicitud: true }
+    });
+
+    const idsSolicitudesEjecutadas = new Set(comprasReales.map(c => c.id_solicitud));
+
+    return solicitudes.map(s => {
+      let nombreProducto = '';
+      let tipoProducto = '';
+      
+      if (s.insumo) {
+        nombreProducto = s.insumo.nombre_insumo;
+        tipoProducto = s.insumo.categoria === 'alimento' ? 'alimento' : 'insumo';
+      } else {
+        nombreProducto = 'Producto pendiente';
+        tipoProducto = 'insumo';
+      }
+
+      return {
+        id_solicitud: s.id_solicitud,
+        id: s.id_solicitud,
+        tipo: tipoProducto,
+        fecha_compra: s.fecha_compra ? new Date(s.fecha_compra).toISOString().split('T')[0] : null,
+        cantidad: s.cantidad,
+        unidad_medida: s.insumo?.unidad_medida || 'kg',
+        motivo: s.motivo,
+        estado_sol: s.estado_sol,
+        createdAt: s.createdAt,
+        fecha_creacion: s.createdAt ? new Date(s.createdAt).toISOString() : null,
+        usuario: s.solicitante?.nombre_completo || 'Admin',
+        fotoUsuario: s.solicitante?.foto_perfil || null,
+        tipo_insumo: s.insumo?.categoria !== 'alimento' ? nombreProducto : null,
+        tipo_alimento: s.insumo?.categoria === 'alimento' ? nombreProducto : null,
+        categoria_insumo: s.insumo?.categoria !== 'alimento' ? s.insumo?.categoria : null,
+        fechaVencimiento: null,
+        especie_destino: s.insumo?.especie_destino,
+        proveedor: s.proveedor || 'No especificado',
+        categoria_alimento: s.insumo?.categoria === 'alimento' ? s.insumo?.categoria : null,
+        cantidad_num: Number(s.cantidad),
+        ejecutada: idsSolicitudesEjecutadas.has(s.id_solicitud),
+        precio_total: s.precio_total ? Number(s.precio_total) : 0
+      };
+    });
   }
 
-  // ============================================================
-  // 📌 SOLICITUDES DE COMPRA
-  // ============================================================
-  
   async crearSolicitud(idAdmin: number, datos: any) {
     let idDueno = datos.id_dueno;
     if (!idDueno) {
@@ -132,7 +153,8 @@ export class InventarioService {
         fecha_compra: new Date(datos.fecha_compra_propuesta),
         motivo: datos.motivo,
         updatedAt: new Date(),
-        proveedor: datos.proveedor || null
+        proveedor: datos.proveedor || null,
+        precio_total: datos.precio_total ? new Decimal(datos.precio_total) : null,
       }
     });
   }
@@ -240,6 +262,14 @@ export class InventarioService {
       throw new BadRequestException('La solicitud debe estar aprobada para ejecutar la compra');
     }
 
+    const compraExistente = await this.prisma.loteInv.findFirst({
+      where: { id_solicitud: id_solicitud }
+    });
+
+    if (compraExistente) {
+      throw new BadRequestException('Esta compra ya fue registrada. No se puede duplicar.');
+    }
+
     let id_insumo = solicitud.id_insumo;
 
     if (!id_insumo) {
@@ -255,12 +285,15 @@ export class InventarioService {
       id_insumo = nuevoInsumo.id_insumo;
     }
 
+    // ✅ CREAR LOTE CON PRECIO_TOTAL
     const lote = await this.prisma.loteInv.create({
       data: {
         id_insumo: id_insumo,
+        id_solicitud: id_solicitud,
         numero_lote: numero_lote,
         cant_inicial: new Decimal(cantidad_real),
         cant_actual: new Decimal(cantidad_real),
+        precio_total: new Decimal(precio_total || 0),
         fecha_compra: new Date(fecha_compra_real),
         fecha_venc: fecha_vencimiento ? new Date(fecha_vencimiento) : null,
         proveedor: proveedor_real,
@@ -274,16 +307,18 @@ export class InventarioService {
       data: {
         fecha_compra: new Date(fecha_compra_real),
         proveedor: proveedor_real,
+        precio_total: new Decimal(precio_total || 0),
         updatedAt: new Date(),
       },
     });
 
-    console.log(`✅ Compra real registrada para solicitud ${id_solicitud}, lote: ${numero_lote}`);
+    console.log(`✅ Compra real registrada para solicitud ${id_solicitud}, lote: ${numero_lote}, total: ${precio_total}`);
 
     return {
       mensaje: 'Compra registrada exitosamente',
       lote,
       id_solicitud,
+      precio_total,
     };
   }
 
@@ -300,12 +335,22 @@ export class InventarioService {
       throw new BadRequestException('Solo se pueden ejecutar compras aprobadas');
     }
 
+    const compraExistente = await this.prisma.loteInv.findFirst({
+      where: { id_solicitud: idSolicitud }
+    });
+
+    if (compraExistente) {
+      throw new BadRequestException('Esta compra ya fue registrada. No se puede duplicar.');
+    }
+
     return this.prisma.$transaction(async (tx) => {
       const lote = await tx.loteInv.create({
         data: {
           id_insumo: solicitud.id_insumo,
+          id_solicitud: idSolicitud,
           cant_inicial: solicitud.cantidad,
           cant_actual: solicitud.cantidad,
+          precio_total: new Decimal(0),
           fecha_venc: datosLote.fecha_vencimiento ? new Date(datosLote.fecha_vencimiento) : null,
           numero_lote: datosLote.numero_lote,
           proveedor: solicitud.proveedor,
@@ -315,7 +360,7 @@ export class InventarioService {
 
       await tx.solicitud.update({
         where: { id_solicitud: idSolicitud },
-        data: { estado_sol: 'Completada', updatedAt: new Date() }
+        data: { estado_sol: 'Aprobada', updatedAt: new Date() }
       });
 
       return lote;
@@ -342,10 +387,6 @@ export class InventarioService {
     });
   }
 
-  // ============================================================
-  // 📌 CONSUMO DE INSUMOS (CORREGIDO)
-  // ============================================================
-
   async registrarConsumo(datos: any) {
     if (!datos.id_insumo) {
       throw new BadRequestException('El id_insumo es obligatorio');
@@ -360,7 +401,6 @@ export class InventarioService {
       throw new BadRequestException('La actividad es obligatoria');
     }
 
-    // Verificar que el trabajador existe
     const trabajador = await this.prisma.trabajador.findUnique({
       where: { id_trabajador: datos.id_responsable }
     });
@@ -382,6 +422,9 @@ export class InventarioService {
     if (stockActual < cantidadAConsumir) {
       throw new BadRequestException(`Stock insuficiente. Disponible: ${stockActual} ${insumo.unidad_medida}`);
     }
+
+    const precioUnitario = datos.precio_unitario || 0;
+    const valorTotalGastado = cantidadAConsumir * precioUnitario;
 
     return this.prisma.$transaction(async (tx) => {
       let restante = cantidadAConsumir;
@@ -409,29 +452,12 @@ export class InventarioService {
           id_trabajador: datos.id_responsable,
           actividad: datos.actividad,
           cantidad: new Decimal(cantidadAConsumir),
+          valor_total: new Decimal(valorTotalGastado),
+          precio_unitario: new Decimal(precioUnitario),
           observaciones: datos.observaciones || '',
           fecha_consumo: new Date(datos.fecha_consumo || new Date())
         }
       });
-
-      // Auditoría desactivada temporalmente para evitar errores de foreign key
-      // try {
-      //   const admin = await this.prisma.persona.findFirst({
-      //     where: { rol: { nombre_rol: 'Administrador' } }
-      //   });
-      //   if (admin) {
-      //     await this.auditoria.registrar({
-      //       id_usuario: admin.id_persona,
-      //       accion: 'REGISTRO_CONSUMO',
-      //       descripcion: `Consumo de ${cantidadAConsumir} ${insumo.unidad_medida} de ${insumo.nombre_insumo} para actividad: ${datos.actividad} (Responsable: ${trabajador.nombre_completo})`,
-      //       entidad: 'ConsumoInsumo',
-      //       id_entidad: consumo.id_consumo,
-      //       rol: 'Administrador'
-      //     });
-      //   }
-      // } catch (err) {
-      //   console.error('Error en auditoría:', err);
-      // }
 
       return {
         mensaje: 'Consumo registrado exitosamente',
@@ -456,6 +482,8 @@ export class InventarioService {
       id_insumo: c.id_insumo,
       nombreInsumo: c.CatInsumos?.nombre_insumo,
       cantidad: c.cantidad,
+      valor_total: c.valor_total ? Number(c.valor_total) : 0,
+      precio_unitario: c.precio_unitario ? Number(c.precio_unitario) : 0,
       unidadMedida: c.CatInsumos?.unidad_medida,
       responsable: c.Trabajador?.nombre_completo,
       observaciones: c.observaciones
@@ -480,7 +508,7 @@ export class InventarioService {
           stock_actual: stock,
           stock_minimo: insumo.stock_minimo,
           unidad: insumo.unidad_medida,
-          critico: stock <= Number(insumo.stock_minimo)
+          critico: stock <= 20
         };
       })
       .filter(i => i.critico);
@@ -492,6 +520,7 @@ export class InventarioService {
       data: {
         actividad: datos.actividad,
         cantidad: datos.cantidad ? new Decimal(datos.cantidad) : undefined,
+        valor_total: datos.valor_total ? new Decimal(datos.valor_total) : undefined,
         observaciones: datos.observaciones,
         fecha_consumo: datos.fecha_consumo ? new Date(datos.fecha_consumo) : undefined
       }

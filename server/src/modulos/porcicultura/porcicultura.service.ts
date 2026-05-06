@@ -6,9 +6,6 @@ import { Decimal } from '@prisma/client/runtime/library';
 export class PorciculturaService {
     constructor(private prisma: PrismaService) {}
 
-    // ============================================================
-    // OBTENER ID DE ESPECIE PORCINO
-    // ============================================================
     private async obtenerIdEspeciePorcino() {
         let especie = await this.prisma.especie.findFirst({
             where: { nombre: { contains: 'Porcino', mode: 'insensitive' } }
@@ -29,9 +26,6 @@ export class PorciculturaService {
         return especie.id_especie;
     }
 
-    // ============================================================
-    // MÉTODOS AUXILIARES CORREGIDOS
-    // ============================================================
     private async obtenerOCrearEstado(nombreEstado: string = 'Activo') {
         let estado = await this.prisma.estadoAni.findFirst({
             where: { nombre: nombreEstado }
@@ -61,11 +55,11 @@ export class PorciculturaService {
     }
 
     // ============================================================
-    // LISTAR CERDOS
+    // LISTAR CERDOS (NORMALIZADO)
     // ============================================================
     async listarCerdos() {
         const idPorcino = await this.obtenerIdEspeciePorcino();
-        return this.prisma.animal.findMany({
+        const cerdos = await this.prisma.animal.findMany({
             where: { id_especie: idPorcino },
             include: {
                 estado: true,
@@ -73,6 +67,25 @@ export class PorciculturaService {
             },
             orderBy: { codigo_local: 'asc' }
         });
+
+        // Normalizar: convertir estado a string como en ganado
+        return cerdos.map(cerdo => ({
+            id_animal: cerdo.id_animal,
+            codigo_local: cerdo.codigo_local,
+            local: cerdo.codigo_local,
+            num_ica_chapeta: cerdo.num_ica_chapeta,
+            oficial: cerdo.num_ica_chapeta,
+            sexo: cerdo.sexo === 'M' ? 'MACHO' : 'HEMBRA',
+            raza: cerdo.raza,
+            fecha_nacimiento: cerdo.fecha_nacimiento,
+            peso_actual: cerdo.peso_actual,
+            origen: cerdo.origen,
+            estado: cerdo.estado?.nombre || 'Activo',
+            ubicacion: cerdo.ubicacion?.nombre_ubi || 'Sin ubicación',
+            foto_url: cerdo.foto_url,
+            createdAt: cerdo.createdAt,
+            updatedAt: cerdo.updatedAt
+        }));
     }
 
     // ============================================================
@@ -98,13 +111,37 @@ export class PorciculturaService {
             sexoChar = 'F';
         }
 
+        const estadoNombre = datos.salud || 'Activo';
+        let estado = await this.prisma.estadoAni.findFirst({
+            where: { nombre: estadoNombre }
+        });
+        
+        if (!estado) {
+            estado = await this.prisma.estadoAni.create({
+                data: { nombre: estadoNombre }
+            });
+            console.log(`✅ Estado "${estadoNombre}" creado con ID: ${estado.id_estado_ani}`);
+        }
+
+        const ubicacionNombre = datos.establo || 'Corral 1';
+        let ubicacion = await this.prisma.ubicacion.findFirst({
+            where: { nombre_ubi: ubicacionNombre }
+        });
+        
+        if (!ubicacion) {
+            ubicacion = await this.prisma.ubicacion.create({
+                data: { nombre_ubi: ubicacionNombre }
+            });
+            console.log(`✅ Ubicación "${ubicacionNombre}" creada con ID: ${ubicacion.id_ubicacion}`);
+        }
+
         const resultado = await this.prisma.animal.create({
             data: {
                 codigo_local: datos.local,
                 num_ica_chapeta: datos.oficial || null,
                 id_especie: idPorcino,
-                id_estado_ani: 1,
-                id_ubicacion: 1,
+                id_estado_ani: estado.id_estado_ani,
+                id_ubicacion: ubicacion.id_ubicacion,
                 sexo: sexoChar,
                 raza: datos.raza || 'Landrace',
                 fecha_nacimiento: datos.nacimiento ? new Date(datos.nacimiento) : new Date(datos.ingreso),
@@ -120,7 +157,7 @@ export class PorciculturaService {
     }
 
     // ============================================================
-    // ACTUALIZAR CERDO (VERSIÓN SIMPLIFICADA)
+    // ACTUALIZAR CERDO
     // ============================================================
     async actualizarCerdo(id: number, datos: any) {
         console.log('🔧 Actualizando cerdo ID:', id);
@@ -145,10 +182,12 @@ export class PorciculturaService {
         if (datos.nacimiento !== undefined) dataActualizar.fecha_nacimiento = new Date(datos.nacimiento);
         if (datos.peso !== undefined) dataActualizar.peso_actual = new Decimal(datos.peso);
         if (datos.origen !== undefined) dataActualizar.origen = datos.origen;
+        
         if (datos.establo !== undefined) {
             const ubicacion = await this.obtenerOCrearUbicacion(datos.establo);
             dataActualizar.id_ubicacion = ubicacion.id_ubicacion;
         }
+        
         if (datos.salud !== undefined) {
             const estado = await this.obtenerOCrearEstado(datos.salud);
             dataActualizar.id_estado_ani = estado.id_estado_ani;

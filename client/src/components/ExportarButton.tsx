@@ -173,7 +173,7 @@ export const ExportarButton = ({ datosFiltrados, targetId }: { datosFiltrados: a
                     <div className="bg-white border border-slate-100 rounded-xl p-4 overflow-hidden shadow-inner">
                         <table className="w-full text-[0.5rem] text-left border-collapse">
                             <thead>
-                                <tr className="border-b border-slate-50 text-slate-400 font-black italic">
+                                <tr className="border-b border-slate-50 text-slate-600 text-[10px] tracking-[1px] font-black italic">
                                     <th className="pb-2">FECHA</th>
                                     <th className="pb-2">CATEGORÍA</th>
                                     <th className="pb-2">CONCEPTO</th>
@@ -183,10 +183,10 @@ export const ExportarButton = ({ datosFiltrados, targetId }: { datosFiltrados: a
                             <tbody className="text-slate-600">
                                 {datosFiltrados.slice(0, 5).map((d, i) => (
                                     <tr key={i} className="border-b border-slate-50/50">
-                                        <td className="py-2">{d.fecha}</td>
-                                        <td className="py-2">{d.categoria}</td>
-                                        <td className="py-2">{d.concepto}</td>
-                                        <td className="py-2 font-bold text-slate-900">${d.valor}</td>
+                                        <td className="py-2 px-1 bg-gray-200 rounded-[4px]">{d.fecha}</td>
+                                        <td className="py-2 px-1 bg-gray-100 rounded-[4px]">{d.categoria}</td>
+                                        <td className="py-2 px-1 bg-gray-200 rounded-[4px]">{d.concepto}</td>
+                                        <td className="py-2 px-1 bg-gray-100 tracking-[1px] rounded-[4px] font-bold text-red-700">${d.valor}</td>
                                     </tr>
                                 ))}
                             </tbody>

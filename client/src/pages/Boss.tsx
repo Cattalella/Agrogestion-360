@@ -44,10 +44,12 @@ export const Boss = () => {
             cantidad1: data?.ganancias?.total_inversion || 0 
         },
         gastosPorSector: gastosPorSector,
+        // 🔧 AGREGADO: usa insumos_vencimiento para días y lista de alertas
+        // insumos_criticos sigue siendo el conteo (no se toca)
         insumosCriticos: {
-            dias: data?.supervision?.insumos_criticos || 0,
+            dias: data?.supervision?.insumos_vencimiento?.dias_proximos ?? 0,
             titulo: "Insumos Críticos",
-            lista: []
+            lista: data?.supervision?.insumos_vencimiento?.lista ?? [],
         },
         pagosTrabajadores: {
             titulo: `Pagado: ${formatearCOPcsv(data?.supervision?.pagos_trabajadores?.total_pagado || 0)}`,
@@ -71,7 +73,7 @@ export const Boss = () => {
             valor: formatearCOPcsv(sector?.valor || 0),
             notas: sector?.detalle || ""
         })) : []),
-        { fecha: new Date().toLocaleDateString(), categoria: "SUPERVISIÓN", concepto: "Insumos Críticos", valor: dashboard.insumosCriticos.dias.toString(), notas: "Insumos por debajo del mínimo" },
+        { fecha: new Date().toLocaleDateString(), categoria: "SUPERVISIÓN", concepto: "Insumos Críticos", valor: (data?.supervision?.insumos_criticos || 0).toString(), notas: "Insumos por debajo del mínimo" },
         { fecha: new Date().toLocaleDateString(), categoria: "SUPERVISIÓN", concepto: "Total Pagado a Trabajadores", valor: formatearCOPcsv(data?.supervision?.pagos_trabajadores?.total_pagado || 0), notas: "Pagos realizados en el período" },
         { fecha: new Date().toLocaleDateString(), categoria: "SUPERVISIÓN", concepto: "Trabajadores Activos", valor: dashboard.trabajadoresActivos.lista.length.toString(), notas: "Personal actualmente activo" },
     ];

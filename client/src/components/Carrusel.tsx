@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from "react";
 import { CircleFadingPlus, BrushCleaning, Plus, ImageOff, Heart } from "lucide-react";
 import { createClient } from '@supabase/supabase-js';
 
-// Inicializar Supabase (usando las mismas variables que en el backend)
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://xqxbqmalxinmqyjmrvmk.supabase.co';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhxeGJxbWFseGlubXF5am1ydm1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MjcyODEsImV4cCI6MjA5MTQwMzI4MX0.up2DjRg-wqDd9E5UWW-VBVIkheyHHUwLT0mXEpHlvac';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -13,7 +12,8 @@ export type FotoEvidencia = {
     fecha: string;
     like?: boolean;
     origen?: 'consumo' | 'trabajo' | 'general' | 'pago_firma';
-    idReferencia?: number;
+    // 🔧 CORREGIDO: nombre consistente con el backend y useEvidencias
+    id_referencia?: number;
 };
 
 interface SeccionEvidenciasProps {
@@ -24,18 +24,14 @@ interface SeccionEvidenciasProps {
     onBorrarTodo?: () => void;
     onBorrarUnaFoto?: (idABorrar: number) => void;
     onToggleLike?: (id: number) => void | Promise<void>;
-    // 🔧 FIX: onConfirmarPago ya NO debe cambiar el estado del pago.
-    // Solo se usa para registrar la asociación foto↔pago en el storage.
-    // El estado del pago cambia ÚNICAMENTE cuando el boss da like.
     onConfirmarPago?: (idPago: number) => void;
 }
 
-// Función para subir imagen a Supabase Storage
 const subirImagenASupabase = async (archivo: File): Promise<string> => {
     const extension = archivo.name.split('.').pop();
     const nombreArchivo = `evidencias/${Date.now()}-${Math.random().toString(36).substring(7)}.${extension}`;
 
-    const { data, error } = await supabase.storage
+    const { error } = await supabase.storage
         .from('evidencias')
         .upload(nombreArchivo, archivo, {
             cacheControl: '3600',
@@ -73,15 +69,10 @@ export const Carrusel = ({
     const [subiendo, setSubiendo] = useState(false);
     const [fotosLocal, setFotosLocal] = useState<FotoEvidencia[]>(fotos);
 
-    // Sincronizar fotosLocal cuando cambien las props
     useEffect(() => {
         setFotosLocal(fotos);
     }, [fotos]);
 
-    // 🔧 FIX: Solo mostrar pagos que están pendientes de firma, NO "No pagado".
-    // Cuando el admin sube una foto y la asocia a un pago, ese pago pasa a
-    // "Pendiente de firma" — eso lo gestiona el padre via onConfirmarPago.
-    // El estado "Pagado con firma" SOLO lo puede dar el boss con el like.
     const pagosDisponibles = pagosPendientes.filter(p =>
         p.estado_pago === 'No pagado' || p.estado_pago === 'Pendiente de firma'
     );
@@ -128,20 +119,18 @@ export const Carrusel = ({
 
     const handleConfirmarAsociacion = () => {
         if (pagoSeleccionadoId && tempFotoUrl) {
-            // 1. Registrar la foto en el carrusel con origen 'pago_firma' e idReferencia
-            //    El estado del pago NO cambia aquí — sigue como "Pendiente de firma"
+            // 🔧 CORREGIDO: usar id_referencia (no idReferencia)
             const evidencia: FotoEvidencia = {
                 id: Date.now(),
                 url: tempFotoUrl,
                 fecha: new Date().toLocaleDateString(),
                 origen: 'pago_firma',
-                idReferencia: pagoSeleccionadoId,
-                like: false  // 🔧 Siempre empieza sin like, el boss lo aprueba después
+                id_referencia: pagoSeleccionadoId,
+                like: false
             };
-            onSubirClick?.(evidencia);
 
-            // 2. Notificar al padre para que actualice el estado del pago a
-            //    "Pendiente de firma" (no a "Pagado con firma" — eso es del boss)
+            console.log('📤 [Carrusel] Foto asociada con id_referencia:', pagoSeleccionadoId);
+            onSubirClick?.(evidencia);
             onConfirmarPago?.(pagoSeleccionadoId);
 
             setMostrarSelectorPago(false);
@@ -159,13 +148,10 @@ export const Carrusel = ({
         setPagoSeleccionadoId(null);
     };
 
-    // Manejar like localmente (optimistic) + llamar al callback async
     const handleToggleLike = (id: number) => {
-        // Optimistic update en UI local
         setFotosLocal(prev => prev.map(foto =>
             foto.id === id ? { ...foto, like: !foto.like } : foto
         ));
-        // El callback hace la llamada al backend (puede ser async)
         onToggleLike?.(id);
     };
 
@@ -193,7 +179,6 @@ export const Carrusel = ({
                         <p className="text-xs text-gray-500 mb-1">
                             Selecciona a qué pago corresponde esta foto del formato firmado.
                         </p>
-                        {/* 🔧 Aclaración visual para el admin */}
                         <p className="text-[10px] text-amber-600 font-bold mb-4 bg-amber-50 px-3 py-1.5 rounded-full">
                             ⚠️ El pago quedará en "Pendiente de firma" hasta que el dueño apruebe la foto con ❤️
                         </p>
@@ -260,7 +245,6 @@ export const Carrusel = ({
                                     overflow-hidden shrink-0
                                     ${indiceActivo === index ? "flex-[6] opacity-100" : "flex-1 opacity-60 blur-[1px]"}
                                 `}
-                                title={rol === "boss" ? "Click para expandir" : ""}
                             >
                                 <img src={foto.url} className="absolute inset-0 w-full h-full object-cover" alt="evidencia" />
 
@@ -275,17 +259,17 @@ export const Carrusel = ({
                                         </button>
 
                                         {foto.like && (
-                                            <div className="absolute top-4 left-4 z-20 bg-white/90 text-red-500 px-3 py-1 rounded-full flex items-center justify-center shadow-lg gap-2" title="¡Aprobado por el dueño!">
+                                            <div className="absolute top-4 left-4 z-20 bg-white/90 text-red-500 px-3 py-1 rounded-full flex items-center justify-center shadow-lg gap-2">
                                                 <Heart size={16} fill="currentColor" />
                                                 <span className="text-xs font-bold text-gray-800">Aprobado</span>
                                             </div>
                                         )}
 
                                         {foto.origen === 'pago_firma' && (
-                                            <div className={`absolute bottom-4 left-4 z-20 px-2 py-1 rounded-full text-[8px] font-bold text-white ${foto.like ? 'bg-emerald-500/90' : 'bg-amber-500/90'}`}>
+                                            <div className={`absolute bottom-4 left-[40%] uppercase  z-20 px-2 py-1 rounded-full tracking-[2px] text-[13px] font-bold text-white ${foto.like ? 'bg-emerald-900' : 'bg-amber-500/90'}`}>
                                                 {foto.like
-                                                    ? `✅ Pagado con firma #${foto.idReferencia}`
-                                                    : `⏳ Pendiente firma #${foto.idReferencia}`
+                                                    ? `✅ Pagado con firma #${foto.id_referencia}`
+                                                    : `⏳ Pendiente firma #${foto.id_referencia}`
                                                 }
                                             </div>
                                         )}
@@ -297,21 +281,18 @@ export const Carrusel = ({
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            console.log('🖱️ Click en like para foto:', foto.id, '| origen:', foto.origen, '| idReferencia:', foto.idReferencia);
+                                            console.log('🖱️ Click en like para foto:', foto.id, '| origen:', foto.origen, '| id_referencia:', foto.id_referencia);
                                             handleToggleLike(foto.id);
                                         }}
                                         title={
                                             foto.origen === 'pago_firma'
-                                                ? foto.like
-                                                    ? "Quitar aprobación del pago"
-                                                    : "Aprobar pago con firma ❤️"
-                                                : foto.like
-                                                    ? "Quitar Me Gusta"
-                                                    : "Dar Me Gusta"
+                                                ? foto.like ? "Quitar aprobación del pago" : "Aprobar pago con firma ❤️"
+                                                : foto.like ? "Quitar Me Gusta" : "Dar Me Gusta"
                                         }
-                                        className={`absolute top-4 right-4 z-20 w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all cursor-pointer active:scale-95 hover:scale-105 ${foto.like
-                                            ? 'bg-white text-red-500 shadow-[0_0_15px_rgba(255,255,255,0.7)]'
-                                            : 'bg-black/40 text-white hover:bg-white/90 hover:text-red-500'
+                                        className={`absolute top-4 right-4 z-20 w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all cursor-pointer active:scale-95 hover:scale-105 ${
+                                            foto.like
+                                                ? 'bg-white text-red-500 shadow-[0_0_15px_rgba(255,255,255,0.7)]'
+                                                : 'bg-black/40 text-white hover:bg-white/90 hover:text-red-500'
                                         }`}
                                     >
                                         <Heart size={26} fill={foto.like ? "currentColor" : "none"} />
@@ -329,7 +310,7 @@ export const Carrusel = ({
                                     </p>
                                     {foto.origen === 'pago_firma' && (
                                         <p className="text-white/80 text-[10px] mt-1">
-                                            {foto.like ? '✅ Pago aprobado' : '⏳ Esperando aprobación del dueño'} #{foto.idReferencia}
+                                            {foto.like ? '✅ Pago aprobado' : '⏳ Esperando aprobación del dueño'} #{foto.id_referencia}
                                         </p>
                                     )}
                                 </div>
@@ -355,7 +336,7 @@ export const Carrusel = ({
                     {rol === "admin" && fotosLocal.length > 0 && (
                         <button
                             onClick={onBorrarTodo}
-                            className="bg-red-800 flex gap-3 items-center tracking-[2px] hover:bg-black text-white px-8 py-3 rounded-2xl font-black text-sm transition-all shadow-[0_3px_15px_rgba(255,0,0,0.5)] active:scale-95 cursor-pointer hover:scale-102 hover:shadow-[0_0px_10px_rgba(225,0,0,5)]"
+                            className="bg-red-800 flex gap-3 items-center tracking-[2px] hover:bg-black text-white px-8 py-3 rounded-2xl font-black text-sm transition-all shadow-[0_3px_15px_rgba(255,0,0,0.5)] active:scale-95 cursor-pointer hover:scale-102"
                         >
                             <BrushCleaning className="hover:rotate-4" /> <span> BORRAR TODO </span>
                         </button>
@@ -365,7 +346,7 @@ export const Carrusel = ({
                         <button
                             onClick={manejarSubidaFoto}
                             disabled={subiendo}
-                            className="group bg-green-800 flex gap-3 items-center tracking-[2px] hover:bg-black text-white px-8 py-3 rounded-2xl font-black text-sm transition-all shadow-[0_3px_15px_rgba(0,255,0,0.4)] active:scale-95 cursor-pointer hover:scale-102 hover:shadow-[0_0px_10px_rgba(0,255,0,1)] disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="group bg-green-800 flex gap-3 items-center tracking-[2px] hover:bg-black text-white px-8 py-3 rounded-2xl font-black text-sm transition-all shadow-[0_3px_15px_rgba(0,255,0,0.4)] active:scale-95 cursor-pointer hover:scale-102 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <CircleFadingPlus className="group-hover:rotate-90" />
                             <span> {subiendo ? "SUBIENDO..." : "NUEVA FOTO"} </span>
